@@ -393,6 +393,8 @@ def main(
     h_feats,
     MODEL,
     BATCH_SIZE=None,
+    nie="gcn",
+    nrl="concat",
 ):
     BATCH_SIZE = BATCH_SIZE or bss[dataset]
     graph, label, n_clusters = load_data(
@@ -413,6 +415,8 @@ def main(
 
     N_HOPS = n_hopss[dataset]
     params = {
+        "nie": nie,
+        "nrl": nrl,
         "lr": lrs[dataset],
         "h_feats": h_feats,
         "l2_coef": l2_coefs[dataset],
@@ -490,7 +494,7 @@ def main(
             "time": elapsed_time,
             "bs": BATCH_SIZE,
             "source": source,
-            "model": model._get_name(),
+            "model": MODEL,
         },
         csv_name=f"results_v{VERSION}.csv",
     )
@@ -538,6 +542,20 @@ if __name__ == "__main__":
         help="model",
     )
     parser.add_argument(
+        "-nie",
+        "--nie",
+        type=str,
+        default="gcn",
+        help="nie",
+    )
+    parser.add_argument(
+        "-nrl",
+        "--nrl",
+        type=str,
+        default="concat",
+        help="nrl",
+    )
+    parser.add_argument(
         "-v",
         "--version",
         type=float,
@@ -580,6 +598,8 @@ if __name__ == "__main__":
             ),
             MODEL=args.model,
             BATCH_SIZE=args.batch_size,
+            nie=args.nie,
+            nrl=args.nrl,
         )
     else:
         for source, datasets in DATASETS.items():
@@ -605,6 +625,8 @@ if __name__ == "__main__":
                         ),
                         MODEL=args.model,
                         BATCH_SIZE=args.batch_size,
+                        nie=args.nie,
+                        nrl=args.nrl,
                     )
                 except Exception as e:
                     traceback.print_exc()

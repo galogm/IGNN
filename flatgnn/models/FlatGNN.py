@@ -82,6 +82,8 @@ class FlatGNN(nn.Module):
         dropout2: float = 0.0,
         n_hops=6,
         n_intervals=3,
+        nie="deepsets",
+        nrl="concat",
     ) -> None:
         super().__init__()
         self.n_intervals = n_intervals
@@ -106,6 +108,8 @@ class FlatGNN(nn.Module):
             n_hops=n_hops,
             dropout=dropout,
             n_intervals=n_intervals,
+            nie=nie,
+            nrl=nrl,
         )
         self.set_gnn_1 = None
         # self.set_gnn_1 = FlatGNN_layer(
@@ -118,11 +122,16 @@ class FlatGNN(nn.Module):
         # )
 
         self.classifier = MLP(
-            in_feats=max(h_feats * (n_hops - n_intervals + 2), h_feats),
-            # in_feats=h_feats * (n_hops +1),
+            in_feats={
+                "multi-con": max(h_feats * (n_hops - n_intervals + 2), h_feats),
+                "concat": h_feats,
+                "max": h_feats,
+                "mean": h_feats,
+                "sum": h_feats,
+                "lstm": h_feats,
+            }[nrl],
             h_feats=[n_clusters],
             layers=1,
-            # acts=[nn.Softmax(dim=1)],
             acts=[nn.Identity()],
             dropout=self.dropout2,
         )

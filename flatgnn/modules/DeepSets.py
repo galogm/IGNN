@@ -59,12 +59,6 @@ class DeepSets(nn.Module):
             acts=[nn.ReLU()] * layers,
             dropout=dropout,
         )
-        # self.phi = MLP(
-        #     in_feats=in_feats,
-        #     h_feats=[h_feats],
-        #     layers=1,
-        #     acts=[nn.ReLU()],
-        # )
         self.rho = MLP(
             in_feats=h_feats,
             h_feats=[h_feats],
@@ -78,11 +72,4 @@ class DeepSets(nn.Module):
             h = self.phi(x)
             return self.rho(torch.mean(h, dim=1))
         h = self.phi(x)
-        return h
-        # return self.rho(
-        #     F.dropout(
-        #         h,
-        #         self.dropout,
-        #         training=self.training,
-        #     )
-        # )
+        return self.rho(h)
