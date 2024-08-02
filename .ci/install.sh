@@ -16,12 +16,12 @@ source .env/bin/activate
 # # update pip
 python3 -m pip install -U pip
 
-# # torch cuda 12.1
-# python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# # torch cuda 11.3
+python3 -m pip install "torch>=1.12,<2.2" torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+python3 -m pip install torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-2.1.2+cu121.html
 
 # # dgl cuda 12.1
-# python -m pip install "dgl>=1.1" -f https://data.dgl.ai/wheels/cu121/repo.html
-
+python3 -m pip install dgl==2.0 -f https://data.dgl.ai/wheels/cu121/repo.html
 
 # # install requirements
 python3 -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/
