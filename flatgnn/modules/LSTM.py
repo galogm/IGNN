@@ -27,11 +27,9 @@ class LSTM(nn.Module):
             dropout=dropout,
         )
 
-    def forward(self, x):
-        # x: (batch_size, seq_length, input_dim)
+    def forward(self, x, nfc=True):
         lstm_out, (h_n, c_n) = self.lstm(x)
-        # Take the last hidden state
-        return h_n[-1]
-        # out = self.fc(h_n[-1])
-        # # print(out.shape,lstm_out.shape,h_n.shape,x.shape)
-        # return out
+        if nfc:
+            return h_n[-1]
+        out = self.fc(h_n[-1])
+        return out

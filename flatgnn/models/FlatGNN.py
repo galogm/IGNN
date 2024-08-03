@@ -82,8 +82,9 @@ class FlatGNN(nn.Module):
         dropout2: float = 0.0,
         n_hops=6,
         n_intervals=3,
-        nie="deepsets",
+        nie="gcn",
         nrl="concat",
+        n_layers=1,
     ) -> None:
         super().__init__()
         self.n_intervals = n_intervals
@@ -102,7 +103,7 @@ class FlatGNN(nn.Module):
         self.device = device
         self.best_model = None
 
-        self.set_gnn = FlatGNN_layer(
+        self.flat_gnn = FlatGNN_layer(
             in_feats=in_feats,
             h_feats=h_feats,
             n_hops=n_hops,
@@ -111,19 +112,32 @@ class FlatGNN(nn.Module):
             nie=nie,
             nrl=nrl,
         )
-        self.set_gnn_1 = None
-        # self.set_gnn_1 = FlatGNN_layer(
-        #     in_feats=h_feats * (n_hops - n_intervals + 2),
-        #     h_feats=h_feats,
-        #     n_hops=n_hops,
-        #     dropout=dropout,
-        #     n_intervals=n_intervals,
-        #     no_save=True,
-        # )
+        hidden_dim = {
+            "multi-con": max(h_feats * (n_hops - n_intervals + 2), h_feats),
+            "concat": h_feats,
+            "max": h_feats,
+            "mean": h_feats,
+            "sum": h_feats,
+            "lstm": h_feats,
+        }[nrl]
+        self.flat_gnn_s = nn.ModuleList(
+            [
+                FlatGNN_layer(
+                    in_feats=hidden_dim,
+                    h_feats=h_feats,
+                    n_hops=n_hops,
+                    dropout=dropout,
+                    n_intervals=n_intervals,
+                    no_save=True,
+                    nie=nie,
+                    nrl=nrl,
+                ) for _ in range(n_layers - 1)
+            ]
+        )
 
         self.classifier = MLP(
             in_feats={
-                "multi-con": max(h_feats * (n_hops - n_intervals + 2), h_feats),
+                "multi-con": hidden_dim,
                 "concat": h_feats,
                 "max": h_feats,
                 "mean": h_feats,
@@ -131,7 +145,6 @@ class FlatGNN(nn.Module):
                 "lstm": h_feats,
             }[nrl],
             h_feats=[n_clusters],
-            layers=1,
             acts=[nn.Identity()],
             dropout=self.dropout2,
         )
@@ -150,13 +163,11 @@ class FlatGNN(nn.Module):
         graph=None,
         device=None,
     ):
-        z_set_gnn = self.set_gnn(graph=graph, device=device)
-        z_set_gnn = (
-            self.set_gnn_1(graph=graph, device=device, feats=torch.cat(z_set_gnn, dim=1))
-            if self.set_gnn_1 is not None else z_set_gnn
-        )
+        z_flat_gnn = self.flat_gnn(graph=graph, device=device)
+        for _, flat_gnn_s in enumerate(self.flat_gnn_s):
+            z_flat_gnn = flat_gnn_s(graph=graph, device=device, feats=torch.cat(z_flat_gnn, dim=1))
 
-        return torch.cat(z_set_gnn, dim=1)
+        return torch.cat(z_flat_gnn, dim=1)
 
     def validate(self, features, labels, train_mask, val_mask, test_mask, graph):
         self.train(False)

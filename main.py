@@ -65,33 +65,6 @@ l2_coefs = {
     "arxiv-year": 0.00005,
     "snap-patents": 0.00005,
 }
-normalize = {
-    "chameleon": False,
-    "squirrel": False,
-    "actor": False,
-    "pubmed": False,
-    "photo": False,
-    "wikics": False,
-    "roman-empire": False,
-    "amazon-ratings": False,
-    "flickr": False,
-    "blogcatalog": False,
-    "texas": True,
-    "cornell": True,
-    "cora": False,
-    "citeseer": False,
-    "wisconsin": True,
-    "minesweeper": True,
-    "tolokers": True,
-    "questions": True,
-    "Johns Hopkins55": True,
-    "Reed98": True,
-    "Amherst41": True,
-    "Cornell5": True,
-    "corafull": True,
-    "arxiv-year": True,
-    "snap-patents": True,
-}
 act = {
     "texas": nn.ReLU,
     "cornell": nn.ReLU,
@@ -174,14 +147,14 @@ lrs = {
     "snap-patents": 0.001,
 }
 ess = {
-    "texas": 30,
+    "texas": 100,
     "cornell": 100,
-    "wisconsin": 50,
+    "wisconsin": 100,
     # "chameleon": 30,
     "chameleon": 100,
     "squirrel": 200,
     "actor": 100,
-    "cora": 300,
+    "cora": 100,
     "citeseer": 200,
     "pubmed": 300,
     # "roman-empire": 300,
@@ -258,7 +231,6 @@ dropouts2 = {
 }
 n_hopss = {
     "chameleon": 8,
-    # "squirrel":7,
     "squirrel": 7,
     "actor": 1,
     "flickr": 2,
@@ -283,6 +255,61 @@ n_hopss = {
     "corafull": 4,
     "arxiv-year": 8,
     "snap-patents": 8,
+}
+n_layers = {
+    "chameleon": 1,
+    "squirrel": 1,
+    "actor": 1,
+    "flickr": 1,
+    "blogcatalog": 1,
+    "roman-empire": 3,
+    "amazon-ratings": 1,
+    "photo": 1,
+    "pubmed": 1,
+    "wikics": 1,
+    "cora": 1,
+    "citeseer": 1,
+    "texas": 1,
+    "cornell": 1,
+    "wisconsin": 1,
+    "minesweeper": 1,
+    "tolokers": 1,
+    "questions": 1,
+    "Johns Hopkins55": 1,
+    "Reed98": 1,
+    "Amherst41": 1,
+    "Cornell5": 1,
+    "corafull": 1,
+    "arxiv-year": 1,
+    "snap-patents": 1,
+}
+nrls = {
+    "chameleon": "lstm",
+    # "squirrel":7,
+    "squirrel": "concat",
+    "actor": "multi-con",
+    "flickr": "lstm",
+    "blogcatalog": "concat",
+    "roman-empire": "concat",
+    "amazon-ratings": "lstm",
+    "photo": "concat",
+    "pubmed": "concat",
+    "wikics": "max",
+    "cora": "concat",
+    "citeseer": "concat",
+    "texas": "concat",
+    "cornell": "concat",
+    "wisconsin": "concat",
+    "minesweeper": "concat",
+    "tolokers": "concat",
+    "questions": "concat",
+    "Johns Hopkins55": "concat",
+    "Reed98": "concat",
+    "Amherst41": "concat",
+    "Cornell5": "concat",
+    "corafull": "concat",
+    "arxiv-year": "concat",
+    "snap-patents": "concat",
 }
 n_intervalss = {
     "chameleon": 2,
@@ -393,15 +420,15 @@ def main(
     h_feats,
     MODEL,
     BATCH_SIZE=None,
-    nie="gcn",
-    nrl="concat",
+    nie=None,
+    nrl=None,
 ):
     BATCH_SIZE = BATCH_SIZE or bss[dataset]
     graph, label, n_clusters = load_data(
         dataset_name=dataset,
         directory=DATA.DATA_DIR,
         source=source,
-        raw_normalize=normalize[dataset],
+        raw_normalize=False,
         rm_self_loop=True,
         add_self_loop=False,
         to_simple=True,
@@ -416,7 +443,7 @@ def main(
     N_HOPS = n_hopss[dataset]
     params = {
         "nie": nie,
-        "nrl": nrl,
+        "nrl": nrl or nrls[dataset],
         "lr": lrs[dataset],
         "h_feats": h_feats,
         "l2_coef": l2_coefs[dataset],
@@ -424,6 +451,7 @@ def main(
         "dropout2": dropouts2[dataset],
         "n_epochs": 2000,
         "n_hops": N_HOPS,
+        "n_layers": n_layers[dataset],
         "early_stop": ess[dataset],
         "n_intervals": min(n_intervalss[dataset], N_HOPS + 1),
     }
@@ -579,22 +607,20 @@ if __name__ == "__main__":
 
     args.batch_size = args.batch_size or None
 
+    DIM_BOUND = {
+        "pubmed": 500,
+        "roman-empire": 300,
+        "amazon-ratings": 300,
+        "wikics": 300,
+    }
+
     if args.dataset != "all":
         main(
             dataset=args.dataset,
             source=args.source,
             h_feats=(
-                {
-                    "pubmed": 500,
-                    "roman-empire": 300,
-                    "amazon-ratings": 300,
-                    "wikics": 300,
-                }[args.dataset] if args.dataset in [
-                    "pubmed",
-                    "roman-empire",
-                    "amazon-ratings",
-                    "wikics",
-                ] and args.h_feats > 500 else args.h_feats
+                DIM_BOUND[args.dataset] if args.dataset in DIM_BOUND.keys() and
+                args.h_feats > DIM_BOUND[args.dataset] else args.h_feats
             ),
             MODEL=args.model,
             BATCH_SIZE=args.batch_size,
@@ -611,17 +637,8 @@ if __name__ == "__main__":
                         dataset=dataset,
                         source=source,
                         h_feats=(
-                            {
-                                "pubmed": 500,
-                                "roman-empire": 300,
-                                "amazon-ratings": 300,
-                                "wikics": 300,
-                            }[dataset] if dataset in [
-                                "pubmed",
-                                "roman-empire",
-                                "amazon-ratings",
-                                "wikics",
-                            ] and args.h_feats > 500 else args.h_feats
+                            DIM_BOUND[dataset] if dataset in DIM_BOUND.keys() and
+                            args.h_feats > DIM_BOUND[args.dataset] else args.h_feats
                         ),
                         MODEL=args.model,
                         BATCH_SIZE=args.batch_size,
