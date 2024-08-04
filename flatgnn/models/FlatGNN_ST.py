@@ -104,14 +104,23 @@ class FlatGNN(nn.Module):
         self.device = device
         self.best_model = None
 
-        self.flat_gnn = FlatGNN_layer(
+        hidden_shared = min(max(in_feats // 2, h_feats * 2), in_feats)
+        self.shared_transform = MLP(
             in_feats=in_feats,
+            h_feats=[hidden_shared],
+            acts=[nn.ReLU()],
+            dropout=dropout,
+        )
+
+        self.flat_gnn = FlatGNN_layer(
+            in_feats=hidden_shared,
             h_feats=h_feats,
             n_hops=n_hops,
             dropout=dropout,
             n_intervals=n_intervals,
             nie=nie,
             nrl=nrl,
+            no_save=True,
         )
         hidden_dim = {
             "multi-con": max(h_feats * (n_hops - n_intervals + 2), h_feats),
@@ -122,17 +131,19 @@ class FlatGNN(nn.Module):
             "lstm": h_feats,
         }[nrl]
         self.flat_gnn_s = nn.ModuleList(
-            FlatGNN_layer(
-                in_feats=hidden_dim,
-                h_feats=h_feats,
-                n_hops=n_hops,
-                dropout=dropout,
-                n_intervals=n_intervals,
-                no_save=True,
-                nie=nie,
-                nrl=nrl,
-            )
-            for _ in range(n_layers - 1)
+            [
+                FlatGNN_layer(
+                    in_feats=hidden_dim,
+                    h_feats=h_feats,
+                    n_hops=n_hops,
+                    dropout=dropout,
+                    n_intervals=n_intervals,
+                    no_save=True,
+                    nie=nie,
+                    nrl=nrl,
+                )
+                for _ in range(n_layers - 1)
+            ]
         )
 
         self.classifier = MLP(
@@ -163,7 +174,8 @@ class FlatGNN(nn.Module):
         graph=None,
         device=None,
     ):
-        z_flat_gnn = self.flat_gnn(graph=graph, device=device)
+        z = self.shared_transform(features.to(device))
+        z_flat_gnn = self.flat_gnn(graph=graph, device=device, feats=z)
         for _, flat_gnn_s in enumerate(self.flat_gnn_s):
             z_flat_gnn = flat_gnn_s(graph=graph, device=device, feats=torch.cat(z_flat_gnn, dim=1))
 

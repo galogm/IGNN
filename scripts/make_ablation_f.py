@@ -2,16 +2,13 @@ from the_utils import csv_to_table
 
 ROW_ORDER = [
     "FlatGNN-gcn-concat",
-    "FlatGNN-gcn-multi-con",
-    "FlatGNN-gcn-sum",
-    "FlatGNN-gcn-sum-fc",
-    "FlatGNN-gcn-max",
-    "FlatGNN-gcn-max-fc",
+    "FlatGNN-gcn-lstm",
     "FlatGNN-gcn-mean",
-    "FlatGNN-gcn-mean-fc",
-    "FlatGNN-gcn-lstm-nfc",
-    "FlatGNN-gcn-lstm-fc",
+    "FlatGNN-gcn-sum",
+    "FlatGNN-gcn-max",
+    "FlatGNN-gcn-multi-con",
 ]
+
 COL_ORDER = [
     "actor",
     "blogcatalog",
@@ -26,7 +23,7 @@ COL_ORDER = [
 ]
 
 df = csv_to_table(
-    raw_path="results/results_v99.0.csv",
+    raw_path="results/results_v99.3.csv",
     save_path="results/ablation-f.csv",
     row_key="model",
     col_key="dataset",

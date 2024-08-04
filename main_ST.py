@@ -18,7 +18,7 @@ from torch import nn
 torch.set_printoptions(threshold=10_000)
 np.set_printoptions(threshold=10_000)
 
-from flatgnn.models import FlatGNN
+from flatgnn.models.FlatGNN_ST import FlatGNN
 from flatgnn.modules import Data
 from flatgnn.utils import get_splits_mask
 from flatgnn.utils import read_configs
@@ -64,6 +64,33 @@ l2_coefs = {
     "photo": 0.00005,
     "arxiv-year": 0.00005,
     "snap-patents": 0.00005,
+}
+act = {
+    "texas": nn.ReLU,
+    "cornell": nn.ReLU,
+    "wisconsin": nn.ReLU,
+    "chameleon": nn.ReLU,
+    "squirrel": nn.ReLU,
+    "actor": nn.ReLU,
+    "cora": nn.ReLU,
+    "citeseer": nn.ReLU,
+    "pubmed": nn.ReLU,
+    "roman-empire": nn.ReLU,
+    "amazon-ratings": nn.ReLU,
+    "minesweeper": nn.ReLU,
+    "tolokers": nn.ReLU,
+    "questions": nn.ReLU,
+    "flickr": nn.ReLU,
+    "blogcatalog": nn.ReLU,
+    "Johns Hopkins55": nn.ReLU,
+    "Reed98": nn.ReLU,
+    "Amherst41": nn.ReLU,
+    "Cornell5": nn.ReLU,
+    "corafull": nn.ReLU,
+    "wikics": nn.ReLU,
+    "photo": nn.ReLU,
+    "arxiv-year": nn.ReLU,
+    "snap-patents": nn.ReLU,
 }
 bss = {
     "texas": 1024,
@@ -258,6 +285,7 @@ n_layers = {
 }
 nrls = {
     "chameleon": "lstm",
+    # "squirrel":7,
     "squirrel": "concat",
     "actor": "concat",
     "flickr": "lstm",
@@ -284,7 +312,7 @@ nrls = {
     "snap-patents": "concat",
 }
 n_intervalss = {
-    "chameleon": 3,
+    "chameleon": 2,
     "squirrel": 3,
     "actor": 3,
     "flickr": 3,
@@ -315,38 +343,40 @@ TRAIN_RATIO = 48
 VALID_RATIOS = 32
 
 DATASETS = {
-    "critical": [
-        # 890
-        "chameleon",
-        # 2,223
-        "squirrel",
-        # # 10,000
-        # "minesweeper",
-        # # 11,758
-        # "tolokers",
-        # # 22,662
-        # "roman-empire",
-        # # 24,492
-        # "amazon-ratings",
-        # 48,921
-        # "questions",
-    ],
+    "critical":
+        [
+            # 890
+            "chameleon",
+            # 2,223
+            "squirrel",
+            # # 10,000
+            # "minesweeper",
+            # # 11,758
+            # "tolokers",
+            # # 22,662
+            # "roman-empire",
+            # # 24,492
+            # "amazon-ratings",
+            # 48,921
+            # "questions",
+        ],
     "cola": [
         "flickr",
         "blogcatalog",
     ],
-    "pyg": [
-        # "texas",
-        # "cornell",
-        # "wisconsin",
-        # "corafull",
-        # "cora",
-        # "citeseer",
-        "photo",
-        "actor",
-        "pubmed",
-        "wikics",
-    ],
+    "pyg":
+        [
+            # "texas",
+            # "cornell",
+            # "wisconsin",
+            # "corafull",
+            # "cora",
+            # "citeseer",
+            "photo",
+            "actor",
+            "pubmed",
+            "wikics",
+        ],
     "Critical": [
         # 22,662
         "roman-empire",
@@ -392,7 +422,6 @@ def main(
     BATCH_SIZE=None,
     nie=None,
     nrl=None,
-    n_hops=None,
 ):
     BATCH_SIZE = BATCH_SIZE or bss[dataset]
     graph, label, n_clusters = load_data(
@@ -411,7 +440,7 @@ def main(
     # if dataset in ("cora", "pubmed"):
     #     graph.ndata["feat"][(graph.ndata["feat"] - 0.0) > 0.0] = 1.0
 
-    N_HOPS = n_hops or n_hopss[dataset]
+    N_HOPS = n_hopss[dataset]
     params = {
         "nie": nie,
         "nrl": nrl or nrls[dataset],
@@ -551,7 +580,7 @@ if __name__ == "__main__":
         "-nrl",
         "--nrl",
         type=str,
-        default=None,
+        default="concat",
         help="nrl",
     )
     parser.add_argument(
@@ -567,13 +596,6 @@ if __name__ == "__main__":
         type=int,
         default=None,
         help="batch size",
-    )
-    parser.add_argument(
-        "-hops",
-        "--n_hops",
-        type=int,
-        default=None,
-        help="n_hops",
     )
     args = parser.parse_args()
 
@@ -597,15 +619,13 @@ if __name__ == "__main__":
             dataset=args.dataset,
             source=args.source,
             h_feats=(
-                DIM_BOUND[args.dataset]
-                if args.dataset in DIM_BOUND.keys() and args.h_feats > DIM_BOUND[args.dataset]
-                else args.h_feats
+                DIM_BOUND[args.dataset] if args.dataset in DIM_BOUND.keys() and
+                args.h_feats > DIM_BOUND[args.dataset] else args.h_feats
             ),
             MODEL=args.model,
             BATCH_SIZE=args.batch_size,
             nie=args.nie,
             nrl=args.nrl,
-            n_hops=args.n_hops,
         )
     else:
         for source, datasets in DATASETS.items():
@@ -617,15 +637,13 @@ if __name__ == "__main__":
                         dataset=dataset,
                         source=source,
                         h_feats=(
-                            DIM_BOUND[dataset]
-                            if dataset in DIM_BOUND.keys() and args.h_feats > DIM_BOUND[dataset]
-                            else args.h_feats
+                            DIM_BOUND[dataset] if dataset in DIM_BOUND.keys() and
+                            args.h_feats > DIM_BOUND[args.dataset] else args.h_feats
                         ),
                         MODEL=args.model,
                         BATCH_SIZE=args.batch_size,
                         nie=args.nie,
                         nrl=args.nrl,
-                        n_hops=args.n_hops,
                     )
                 except Exception as e:
                     traceback.print_exc()

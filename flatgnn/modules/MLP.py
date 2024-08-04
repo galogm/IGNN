@@ -13,6 +13,7 @@ from torch import nn
 
 class MLP(nn.Module):
     """MLP"""
+
     def __init__(
         self,
         in_feats: int,

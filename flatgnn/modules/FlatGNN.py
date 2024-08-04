@@ -42,6 +42,7 @@ from .MLP import MLP
 
 class FlatGNN(nn.Module):
     """FlatGNN."""
+
     def __init__(
         self,
         in_feats,
@@ -63,24 +64,22 @@ class FlatGNN(nn.Module):
         N_NIE = self.n_hops + 1
         if nie == "deepsets":
             self.nei_ind_emb = nn.ModuleList(
-                [
-                    DeepSets(
-                        in_feats=in_feats,
-                        h_feats=h_feats,
-                        dropout=dropout,
-                    ) for _ in range(N_NIE)
-                ]
+                DeepSets(
+                    in_feats=in_feats,
+                    h_feats=h_feats,
+                    dropout=dropout,
+                )
+                for _ in range(N_NIE)
             )
         elif nie == "gcn":
             self.nei_ind_emb = nn.ModuleList(
-                [
-                    MLP(
-                        in_feats=in_feats,
-                        h_feats=[h_feats],
-                        acts=[nn.ReLU()],
-                        dropout=dropout,
-                    ) for _ in range(N_NIE)
-                ]
+                MLP(
+                    in_feats=in_feats,
+                    h_feats=[h_feats],
+                    acts=[nn.ReLU()],
+                    dropout=dropout,
+                )
+                for _ in range(N_NIE)
             )
 
         self.nei_feats = None
@@ -109,7 +108,8 @@ class FlatGNN(nn.Module):
                         layers=1,
                         acts=[nn.ReLU()],
                         dropout=dropout,
-                    ) for _ in range(self.n_relations + 1)
+                    )
+                    for _ in range(self.n_relations + 1)
                 ]
             )
         elif nrl in ["max", "sum", "mean"]:
@@ -163,7 +163,7 @@ class FlatGNN(nn.Module):
                 n_hops=self.n_hops,
                 set_diag=True,
                 remove_diag=False,
-                symm_norm=True,
+                symm_norm={"gcn": True, "deepsets": False}[self.nie],
                 device=device,
             )
         elif self.no_save == True:
@@ -173,14 +173,16 @@ class FlatGNN(nn.Module):
                         row=adj.row.long(),
                         col=adj.col.long(),
                         sparse_sizes=adj.shape,
-                    ) if self.adj is None else self.adj
+                    )
+                    if self.adj is None
+                    else self.adj
                 ),
                 features=features,
                 name=graph.name,
                 n_hops=self.n_hops,
                 set_diag=True,
                 remove_diag=False,
-                symm_norm=True,
+                symm_norm={"gcn": True, "deepsets": False}[self.nie],
                 device=device,
                 no_save=True,
                 return_adj=True,
@@ -207,26 +209,43 @@ class FlatGNN(nn.Module):
                 torch.cat(
                     [
                         self.nei_rel_learn[i](
-                            hops_feats[:, self.h_feats * i:self.h_feats * (i + self.interval)]
-                        ) for i in range(self.n_relations + 1)
+                            hops_feats[:, self.h_feats * i : self.h_feats * (i + self.interval)]
+                        )
+                        for i in range(self.n_relations + 1)
                     ],
                     dim=1,
                 )
             ]
         if self.nrl == "max":
-            return [self.nei_rel_learn[0](torch.max(
-                torch.stack(self.ns, dim=1),
-                dim=1,
-            )[0])]
+            return [
+                self.nei_rel_learn[0](
+                    torch.max(
+                        torch.stack(self.ns, dim=1),
+                        dim=1,
+                    )[0]
+                )
+            ]
         if self.nrl == "mean":
-            return [self.nei_rel_learn[0](torch.mean(
-                torch.stack(self.ns, dim=1),
-                dim=1,
-            ))]
+            return [
+                self.nei_rel_learn[0](
+                    torch.mean(
+                        torch.stack(self.ns, dim=1),
+                        dim=1,
+                    )
+                )
+            ]
         if self.nrl == "sum":
-            return [self.nei_rel_learn[0](torch.sum(
-                torch.stack(self.ns, dim=1),
-                dim=1,
-            ))]
+            return [
+                self.nei_rel_learn[0](
+                    torch.sum(
+                        torch.stack(self.ns, dim=1),
+                        dim=1,
+                    )
+                )
+            ]
         if self.nrl == "lstm":
-            return [self.nei_rel_learn[0](torch.stack(self.ns, dim=1), )]
+            return [
+                self.nei_rel_learn[0](
+                    torch.stack(self.ns, dim=1),
+                )
+            ]
