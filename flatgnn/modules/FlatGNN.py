@@ -33,6 +33,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch_sparse import fill_diag
 from torch_sparse import SparseTensor
 from tqdm import tqdm
+from dgl.nn.pytorch import GraphConv
 
 from ..utils import preprocess_neighborhoods
 from .DeepSets import DeepSets
@@ -71,7 +72,7 @@ class FlatGNN(nn.Module):
                 )
                 for _ in range(N_NIE)
             )
-        elif nie == "gcn":
+        elif nie == "gcn-nie-nst":
             self.nei_ind_emb = nn.ModuleList(
                 MLP(
                     in_feats=in_feats,
@@ -80,6 +81,52 @@ class FlatGNN(nn.Module):
                     dropout=dropout,
                 )
                 for _ in range(N_NIE)
+            )
+        elif nie == "gcn-nie-st":
+            self.nei_ind_emb = nn.ModuleList(
+                MLP(
+                    in_feats=in_feats if i == 0 else h_feats,
+                    h_feats=[h_feats],
+                    acts=[nn.ReLU()],
+                    dropout=dropout,
+                )
+                for i in range(N_NIE)
+            )
+        elif nie == "gcn-nnie-nst":
+            self.nei_ind_emb = nn.ModuleList(
+                (
+                    GraphConv(
+                        in_feats=in_feats if i == 1 else h_feats,
+                        out_feats=h_feats,
+                        activation=nn.ReLU(),
+                    )
+                    if i != 0
+                    else MLP(
+                        in_feats=in_feats,
+                        h_feats=[h_feats],
+                        acts=[nn.ReLU()],
+                        dropout=dropout,
+                    )
+                )
+                for i in range(N_NIE)
+            )
+        elif nie == "gcn-nnie-st":
+            self.nei_ind_emb = nn.ModuleList(
+                (
+                    GraphConv(
+                        in_feats=h_feats,
+                        out_feats=h_feats,
+                        activation=nn.ReLU(),
+                    )
+                    if i != 0
+                    else MLP(
+                        in_feats=in_feats,
+                        h_feats=[h_feats],
+                        acts=[nn.ReLU()],
+                        dropout=dropout,
+                    )
+                )
+                for i in range(N_NIE)
             )
 
         self.nei_feats = None
@@ -151,22 +198,22 @@ class FlatGNN(nn.Module):
         self.ns = []
         adj = graph.adj()
         features = graph.ndata["feat"] if feats is None else feats
-        if self.nei_feats is None and self.no_save == False:
-            self.nei_feats = preprocess_neighborhoods(
-                adj=SparseTensor(
-                    row=adj.row.long(),
-                    col=adj.col.long(),
-                    sparse_sizes=adj.shape,
-                ),
-                features=features,
-                name=graph.name,
-                n_hops=self.n_hops,
-                set_diag=True,
-                remove_diag=False,
-                symm_norm={"gcn": True, "deepsets": False}[self.nie],
-                device=device,
-            )
-        elif self.no_save == True:
+
+        if self.nie == "gcn-nnie-nst":
+            h = features.to(device)
+            self.ns.append(self.nei_ind_emb[0](h))
+            for i in range(1, self.n_hops + 1):
+                h = self.nei_ind_emb[i](graph=graph.to(device), feat=h)
+                self.ns.append(h)
+        elif self.nie == "gcn-nnie-st":
+            h = self.nei_ind_emb[0](features.to(device))
+            self.ns.append(h)
+            for i in range(1, self.n_hops + 1):
+                h = self.nei_ind_emb[i](graph=graph.to(device), feat=h)
+                self.ns.append(h)
+        elif self.nie == "gcn-nie-st":
+            h = self.nei_ind_emb[0](features.to(device))
+            self.ns.append(h)
             self.nei_feats, self.adj = preprocess_neighborhoods(
                 adj=(
                     SparseTensor(
@@ -177,25 +224,76 @@ class FlatGNN(nn.Module):
                     if self.adj is None
                     else self.adj
                 ),
-                features=features,
+                features=h,
                 name=graph.name,
                 n_hops=self.n_hops,
                 set_diag=True,
                 remove_diag=False,
-                symm_norm={"gcn": True, "deepsets": False}[self.nie],
+                symm_norm={
+                    "gcn-nie-nst": True,
+                    "deepsets": False,
+                    "gcn-nie-st": True,
+                }[self.nie],
                 device=device,
                 no_save=True,
                 return_adj=True,
                 process_adj=False if self.adj is not None else True,
             )
-
-        for i in range(self.n_hops + 1):
-            self.ns.append(self.nei_ind_emb[i](self.nei_feats[i]))
+            for i in range(1, self.n_hops + 1):
+                self.ns.append(self.nei_ind_emb[i](self.nei_feats[i]))
+        elif self.nie == "gcn-nie-nst":
+            if self.nei_feats is None and self.no_save == False:
+                self.nei_feats = preprocess_neighborhoods(
+                    adj=SparseTensor(
+                        row=adj.row.long(),
+                        col=adj.col.long(),
+                        sparse_sizes=adj.shape,
+                    ),
+                    features=features,
+                    name=graph.name,
+                    n_hops=self.n_hops,
+                    set_diag=True,
+                    remove_diag=False,
+                    symm_norm={
+                        "gcn": True,
+                        "deepsets": False,
+                        "gcn-nie-nst": True,
+                    }[self.nie],
+                    device=device,
+                )
+            elif self.no_save == True:
+                self.nei_feats, self.adj = preprocess_neighborhoods(
+                    adj=(
+                        SparseTensor(
+                            row=adj.row.long(),
+                            col=adj.col.long(),
+                            sparse_sizes=adj.shape,
+                        )
+                        if self.adj is None
+                        else self.adj
+                    ),
+                    features=features,
+                    name=graph.name,
+                    n_hops=self.n_hops,
+                    set_diag=True,
+                    remove_diag=False,
+                    symm_norm={
+                        "gcn-nie-nst": True,
+                        "deepsets": False,
+                        "gcn-nie-nst": True,
+                    }[self.nie],
+                    device=device,
+                    no_save=True,
+                    return_adj=True,
+                    process_adj=False if self.adj is not None else True,
+                )
+            for i in range(self.n_hops + 1):
+                self.ns.append(self.nei_ind_emb[i](self.nei_feats[i]))
 
         hops_feats = torch.cat(self.ns, dim=1)
 
         if self.nrl == "none":
-            return [hops_feats]
+            return [self.ns[-1]]
 
         if self.nrl == "concat":
             return [

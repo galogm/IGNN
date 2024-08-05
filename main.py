@@ -320,68 +320,81 @@ DATASETS = {
         "chameleon",
         # 2,223
         "squirrel",
-        # # 10,000
-        # "minesweeper",
-        # # 11,758
-        # "tolokers",
-        # # 22,662
-        # "roman-empire",
-        # # 24,492
-        # "amazon-ratings",
-        # 48,921
-        # "questions",
-    ],
-    "cola": [
-        "flickr",
-        "blogcatalog",
     ],
     "pyg": [
-        # "texas",
-        # "cornell",
-        # "wisconsin",
-        # "corafull",
-        # "cora",
-        # "citeseer",
-        "photo",
         "actor",
         "pubmed",
-        "wikics",
     ],
-    "Critical": [
-        # 22,662
-        "roman-empire",
-        # 24,492
-        "amazon-ratings",
-        # 48,921
-        # "questions",
-    ],
-    # "linkx": [
-    #     # (array([0, 1, 2]), array([ 97, 504, 361]))
-    #     # 962
-    #     # "Reed98",
-    #     # # array([0, 1, 2]), array([ 418, 2153, 2609]
-    #     # # 5,180
-    #     # "Johns Hopkins55",
-    #     # # (array([0, 1, 2]), array([ 203, 1015, 1017]))
-    #     # # 2,235
-    #     # "Amherst41",
-    #     # # (array([0, 1, 2]), array([1838, 8135, 8687]))
-    #     # # 18,660
-    #     # "Cornell5",
-    #     # # 41,554
-    #     # "Penn94",
-    #     # # 168,114
-    #     # "twitch-gamers",
-    #     # 169,343
-    #     "arxiv-year",
-    #     # 421,961
-    #     # "genius",
-    #     # # 1,632,803
-    #     # "pokec",
-    #     # 2,923,922
-    #     "snap-patents",
-    # ],
 }
+
+# DATASETS = {
+#     "critical": [
+#         # 890
+#         "chameleon",
+#         # 2,223
+#         "squirrel",
+#         # # 10,000
+#         # "minesweeper",
+#         # # 11,758
+#         # "tolokers",
+#         # # 22,662
+#         # "roman-empire",
+#         # # 24,492
+#         # "amazon-ratings",
+#         # 48,921
+#         # "questions",
+#     ],
+#     "cola": [
+#         "flickr",
+#         "blogcatalog",
+#     ],
+#     "pyg": [
+#         # "texas",
+#         # "cornell",
+#         # "wisconsin",
+#         # "corafull",
+#         # "cora",
+#         # "citeseer",
+#         "photo",
+#         "actor",
+#         "pubmed",
+#         "wikics",
+#     ],
+#     "Critical": [
+#         # 22,662
+#         "roman-empire",
+#         # 24,492
+#         "amazon-ratings",
+#         # 48,921
+#         # "questions",
+#     ],
+#     # "linkx": [
+#     #     # (array([0, 1, 2]), array([ 97, 504, 361]))
+#     #     # 962
+#     #     # "Reed98",
+#     #     # # array([0, 1, 2]), array([ 418, 2153, 2609]
+#     #     # # 5,180
+#     #     # "Johns Hopkins55",
+#     #     # # (array([0, 1, 2]), array([ 203, 1015, 1017]))
+#     #     # # 2,235
+#     #     # "Amherst41",
+#     #     # # (array([0, 1, 2]), array([1838, 8135, 8687]))
+#     #     # # 18,660
+#     #     # "Cornell5",
+#     #     # # 41,554
+#     #     # "Penn94",
+#     #     # # 168,114
+#     #     # "twitch-gamers",
+#     #     # 169,343
+#     #     "arxiv-year",
+#     #     # 421,961
+#     #     # "genius",
+#     #     # # 1,632,803
+#     #     # "pokec",
+#     #     # 2,923,922
+#     #     "snap-patents",
+#     # ],
+# }
 
 
 def main(
@@ -411,10 +424,10 @@ def main(
     # if dataset in ("cora", "pubmed"):
     #     graph.ndata["feat"][(graph.ndata["feat"] - 0.0) > 0.0] = 1.0
 
-    N_HOPS = n_hops or n_hopss[dataset]
+    N_HOPS = n_hops if n_hops is not None else n_hopss[dataset]
     params = {
         "nie": nie,
-        "nrl": nrl or nrls[dataset],
+        "nrl": nrl if nrl is not None else  nrls[dataset],
         "lr": lrs[dataset],
         "h_feats": h_feats,
         "l2_coef": l2_coefs[dataset],
@@ -537,14 +550,14 @@ if __name__ == "__main__":
         "-m",
         "--model",
         type=str,
-        default="MoE",
+        default="gcn-nie-nst",
         help="model",
     )
     parser.add_argument(
         "-nie",
         "--nie",
         type=str,
-        default="gcn",
+        default="gcn-nie-nst",
         help="nie",
     )
     parser.add_argument(

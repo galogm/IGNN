@@ -120,6 +120,7 @@ class FlatGNN(nn.Module):
             "mean": h_feats,
             "sum": h_feats,
             "lstm": h_feats,
+            "none": h_feats,
         }[nrl]
         self.flat_gnn_s = nn.ModuleList(
             FlatGNN_layer(
@@ -143,6 +144,7 @@ class FlatGNN(nn.Module):
                 "mean": h_feats,
                 "sum": h_feats,
                 "lstm": h_feats,
+                "none": h_feats,
             }[nrl],
             h_feats=[n_clusters],
             acts=[nn.Identity()],
