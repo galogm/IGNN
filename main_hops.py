@@ -18,7 +18,7 @@ from torch import nn
 torch.set_printoptions(threshold=10_000)
 np.set_printoptions(threshold=10_000)
 
-from flatgnn.models.FlatGNN_ST import FlatGNN
+from flatgnn.models import FlatGNN
 from flatgnn.modules import Data
 from flatgnn.utils import get_splits_mask
 from flatgnn.utils import read_configs
@@ -33,6 +33,7 @@ from the_utils import (
     make_parent_dirs,
 )
 
+import networkx as nx
 import time
 
 from sklearn.metrics import accuracy_score as ACC
@@ -64,33 +65,6 @@ l2_coefs = {
     "photo": 0.00005,
     "arxiv-year": 0.00005,
     "snap-patents": 0.00005,
-}
-act = {
-    "texas": nn.ReLU,
-    "cornell": nn.ReLU,
-    "wisconsin": nn.ReLU,
-    "chameleon": nn.ReLU,
-    "squirrel": nn.ReLU,
-    "actor": nn.ReLU,
-    "cora": nn.ReLU,
-    "citeseer": nn.ReLU,
-    "pubmed": nn.ReLU,
-    "roman-empire": nn.ReLU,
-    "amazon-ratings": nn.ReLU,
-    "minesweeper": nn.ReLU,
-    "tolokers": nn.ReLU,
-    "questions": nn.ReLU,
-    "flickr": nn.ReLU,
-    "blogcatalog": nn.ReLU,
-    "Johns Hopkins55": nn.ReLU,
-    "Reed98": nn.ReLU,
-    "Amherst41": nn.ReLU,
-    "Cornell5": nn.ReLU,
-    "corafull": nn.ReLU,
-    "wikics": nn.ReLU,
-    "photo": nn.ReLU,
-    "arxiv-year": nn.ReLU,
-    "snap-patents": nn.ReLU,
 }
 bss = {
     "texas": 1024,
@@ -151,7 +125,7 @@ ess = {
     "cornell": 100,
     "wisconsin": 100,
     # "chameleon": 30,
-    "chameleon": 100,
+    "chameleon": 200,
     "squirrel": 200,
     "actor": 100,
     "cora": 100,
@@ -231,7 +205,7 @@ dropouts2 = {
 }
 n_hopss = {
     "chameleon": 8,
-    "squirrel": 7,
+    "squirrel": 128,
     "actor": 1,
     "flickr": 2,
     "blogcatalog": 2,
@@ -285,7 +259,6 @@ n_layers = {
 }
 nrls = {
     "chameleon": "lstm",
-    # "squirrel":7,
     "squirrel": "concat",
     "actor": "concat",
     "flickr": "lstm",
@@ -312,7 +285,7 @@ nrls = {
     "snap-patents": "concat",
 }
 n_intervalss = {
-    "chameleon": 2,
+    "chameleon": 3,
     "squirrel": 3,
     "actor": 3,
     "flickr": 3,
@@ -341,6 +314,46 @@ n_intervalss = {
 
 TRAIN_RATIO = 48
 VALID_RATIOS = 32
+
+
+def graph_diameter(g):
+    """
+    Computes the diameter of a given graph.
+
+    Parameters:
+    g (DGLGraph): The input graph.
+
+    Returns:
+    int: The diameter of the graph.
+    """
+    # Convert the DGL graph to a NetworkX graph
+    nx_graph = g.to_networkx()
+
+    # Use NetworkX to compute the all-pairs shortest path lengths
+    lengths = dict(nx.all_pairs_shortest_path_length(nx_graph))
+
+    # Find the maximum shortest path length
+    max_length = 0
+    for src in lengths:
+        for dst in lengths[src]:
+            if lengths[src][dst] > max_length:
+                max_length = lengths[src][dst]
+
+    return max_length
+
+
+# DATASETS = {
+#     "critical": [
+#         # 890
+#         "chameleon",
+#         # 2,223
+#         "squirrel",
+#     ],
+#     "pyg": [
+#         "actor",
+#         "pubmed",
+#     ],
+# }
 
 DATASETS = {
     "critical":
@@ -422,6 +435,7 @@ def main(
     BATCH_SIZE=None,
     nie=None,
     nrl=None,
+    n_hops=None,
 ):
     BATCH_SIZE = BATCH_SIZE or bss[dataset]
     graph, label, n_clusters = load_data(
@@ -435,15 +449,24 @@ def main(
         verbosity=3,
     )
 
-    # graph = graph.to(DEVICE)
+    # save_to_csv_files(
+    #     results={
+    #         "diameter": graph_diameter(graph),
+    #     },
+    #     insert_info={
+    #         "dataset": dataset,
+    #     },
+    #     append_info={
+    #         "bs": BATCH_SIZE,
+    #         "source": source,
+    #     },
+    #     csv_name=f"diameter.csv",
+    # )
 
-    # if dataset in ("cora", "pubmed"):
-    #     graph.ndata["feat"][(graph.ndata["feat"] - 0.0) > 0.0] = 1.0
-
-    N_HOPS = n_hopss[dataset]
+    N_HOPS = n_hops if n_hops is not None else n_hopss[dataset]
     params = {
         "nie": nie,
-        "nrl": nrl or nrls[dataset],
+        "nrl": nrl if nrl is not None else nrls[dataset],
         "lr": lrs[dataset],
         "h_feats": h_feats,
         "l2_coef": l2_coefs[dataset],
@@ -566,21 +589,21 @@ if __name__ == "__main__":
         "-m",
         "--model",
         type=str,
-        default="MoE",
+        default="gcn-nie-nst",
         help="model",
     )
     parser.add_argument(
         "-nie",
         "--nie",
         type=str,
-        default="gcn",
+        default="gcn-nie-nst",
         help="nie",
     )
     parser.add_argument(
         "-nrl",
         "--nrl",
         type=str,
-        default="concat",
+        default=None,
         help="nrl",
     )
     parser.add_argument(
@@ -596,6 +619,13 @@ if __name__ == "__main__":
         type=int,
         default=None,
         help="batch size",
+    )
+    parser.add_argument(
+        "-hops",
+        "--n_hops",
+        type=int,
+        default=None,
+        help="n_hops",
     )
     args = parser.parse_args()
 
@@ -614,37 +644,42 @@ if __name__ == "__main__":
         "wikics": 300,
     }
 
-    if args.dataset != "all":
-        main(
-            dataset=args.dataset,
-            source=args.source,
-            h_feats=(
-                DIM_BOUND[args.dataset] if args.dataset in DIM_BOUND.keys() and
-                args.h_feats > DIM_BOUND[args.dataset] else args.h_feats
-            ),
-            MODEL=args.model,
-            BATCH_SIZE=args.batch_size,
-            nie=args.nie,
-            nrl=args.nrl,
-        )
-    else:
-        for source, datasets in DATASETS.items():
-            # for source, datasets in [('pyg',['texas']),('cola',['blogcatalog']),('pyg',['cora'])]:
-            for dataset in datasets:
-                source = source.lower()
-                try:
-                    main(
-                        dataset=dataset,
-                        source=source,
-                        h_feats=(
-                            DIM_BOUND[dataset] if dataset in DIM_BOUND.keys() and
-                            args.h_feats > DIM_BOUND[args.dataset] else args.h_feats
-                        ),
-                        MODEL=args.model,
-                        BATCH_SIZE=args.batch_size,
-                        nie=args.nie,
-                        nrl=args.nrl,
-                    )
-                except Exception as e:
-                    traceback.print_exc()
-                    continue
+    for n_hops in [128, 64, 32, 16, 8, 4, 2, 1, 0]:
+        args.n_hops = n_hops
+
+        if args.dataset != "all":
+            main(
+                dataset=args.dataset,
+                source=args.source,
+                h_feats=(
+                    DIM_BOUND[args.dataset] if args.dataset in DIM_BOUND.keys() and
+                    args.h_feats > DIM_BOUND[args.dataset] else args.h_feats
+                ),
+                MODEL=args.model,
+                BATCH_SIZE=args.batch_size,
+                nie=args.nie,
+                nrl=args.nrl,
+                n_hops=args.n_hops,
+            )
+        else:
+            for source, datasets in DATASETS.items():
+                # for source, datasets in [('pyg',['texas']),('cola',['blogcatalog']),('pyg',['cora'])]:
+                for dataset in datasets:
+                    source = source.lower()
+                    try:
+                        main(
+                            dataset=dataset,
+                            source=source,
+                            h_feats=(
+                                DIM_BOUND[dataset] if dataset in DIM_BOUND.keys() and
+                                args.h_feats > DIM_BOUND[dataset] else args.h_feats
+                            ),
+                            MODEL=args.model,
+                            BATCH_SIZE=args.batch_size,
+                            nie=args.nie,
+                            nrl=args.nrl,
+                            n_hops=args.n_hops,
+                        )
+                    except Exception as e:
+                        traceback.print_exc()
+                        continue

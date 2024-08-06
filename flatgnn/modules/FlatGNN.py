@@ -17,6 +17,7 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 import torch.nn.functional as F
+from dgl.nn.pytorch import GraphConv
 from sklearn.cluster import KMeans
 from sklearn.metrics import accuracy_score as ACC
 from sklearn.preprocessing import normalize
@@ -33,7 +34,6 @@ from torch.utils.tensorboard import SummaryWriter
 from torch_sparse import fill_diag
 from torch_sparse import SparseTensor
 from tqdm import tqdm
-from dgl.nn.pytorch import GraphConv
 
 from ..utils import preprocess_neighborhoods
 from .DeepSets import DeepSets
@@ -43,7 +43,6 @@ from .MLP import MLP
 
 class FlatGNN(nn.Module):
     """FlatGNN."""
-
     def __init__(
         self,
         in_feats,
@@ -69,8 +68,7 @@ class FlatGNN(nn.Module):
                     in_feats=in_feats,
                     h_feats=h_feats,
                     dropout=dropout,
-                )
-                for _ in range(N_NIE)
+                ) for _ in range(N_NIE)
             )
         elif nie == "gcn-nie-nst":
             self.nei_ind_emb = nn.ModuleList(
@@ -79,8 +77,7 @@ class FlatGNN(nn.Module):
                     h_feats=[h_feats],
                     acts=[nn.ReLU()],
                     dropout=dropout,
-                )
-                for _ in range(N_NIE)
+                ) for _ in range(N_NIE)
             )
         elif nie == "gcn-nie-st":
             self.nei_ind_emb = nn.ModuleList(
@@ -89,8 +86,7 @@ class FlatGNN(nn.Module):
                     h_feats=[h_feats],
                     acts=[nn.ReLU()],
                     dropout=dropout,
-                )
-                for i in range(N_NIE)
+                ) for i in range(N_NIE)
             )
         elif nie == "gcn-nnie-nst":
             self.nei_ind_emb = nn.ModuleList(
@@ -99,16 +95,13 @@ class FlatGNN(nn.Module):
                         in_feats=in_feats if i == 1 else h_feats,
                         out_feats=h_feats,
                         activation=nn.ReLU(),
-                    )
-                    if i != 0
-                    else MLP(
+                    ) if i != 0 else MLP(
                         in_feats=in_feats,
                         h_feats=[h_feats],
                         acts=[nn.ReLU()],
                         dropout=dropout,
                     )
-                )
-                for i in range(N_NIE)
+                ) for i in range(N_NIE)
             )
         elif nie == "gcn-nnie-st":
             self.nei_ind_emb = nn.ModuleList(
@@ -117,16 +110,13 @@ class FlatGNN(nn.Module):
                         in_feats=h_feats,
                         out_feats=h_feats,
                         activation=nn.ReLU(),
-                    )
-                    if i != 0
-                    else MLP(
+                    ) if i != 0 else MLP(
                         in_feats=in_feats,
                         h_feats=[h_feats],
                         acts=[nn.ReLU()],
                         dropout=dropout,
                     )
-                )
-                for i in range(N_NIE)
+                ) for i in range(N_NIE)
             )
 
         self.nei_feats = None
@@ -155,8 +145,7 @@ class FlatGNN(nn.Module):
                         layers=1,
                         acts=[nn.ReLU()],
                         dropout=dropout,
-                    )
-                    for _ in range(self.n_relations + 1)
+                    ) for _ in range(self.n_relations + 1)
                 ]
             )
         elif nrl in ["max", "sum", "mean"]:
@@ -220,9 +209,7 @@ class FlatGNN(nn.Module):
                         row=adj.row.long(),
                         col=adj.col.long(),
                         sparse_sizes=adj.shape,
-                    )
-                    if self.adj is None
-                    else self.adj
+                    ) if self.adj is None else self.adj
                 ),
                 features=h,
                 name=graph.name,
@@ -241,7 +228,7 @@ class FlatGNN(nn.Module):
             )
             for i in range(1, self.n_hops + 1):
                 self.ns.append(self.nei_ind_emb[i](self.nei_feats[i]))
-        elif self.nie == "gcn-nie-nst":
+        elif self.nie in ["deepsets", "gcn-nie-nst"]:
             if self.nei_feats is None and self.no_save == False:
                 self.nei_feats = preprocess_neighborhoods(
                     adj=SparseTensor(
@@ -268,9 +255,7 @@ class FlatGNN(nn.Module):
                             row=adj.row.long(),
                             col=adj.col.long(),
                             sparse_sizes=adj.shape,
-                        )
-                        if self.adj is None
-                        else self.adj
+                        ) if self.adj is None else self.adj
                     ),
                     features=features,
                     name=graph.name,
@@ -278,7 +263,7 @@ class FlatGNN(nn.Module):
                     set_diag=True,
                     remove_diag=False,
                     symm_norm={
-                        "gcn-nie-nst": True,
+                        "gcn": True,
                         "deepsets": False,
                         "gcn-nie-nst": True,
                     }[self.nie],
@@ -307,43 +292,26 @@ class FlatGNN(nn.Module):
                 torch.cat(
                     [
                         self.nei_rel_learn[i](
-                            hops_feats[:, self.h_feats * i : self.h_feats * (i + self.interval)]
-                        )
-                        for i in range(self.n_relations + 1)
+                            hops_feats[:, self.h_feats * i:self.h_feats * (i + self.interval)]
+                        ) for i in range(self.n_relations + 1)
                     ],
                     dim=1,
                 )
             ]
         if self.nrl == "max":
-            return [
-                self.nei_rel_learn[0](
-                    torch.max(
-                        torch.stack(self.ns, dim=1),
-                        dim=1,
-                    )[0]
-                )
-            ]
+            return [self.nei_rel_learn[0](torch.max(
+                torch.stack(self.ns, dim=1),
+                dim=1,
+            )[0])]
         if self.nrl == "mean":
-            return [
-                self.nei_rel_learn[0](
-                    torch.mean(
-                        torch.stack(self.ns, dim=1),
-                        dim=1,
-                    )
-                )
-            ]
+            return [self.nei_rel_learn[0](torch.mean(
+                torch.stack(self.ns, dim=1),
+                dim=1,
+            ))]
         if self.nrl == "sum":
-            return [
-                self.nei_rel_learn[0](
-                    torch.sum(
-                        torch.stack(self.ns, dim=1),
-                        dim=1,
-                    )
-                )
-            ]
+            return [self.nei_rel_learn[0](torch.sum(
+                torch.stack(self.ns, dim=1),
+                dim=1,
+            ))]
         if self.nrl == "lstm":
-            return [
-                self.nei_rel_learn[0](
-                    torch.stack(self.ns, dim=1),
-                )
-            ]
+            return [self.nei_rel_learn[0](torch.stack(self.ns, dim=1), )]

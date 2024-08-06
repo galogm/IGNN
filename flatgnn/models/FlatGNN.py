@@ -68,7 +68,6 @@ class ONGNNConv(nn.Module):
 
 class FlatGNN(nn.Module):
     """FlatGNN"""
-
     def __init__(
         self,
         in_feats,
@@ -132,8 +131,7 @@ class FlatGNN(nn.Module):
                 no_save=True,
                 nie=nie,
                 nrl=nrl,
-            )
-            for _ in range(n_layers - 1)
+            ) for _ in range(n_layers - 1)
         )
 
         self.classifier = MLP(
@@ -208,7 +206,8 @@ class FlatGNN(nn.Module):
         cnt = 0
         best_state_dict = None
         writer = SummaryWriter(
-            log_dir=f"logs/runs/{get_str_time()[:10]}/joint_{graph.name}_{split_id}_{self.h_feats}_{get_str_time()[11:]}"
+            log_dir=
+            f"logs/runs/{get_str_time()[:10]}/joint_{graph.name}_{split_id}_{self.h_feats}_{get_str_time()[11:]}"
         )
 
         t_start = time.time()
@@ -261,17 +260,17 @@ class FlatGNN(nn.Module):
                     )
                     break
 
-            writer.add_scalar("joint/time/train", time.time() - t, epoch)
+            # writer.add_scalar("joint/time/train", time.time() - t, epoch)
 
-            writer.add_scalar("joint/metric/train", train_acc, epoch)
-            writer.add_scalar("joint/metric/val", valid_acc, epoch)
-            writer.add_scalar("joint/metric/test", test_acc, epoch)
-            writer.add_scalar("joint/loss/train", loss.item(), epoch)
-            writer.add_scalar("joint/loss/val", loss_val.item(), epoch)
-            writer.add_scalar("joint/loss/test", loss_test.item(), epoch)
+            # writer.add_scalar("joint/metric/train", train_acc, epoch)
+            # writer.add_scalar("joint/metric/val", valid_acc, epoch)
+            # writer.add_scalar("joint/metric/test", test_acc, epoch)
+            # writer.add_scalar("joint/loss/train", loss.item(), epoch)
+            # writer.add_scalar("joint/loss/val", loss_val.item(), epoch)
+            # writer.add_scalar("joint/loss/test", loss_test.item(), epoch)
 
         t_finish = time.time()
-        print(f"10 epoch cost: {(t_finish-t_start)/self.n_epochs * 10:.4f}s")
+        print(f"10 epoch cost: {(t_finish-t_start)/epoch * 10:.4f}s")
         if best_state_dict is not None:
             self.load_state_dict(best_state_dict)
 

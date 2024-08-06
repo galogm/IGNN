@@ -33,6 +33,7 @@ from the_utils import (
     make_parent_dirs,
 )
 
+import networkx as nx
 import time
 
 from sklearn.metrics import accuracy_score as ACC
@@ -204,11 +205,11 @@ dropouts2 = {
 }
 n_hopss = {
     "chameleon": 8,
-    "squirrel": 7,
+    "squirrel": 64,
     "actor": 1,
     "flickr": 2,
     "blogcatalog": 2,
-    "roman-empire": 2,
+    "roman-empire": 1,
     "amazon-ratings": 4,
     "photo": 2,
     "pubmed": 3,
@@ -314,18 +315,32 @@ n_intervalss = {
 TRAIN_RATIO = 48
 VALID_RATIOS = 32
 
-DATASETS = {
-    "critical": [
-        # 890
-        "chameleon",
-        # 2,223
-        "squirrel",
-    ],
-    "pyg": [
-        "actor",
-        "pubmed",
-    ],
-}
+
+def graph_diameter(g):
+    """
+    Computes the diameter of a given graph.
+
+    Parameters:
+    g (DGLGraph): The input graph.
+
+    Returns:
+    int: The diameter of the graph.
+    """
+    # Convert the DGL graph to a NetworkX graph
+    nx_graph = g.to_networkx()
+
+    # Use NetworkX to compute the all-pairs shortest path lengths
+    lengths = dict(nx.all_pairs_shortest_path_length(nx_graph))
+
+    # Find the maximum shortest path length
+    max_length = 0
+    for src in lengths:
+        for dst in lengths[src]:
+            if lengths[src][dst] > max_length:
+                max_length = lengths[src][dst]
+
+    return max_length
+
 
 # DATASETS = {
 #     "critical": [
@@ -333,68 +348,83 @@ DATASETS = {
 #         "chameleon",
 #         # 2,223
 #         "squirrel",
-#         # # 10,000
-#         # "minesweeper",
-#         # # 11,758
-#         # "tolokers",
-#         # # 22,662
-#         # "roman-empire",
-#         # # 24,492
-#         # "amazon-ratings",
-#         # 48,921
-#         # "questions",
-#     ],
-#     "cola": [
-#         "flickr",
-#         "blogcatalog",
 #     ],
 #     "pyg": [
-#         # "texas",
-#         # "cornell",
-#         # "wisconsin",
-#         # "corafull",
-#         # "cora",
-#         # "citeseer",
-#         "photo",
 #         "actor",
 #         "pubmed",
-#         "wikics",
 #     ],
-#     "Critical": [
-#         # 22,662
-#         "roman-empire",
-#         # 24,492
-#         "amazon-ratings",
-#         # 48,921
-#         # "questions",
-#     ],
-#     # "linkx": [
-#     #     # (array([0, 1, 2]), array([ 97, 504, 361]))
-#     #     # 962
-#     #     # "Reed98",
-#     #     # # array([0, 1, 2]), array([ 418, 2153, 2609]
-#     #     # # 5,180
-#     #     # "Johns Hopkins55",
-#     #     # # (array([0, 1, 2]), array([ 203, 1015, 1017]))
-#     #     # # 2,235
-#     #     # "Amherst41",
-#     #     # # (array([0, 1, 2]), array([1838, 8135, 8687]))
-#     #     # # 18,660
-#     #     # "Cornell5",
-#     #     # # 41,554
-#     #     # "Penn94",
-#     #     # # 168,114
-#     #     # "twitch-gamers",
-#     #     # 169,343
-#     #     "arxiv-year",
-#     #     # 421,961
-#     #     # "genius",
-#     #     # # 1,632,803
-#     #     # "pokec",
-#     #     # 2,923,922
-#     #     "snap-patents",
-#     # ],
 # }
+
+DATASETS = {
+    "critical":
+        [
+            # 890
+            "chameleon",
+            # 2,223
+            "squirrel",
+            # # 10,000
+            # "minesweeper",
+            # # 11,758
+            # "tolokers",
+            # # 22,662
+            # "roman-empire",
+            # # 24,492
+            # "amazon-ratings",
+            # 48,921
+            # "questions",
+        ],
+    "cola": [
+        "flickr",
+        "blogcatalog",
+    ],
+    "pyg":
+        [
+            # "texas",
+            # "cornell",
+            # "wisconsin",
+            # "corafull",
+            # "cora",
+            # "citeseer",
+            "photo",
+            "actor",
+            "pubmed",
+            "wikics",
+        ],
+    "Critical": [
+        # 22,662
+        "roman-empire",
+        # 24,492
+        "amazon-ratings",
+        # 48,921
+        # "questions",
+    ],
+    # "linkx": [
+    #     # (array([0, 1, 2]), array([ 97, 504, 361]))
+    #     # 962
+    #     # "Reed98",
+    #     # # array([0, 1, 2]), array([ 418, 2153, 2609]
+    #     # # 5,180
+    #     # "Johns Hopkins55",
+    #     # # (array([0, 1, 2]), array([ 203, 1015, 1017]))
+    #     # # 2,235
+    #     # "Amherst41",
+    #     # # (array([0, 1, 2]), array([1838, 8135, 8687]))
+    #     # # 18,660
+    #     # "Cornell5",
+    #     # # 41,554
+    #     # "Penn94",
+    #     # # 168,114
+    #     # "twitch-gamers",
+    #     # 169,343
+    #     "arxiv-year",
+    #     # 421,961
+    #     # "genius",
+    #     # # 1,632,803
+    #     # "pokec",
+    #     # 2,923,922
+    #     "snap-patents",
+    # ],
+}
 
 
 def main(
@@ -419,15 +449,24 @@ def main(
         verbosity=3,
     )
 
-    # graph = graph.to(DEVICE)
-
-    # if dataset in ("cora", "pubmed"):
-    #     graph.ndata["feat"][(graph.ndata["feat"] - 0.0) > 0.0] = 1.0
+    # save_to_csv_files(
+    #     results={
+    #         "diameter": graph_diameter(graph),
+    #     },
+    #     insert_info={
+    #         "dataset": dataset,
+    #     },
+    #     append_info={
+    #         "bs": BATCH_SIZE,
+    #         "source": source,
+    #     },
+    #     csv_name=f"diameter.csv",
+    # )
 
     N_HOPS = n_hops if n_hops is not None else n_hopss[dataset]
     params = {
         "nie": nie,
-        "nrl": nrl if nrl is not None else  nrls[dataset],
+        "nrl": nrl if nrl is not None else nrls[dataset],
         "lr": lrs[dataset],
         "h_feats": h_feats,
         "l2_coef": l2_coefs[dataset],
@@ -610,9 +649,8 @@ if __name__ == "__main__":
             dataset=args.dataset,
             source=args.source,
             h_feats=(
-                DIM_BOUND[args.dataset]
-                if args.dataset in DIM_BOUND.keys() and args.h_feats > DIM_BOUND[args.dataset]
-                else args.h_feats
+                DIM_BOUND[args.dataset] if args.dataset in DIM_BOUND.keys() and
+                args.h_feats > DIM_BOUND[args.dataset] else args.h_feats
             ),
             MODEL=args.model,
             BATCH_SIZE=args.batch_size,
@@ -630,9 +668,8 @@ if __name__ == "__main__":
                         dataset=dataset,
                         source=source,
                         h_feats=(
-                            DIM_BOUND[dataset]
-                            if dataset in DIM_BOUND.keys() and args.h_feats > DIM_BOUND[dataset]
-                            else args.h_feats
+                            DIM_BOUND[dataset] if dataset in DIM_BOUND.keys() and
+                            args.h_feats > DIM_BOUND[dataset] else args.h_feats
                         ),
                         MODEL=args.model,
                         BATCH_SIZE=args.batch_size,
