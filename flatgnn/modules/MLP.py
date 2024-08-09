@@ -18,7 +18,7 @@ class MLP(nn.Module):
         self,
         in_feats: int,
         h_feats: List[int],
-        layers: int = None,
+        layer_norm: bool = False,
         acts: List[Callable] = None,
         dropout: float = 0.0,
     ) -> None:
@@ -35,6 +35,12 @@ class MLP(nn.Module):
                         nn.LayerNorm(h_feats[i]),
                         acts[i],
                     )
+                    if layer_norm
+                    else nn.Sequential(
+                        nn.Dropout(p=dropout),
+                        nn.Linear(in_feats[i], h_feats[i]),
+                        acts[i],
+                    )
                 )
             else:
                 module_list.append(
@@ -42,6 +48,12 @@ class MLP(nn.Module):
                         nn.Dropout(p=dropout),
                         nn.Linear(in_feats[i], h_feats[i]),
                         nn.LayerNorm(h_feats[i]),
+                    )
+                    if layer_norm
+                    else nn.Sequential(
+                        nn.Dropout(p=dropout),
+                        nn.Linear(in_feats[i], h_feats[i]),
+                        acts[i],
                     )
                 )
         self.ec = nn.ModuleList(module_list)

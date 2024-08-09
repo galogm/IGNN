@@ -133,7 +133,7 @@ ess = {
     "pubmed": 300,
     # "roman-empire": 300,
     "roman-empire": 100,
-    "amazon-ratings": 300,
+    "amazon-ratings": 100,
     "flickr": 100,
     "blogcatalog": 100,
     "corafull": 400,
@@ -204,13 +204,13 @@ dropouts2 = {
     "wisconsin": 0.9,
 }
 n_hopss = {
-    "chameleon": 8,
+    "chameleon": 10,
     "squirrel": 64,
     "actor": 1,
     "flickr": 2,
     "blogcatalog": 2,
     "roman-empire": 1,
-    "amazon-ratings": 4,
+    "amazon-ratings": 8,
     "photo": 2,
     "pubmed": 3,
     "wikics": 3,
@@ -236,7 +236,7 @@ n_layers = {
     "actor": 1,
     "flickr": 1,
     "blogcatalog": 1,
-    "roman-empire": 3,
+    "roman-empire": 5,
     "amazon-ratings": 1,
     "photo": 1,
     "pubmed": 1,
@@ -283,6 +283,60 @@ nrls = {
     "corafull": "concat",
     "arxiv-year": "concat",
     "snap-patents": "concat",
+}
+acts = {
+    "chameleon": "relu",
+    "squirrel": "relu",
+    "actor": "relu",
+    "flickr": "relu",
+    "blogcatalog": "relu",
+    "roman-empire": "relu",
+    "amazon-ratings": "prelu",
+    "photo": "relu",
+    "pubmed": "relu",
+    "wikics": "relu",
+    "cora": "relu",
+    "citeseer": "relu",
+    "texas": "relu",
+    "cornell": "relu",
+    "wisconsin": "relu",
+    "minesweeper": "relu",
+    "tolokers": "relu",
+    "questions": "relu",
+    "Johns Hopkins55": "relu",
+    "Reed98": "relu",
+    "Amherst41": "relu",
+    "Cornell5": "relu",
+    "corafull": "relu",
+    "arxiv-year": "relu",
+    "snap-patents": "relu",
+}
+layer_norms = {
+    "chameleon": True,
+    "squirrel": True,
+    "actor": True,
+    "flickr": True,
+    "blogcatalog": True,
+    "roman-empire": True,
+    "amazon-ratings": True,
+    "photo": True,
+    "pubmed": True,
+    "wikics": True,
+    "cora": True,
+    "citeseer": True,
+    "texas": True,
+    "cornell": True,
+    "wisconsin": True,
+    "minesweeper": True,
+    "tolokers": True,
+    "questions": True,
+    "Johns Hopkins55": True,
+    "Reed98": True,
+    "Amherst41": True,
+    "Cornell5": True,
+    "corafull": True,
+    "arxiv-year": True,
+    "snap-patents": True,
 }
 n_intervalss = {
     "chameleon": 3,
@@ -356,40 +410,38 @@ def graph_diameter(g):
 # }
 
 DATASETS = {
-    "critical":
-        [
-            # 890
-            "chameleon",
-            # 2,223
-            "squirrel",
-            # # 10,000
-            # "minesweeper",
-            # # 11,758
-            # "tolokers",
-            # # 22,662
-            # "roman-empire",
-            # # 24,492
-            # "amazon-ratings",
-            # 48,921
-            # "questions",
-        ],
+    "critical": [
+        # 890
+        "chameleon",
+        # 2,223
+        "squirrel",
+        # # 10,000
+        # "minesweeper",
+        # # 11,758
+        # "tolokers",
+        # # 22,662
+        # "roman-empire",
+        # # 24,492
+        # "amazon-ratings",
+        # 48,921
+        # "questions",
+    ],
     "cola": [
         "flickr",
         "blogcatalog",
     ],
-    "pyg":
-        [
-            # "texas",
-            # "cornell",
-            # "wisconsin",
-            # "corafull",
-            # "cora",
-            # "citeseer",
-            "photo",
-            "actor",
-            "pubmed",
-            "wikics",
-        ],
+    "pyg": [
+        # "texas",
+        # "cornell",
+        # "wisconsin",
+        # "corafull",
+        # "cora",
+        # "citeseer",
+        "photo",
+        "actor",
+        "pubmed",
+        "wikics",
+    ],
     "Critical": [
         # 22,662
         "roman-empire",
@@ -477,6 +529,8 @@ def main(
         "n_layers": n_layers[dataset],
         "early_stop": ess[dataset],
         "n_intervals": min(n_intervalss[dataset], N_HOPS + 1),
+        "act": acts[dataset],
+        "layer_norm": layer_norms[dataset],
     }
     tab_printer(params)
 
@@ -602,7 +656,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-nrl",
         "--nrl",
-        type=str,
+        type=lambda x: None if x == "None" else x,
         default=None,
         help="nrl",
     )
@@ -623,7 +677,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-hops",
         "--n_hops",
-        type=int,
+        type=lambda x: None if x == "None" else int(x),
         default=None,
         help="n_hops",
     )
@@ -649,8 +703,9 @@ if __name__ == "__main__":
             dataset=args.dataset,
             source=args.source,
             h_feats=(
-                DIM_BOUND[args.dataset] if args.dataset in DIM_BOUND.keys() and
-                args.h_feats > DIM_BOUND[args.dataset] else args.h_feats
+                DIM_BOUND[args.dataset]
+                if args.dataset in DIM_BOUND.keys() and args.h_feats > DIM_BOUND[args.dataset]
+                else args.h_feats
             ),
             MODEL=args.model,
             BATCH_SIZE=args.batch_size,
@@ -668,8 +723,9 @@ if __name__ == "__main__":
                         dataset=dataset,
                         source=source,
                         h_feats=(
-                            DIM_BOUND[dataset] if dataset in DIM_BOUND.keys() and
-                            args.h_feats > DIM_BOUND[dataset] else args.h_feats
+                            DIM_BOUND[dataset]
+                            if dataset in DIM_BOUND.keys() and args.h_feats > DIM_BOUND[dataset]
+                            else args.h_feats
                         ),
                         MODEL=args.model,
                         BATCH_SIZE=args.batch_size,

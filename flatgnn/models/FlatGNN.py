@@ -68,6 +68,7 @@ class ONGNNConv(nn.Module):
 
 class FlatGNN(nn.Module):
     """FlatGNN"""
+
     def __init__(
         self,
         in_feats,
@@ -75,16 +76,19 @@ class FlatGNN(nn.Module):
         n_clusters,
         n_epochs=2000,
         lr: float = 0.001,
-        l2_coef: float = 0.0001,
+        l2_coef: float = 0.00005,
         early_stop: int = 100,
         device=None,
         dropout: float = 0.0,
         dropout2: float = 0.0,
+        lda: float = 1,
         n_hops=6,
         n_intervals=3,
         nie="gcn",
         nrl="concat",
         n_layers=1,
+        act="relu",
+        layer_norm=True,
     ) -> None:
         super().__init__()
         self.n_intervals = n_intervals
@@ -111,16 +115,20 @@ class FlatGNN(nn.Module):
             n_intervals=n_intervals,
             nie=nie,
             nrl=nrl,
+            act=act,
+            layer_norm=layer_norm,
         )
         hidden_dim = {
             "multi-con": max(h_feats * (n_hops - n_intervals + 2), h_feats),
             "concat": h_feats,
+            "only-concat": h_feats * (n_hops + 1),
             "max": h_feats,
             "mean": h_feats,
             "sum": h_feats,
             "lstm": h_feats,
             "none": h_feats,
         }[nrl]
+        self.beta = lda / n_layers
         self.flat_gnn_s = nn.ModuleList(
             FlatGNN_layer(
                 in_feats=hidden_dim,
@@ -131,13 +139,17 @@ class FlatGNN(nn.Module):
                 no_save=True,
                 nie=nie,
                 nrl=nrl,
-            ) for _ in range(n_layers - 1)
+                act=act,
+                layer_norm=layer_norm,
+            )
+            for _ in range(n_layers - 1)
         )
 
         self.classifier = MLP(
             in_feats={
                 "multi-con": hidden_dim,
                 "concat": h_feats,
+                "only-concat": h_feats * (n_hops + 1),
                 "max": h_feats,
                 "mean": h_feats,
                 "sum": h_feats,
@@ -146,7 +158,8 @@ class FlatGNN(nn.Module):
             }[nrl],
             h_feats=[n_clusters],
             acts=[nn.Identity()],
-            dropout=self.dropout2,
+            dropout=dropout2,
+            layer_norm=False,
         )
 
         self.ce = torch.nn.CrossEntropyLoss()
@@ -163,11 +176,18 @@ class FlatGNN(nn.Module):
         graph=None,
         device=None,
     ):
-        z_flat_gnn = self.flat_gnn(graph=graph, device=device)
+        z_flat_gnn = torch.cat(self.flat_gnn(graph=graph, device=device), dim=-1)
         for _, flat_gnn_s in enumerate(self.flat_gnn_s):
-            z_flat_gnn = flat_gnn_s(graph=graph, device=device, feats=torch.cat(z_flat_gnn, dim=1))
+            z_flat_gnn = (
+                self.beta
+                * torch.cat(
+                    flat_gnn_s(graph=graph, device=device, feats=z_flat_gnn),
+                    dim=-1,
+                )
+                + (1 - self.beta) * z_flat_gnn
+            )
 
-        return torch.cat(z_flat_gnn, dim=1)
+        return z_flat_gnn
 
     def validate(self, features, labels, train_mask, val_mask, test_mask, graph):
         self.train(False)
@@ -206,13 +226,11 @@ class FlatGNN(nn.Module):
         cnt = 0
         best_state_dict = None
         writer = SummaryWriter(
-            log_dir=
-            f"logs/runs/{get_str_time()[:10]}/joint_{graph.name}_{split_id}_{self.h_feats}_{get_str_time()[11:]}"
+            log_dir=f"logs/runs/{get_str_time()[:10]}/joint_{graph.name}_{split_id}_{self.h_feats}_{get_str_time()[11:]}"
         )
 
         t_start = time.time()
         for epoch in range(self.n_epochs):
-            t = time.time()
             self.train()
             self.optimizer.zero_grad()
 

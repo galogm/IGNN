@@ -33,16 +33,19 @@ def get_splits_mask(
         split_save_dir=SPLIT_DIR,
     )
     train_mask = (
-        torch.zeros(graph.num_nodes()).scatter_(0, torch.tensor(train_idx, dtype=torch.int64),
-                                                1).bool()
+        torch.zeros(graph.num_nodes())
+        .scatter_(0, torch.tensor(train_idx, dtype=torch.int64), 1)
+        .bool()
     )
     val_mask = (
-        torch.zeros(graph.num_nodes()).scatter_(0, torch.tensor(val_idx, dtype=torch.int64),
-                                                1).bool()
+        torch.zeros(graph.num_nodes())
+        .scatter_(0, torch.tensor(val_idx, dtype=torch.int64), 1)
+        .bool()
     )
     test_mask = (
-        torch.zeros(graph.num_nodes()).scatter_(0, torch.tensor(test_idx, dtype=torch.int64),
-                                                1).bool()
+        torch.zeros(graph.num_nodes())
+        .scatter_(0, torch.tensor(test_idx, dtype=torch.int64), 1)
+        .bool()
     )
 
     return train_mask, val_mask, test_mask
@@ -135,7 +138,8 @@ def preprocess_neighborhoods(
     adj = adj.to_scipy(layout="csr")
     x = features.numpy()
     sym = "sym" if symm_norm else "nsy"
-    base = Path(f"{save_dir}/{name}/{sym}")
+    diag = "diag" if set_diag else "ndiag"
+    base = Path(f"{save_dir}/{name}/{diag}/{sym}")
     for i in tqdm(range(1, n_hops + 1)):
         file = base.joinpath(f"{i}")
         if file.exists():

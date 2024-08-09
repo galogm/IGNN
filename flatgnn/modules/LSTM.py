@@ -22,7 +22,6 @@ class LSTM(nn.Module):
         self.fc = MLP(
             in_feats=hidden_dim,
             h_feats=[output_dim],
-            layers=1,
             acts=[nn.ReLU()],
             dropout=dropout,
         )
