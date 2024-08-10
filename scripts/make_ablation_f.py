@@ -1,19 +1,20 @@
 from the_utils import csv_to_table
 
 ROW_ORDER = [
-    "FlatGNN-gcn-concat",
-    "FlatGNN-gcn-lstm",
-    "FlatGNN-gcn-mean",
-    "FlatGNN-gcn-sum",
-    "FlatGNN-gcn-max",
-    "FlatGNN-gcn-multi-con",
+    "FlatGNN-gcn-nie-nst-only-concat",
+    "FlatGNN-gcn-nie-nst-concat",
+    "FlatGNN-gcn-nie-nst-lstm",
+    "FlatGNN-gcn-nie-nst-mean",
+    "FlatGNN-gcn-nie-nst-sum",
+    "FlatGNN-gcn-nie-nst-max",
+    # "FlatGNN-gcn-multi-con",
 ]
 
 COL_ORDER = [
     "actor",
     "blogcatalog",
     "flickr",
-    "roman-empire",
+    # "roman-empire",
     "squirrel",
     "chameleon",
     "amazon-ratings",
@@ -23,7 +24,7 @@ COL_ORDER = [
 ]
 
 df = csv_to_table(
-    raw_path="results/results_v99.3.csv",
+    raw_path="results/results_v99.1.csv",
     save_path="results/ablation-f.csv",
     row_key="model",
     col_key="dataset",

@@ -42,10 +42,11 @@ class DeepSets(nn.Module):
         self,
         in_feats,
         h_feats,
-        dropout=0.0,
+        layer_norm: bool = False,
+        acts: List[Callable] = None,
+        dropout: float = 0.0,
     ):
         super().__init__()
-        layers = 1
         hs = [h_feats]
         # n = int(math.log2(in_feats)) - math.log2(h_feats)
         # while n // 2 > 0:
@@ -55,16 +56,16 @@ class DeepSets(nn.Module):
         self.phi = MLP(
             in_feats=in_feats,
             h_feats=hs[::-1],
-            layers=layers,
-            acts=[nn.ReLU()] * layers,
+            acts=acts,
             dropout=dropout,
+            layer_norm=layer_norm,
         )
         self.rho = MLP(
             in_feats=h_feats,
             h_feats=[h_feats],
-            layers=1,
-            acts=[nn.ReLU()],
+            acts=acts,
             dropout=dropout,
+            layer_norm=layer_norm,
         )
 
     def forward(self, x, mean=False):

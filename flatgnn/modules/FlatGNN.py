@@ -76,7 +76,9 @@ class FlatGNN(nn.Module):
                 DeepSets(
                     in_feats=in_feats,
                     h_feats=h_feats,
-                    dropout=0,
+                    acts=[acts[act]()],
+                    dropout=dropout,
+                    layer_norm=layer_norm,
                 )
                 for _ in range(N_NIE)
             )
