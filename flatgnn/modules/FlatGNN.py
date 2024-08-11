@@ -95,14 +95,15 @@ class FlatGNN(nn.Module):
             )
         elif nie == "gcn-nie-st":
             self.nei_ind_emb = nn.ModuleList(
-                MLP(
-                    in_feats=in_feats if i == 0 else h_feats,
-                    h_feats=[h_feats],
-                    acts=[acts[act]()],
-                    dropout=0,
-                    layer_norm=layer_norm,
-                )
-                for i in range(N_NIE)
+                [
+                    MLP(
+                        in_feats=in_feats,
+                        h_feats=[h_feats],
+                        acts=[acts[act]()],
+                        dropout=0,
+                        layer_norm=layer_norm,
+                    )
+                ]
             )
         elif nie == "gcn-nnie-nst":
             self.nei_ind_emb = nn.ModuleList(
@@ -225,37 +226,7 @@ class FlatGNN(nn.Module):
             for i in range(1, self.n_hops + 1):
                 h = self.nei_ind_emb[i](graph=graph.to(device), feat=h)
                 self.ns.append(h)
-        elif self.nie == "gcn-nie-st":
-            h = self.nei_ind_emb[0](features.to(device))
-            self.ns.append(h)
-            self.nei_feats, self.adj = preprocess_neighborhoods(
-                adj=(
-                    SparseTensor(
-                        row=adj.row.long(),
-                        col=adj.col.long(),
-                        sparse_sizes=adj.shape,
-                    )
-                    if self.adj is None
-                    else self.adj
-                ),
-                features=h,
-                name=graph.name,
-                n_hops=self.n_hops,
-                set_diag=True,
-                remove_diag=False,
-                symm_norm={
-                    "gcn-nie-nst": True,
-                    "deepsets": False,
-                    "gcn-nie-st": True,
-                }[self.nie],
-                device=device,
-                no_save=True,
-                return_adj=True,
-                process_adj=False if self.adj is not None else True,
-            )
-            for i in range(1, self.n_hops + 1):
-                self.ns.append(self.nei_ind_emb[i](self.nei_feats[i]))
-        elif self.nie in ["deepsets", "gcn-nie-nst"]:
+        elif self.nie in ["deepsets", "gcn-nie-nst", "gcn-nie-st"]:
             if self.nei_feats is None and self.no_save == False:
                 self.nei_feats = preprocess_neighborhoods(
                     adj=SparseTensor(
@@ -272,6 +243,7 @@ class FlatGNN(nn.Module):
                         "gcn": True,
                         "deepsets": False,
                         "gcn-nie-nst": True,
+                        "gcn-nie-st": True,
                     }[self.nie],
                     device=device,
                 )
@@ -295,14 +267,19 @@ class FlatGNN(nn.Module):
                         "gcn": True,
                         "deepsets": False,
                         "gcn-nie-nst": True,
+                        "gcn-nie-st": True,
                     }[self.nie],
                     device=device,
                     no_save=True,
                     return_adj=True,
                     process_adj=False if self.adj is not None else True,
                 )
-            for i in range(self.n_hops + 1):
-                self.ns.append(self.nei_ind_emb[i](self.nei_feats[i]))
+            if self.nie in ["deepsets", "gcn-nie-nst"]:
+                for i in range(self.n_hops + 1):
+                    self.ns.append(self.nei_ind_emb[i](self.nei_feats[i]))
+            elif self.nie in ["gcn-nie-st"]:
+                for i in range(self.n_hops + 1):
+                    self.ns.append(self.nei_ind_emb[0](self.nei_feats[i]))
 
         hops_feats = torch.cat(self.ns, dim=1)
 

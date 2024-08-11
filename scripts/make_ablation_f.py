@@ -14,7 +14,7 @@ COL_ORDER = [
     "actor",
     "blogcatalog",
     "flickr",
-    # "roman-empire",
+    "roman-empire",
     "squirrel",
     "chameleon",
     "amazon-ratings",
@@ -24,8 +24,8 @@ COL_ORDER = [
 ]
 
 df = csv_to_table(
-    raw_path="results/results_v99.1.csv",
-    save_path="results/ablation-f.csv",
+    raw_path="results/nrl.csv",
+    save_path="results/nrl-f.csv",
     row_key="model",
     col_key="dataset",
     val_key="acc_hl",
