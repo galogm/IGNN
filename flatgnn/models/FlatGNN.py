@@ -36,39 +36,8 @@ from ..modules import FlatGNN as FlatGNN_layer
 from ..modules import MLP
 
 
-class ONGNNConv(nn.Module):
-    def __init__(self, tm_net, tm_norm, simple_gating, tm, diff_or, repeats):
-        super(ONGNNConv, self).__init__()
-        self.tm_net = tm_net
-        self.tm_norm = tm_norm
-        self.simple_gating = simple_gating
-        self.tm = tm
-        self.diff_or = diff_or
-        self.repeats = repeats
-
-    def forward(self, x, m, last_tm_signal):
-        if self.tm == True:
-            if self.simple_gating == True:
-                tm_signal_raw = F.sigmoid(self.tm_net(torch.cat((x, m), dim=1)))
-            else:
-                tm_signal_raw = F.softmax(self.tm_net(torch.cat((x, m), dim=1)), dim=-1)
-                tm_signal_raw = torch.cumsum(tm_signal_raw, dim=-1)
-                if self.diff_or == True:
-                    tm_signal_raw = last_tm_signal + (1 - last_tm_signal) * tm_signal_raw
-            tm_signal = tm_signal_raw.repeat_interleave(repeats=self.repeats, dim=1)
-            out = x * tm_signal + m * (1 - tm_signal)
-        else:
-            out = m
-            tm_signal_raw = last_tm_signal
-
-        out = self.tm_norm(out)
-
-        return out, tm_signal_raw
-
-
 class FlatGNN(nn.Module):
     """FlatGNN"""
-
     def __init__(
         self,
         in_feats,
@@ -79,8 +48,9 @@ class FlatGNN(nn.Module):
         l2_coef: float = 0.00005,
         early_stop: int = 100,
         device=None,
-        dropout: float = 0.0,
-        dropout2: float = 0.0,
+        nas_dropout: float = 0.0,
+        nss_dropout: float = 0.8,
+        clf_dropout: float = 0.9,
         lda: float = 1,
         n_hops=6,
         n_intervals=3,
@@ -92,8 +62,7 @@ class FlatGNN(nn.Module):
     ) -> None:
         super().__init__()
         self.n_intervals = n_intervals
-        self.dropout = dropout
-        self.dropout2 = dropout2
+        self.nss_dropout = nss_dropout
 
         # FlatGNN
         self.n_epochs = n_epochs
@@ -111,7 +80,8 @@ class FlatGNN(nn.Module):
             in_feats=in_feats,
             h_feats=h_feats,
             n_hops=n_hops,
-            dropout=dropout,
+            nas_dropout=nas_dropout,
+            nss_dropout=nss_dropout,
             n_intervals=n_intervals,
             nie=nie,
             nrl=nrl,
@@ -121,6 +91,7 @@ class FlatGNN(nn.Module):
         hidden_dim = {
             "multi-con": max(h_feats * (n_hops - n_intervals + 2), h_feats),
             "concat": h_feats,
+            "ordered-gating": h_feats,
             "only-concat": h_feats * (n_hops + 1),
             "max": h_feats,
             "mean": h_feats,
@@ -128,27 +99,31 @@ class FlatGNN(nn.Module):
             "lstm": h_feats,
             "none": h_feats,
         }[nrl]
-        self.beta = lda / n_layers
-        self.flat_gnn_s = nn.ModuleList(
-            FlatGNN_layer(
-                in_feats=hidden_dim,
-                h_feats=h_feats,
-                n_hops=n_hops,
-                dropout=dropout,
-                n_intervals=n_intervals,
-                no_save=True,
-                nie=nie,
-                nrl=nrl,
-                act=act,
-                layer_norm=layer_norm,
+
+        self.flat_gnn_s = None
+        if n_layers > 1:
+            self.beta = lda / n_layers
+            self.flat_gnn_s = nn.ModuleList(
+                FlatGNN_layer(
+                    in_feats=hidden_dim,
+                    h_feats=h_feats,
+                    n_hops=n_hops,
+                    nas_dropout=nas_dropout,
+                    nss_dropout=nss_dropout,
+                    n_intervals=n_intervals,
+                    no_save=True,
+                    nie=nie,
+                    nrl=nrl,
+                    act=act,
+                    layer_norm=layer_norm,
+                ) for _ in range(n_layers - 1)
             )
-            for _ in range(n_layers - 1)
-        )
 
         self.classifier = MLP(
             in_feats={
                 "multi-con": hidden_dim,
                 "concat": h_feats,
+                "ordered-gating": h_feats,
                 "only-concat": h_feats * (n_hops + 1),
                 "max": h_feats,
                 "mean": h_feats,
@@ -158,7 +133,7 @@ class FlatGNN(nn.Module):
             }[nrl],
             h_feats=[n_clusters],
             acts=[nn.Identity()],
-            dropout=dropout2,
+            dropout=clf_dropout,
             layer_norm=False,
         )
 
@@ -176,16 +151,13 @@ class FlatGNN(nn.Module):
         graph=None,
         device=None,
     ):
-        z_flat_gnn = torch.cat(self.flat_gnn(graph=graph, device=device), dim=-1)
-        for _, flat_gnn_s in enumerate(self.flat_gnn_s):
-            z_flat_gnn = (
-                self.beta
-                * torch.cat(
-                    flat_gnn_s(graph=graph, device=device, feats=z_flat_gnn),
-                    dim=-1,
+        z_flat_gnn = self.flat_gnn(graph=graph, device=device)
+        if self.flat_gnn_s is not None:
+            for _, flat_gnn_s in enumerate(self.flat_gnn_s):
+                z_flat_gnn = (
+                    self.beta * flat_gnn_s(graph=graph, device=device, feats=z_flat_gnn) +
+                    (1 - self.beta) * z_flat_gnn
                 )
-                + (1 - self.beta) * z_flat_gnn
-            )
 
         return z_flat_gnn
 
@@ -226,7 +198,8 @@ class FlatGNN(nn.Module):
         cnt = 0
         best_state_dict = None
         writer = SummaryWriter(
-            log_dir=f"logs/runs/{get_str_time()[:10]}/joint_{graph.name}_{split_id}_{self.h_feats}_{get_str_time()[11:]}"
+            log_dir=
+            f"logs/runs/{get_str_time()[:10]}/joint_{graph.name}_{split_id}_{self.h_feats}_{get_str_time()[11:]}"
         )
 
         t_start = time.time()

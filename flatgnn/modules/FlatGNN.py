@@ -39,6 +39,7 @@ from ..utils import preprocess_neighborhoods
 from .DeepSets import DeepSets
 from .LSTM import LSTM
 from .MLP import MLP
+from .orderedGating import ONGNNConv
 
 acts = {
     "relu": nn.ReLU,
@@ -49,16 +50,16 @@ acts = {
 
 class FlatGNN(nn.Module):
     """FlatGNN."""
-
     def __init__(
         self,
         in_feats,
         h_feats,
         n_hops,
-        dropout=0.0,
+        nas_dropout=0.0,
+        nss_dropout=0.8,
         n_intervals=3,
         no_save=False,
-        nie="deepsets",
+        nie="gcn-nie-nst",
         nrl="concat",
         act="relu",
         layer_norm=True,
@@ -77,10 +78,9 @@ class FlatGNN(nn.Module):
                     in_feats=in_feats,
                     h_feats=h_feats,
                     acts=[acts[act]()],
-                    dropout=dropout,
+                    dropout=nas_dropout,
                     layer_norm=layer_norm,
-                )
-                for _ in range(N_NIE)
+                ) for _ in range(N_NIE)
             )
         elif nie == "gcn-nie-nst":
             self.nei_ind_emb = nn.ModuleList(
@@ -88,10 +88,9 @@ class FlatGNN(nn.Module):
                     in_feats=in_feats,
                     h_feats=[h_feats],
                     acts=[acts[act]()],
-                    dropout=dropout,
+                    dropout=nas_dropout,
                     layer_norm=layer_norm,
-                )
-                for _ in range(N_NIE)
+                ) for _ in range(N_NIE)
             )
         elif nie == "gcn-nie-st":
             self.nei_ind_emb = nn.ModuleList(
@@ -100,7 +99,7 @@ class FlatGNN(nn.Module):
                         in_feats=in_feats,
                         h_feats=[h_feats],
                         acts=[acts[act]()],
-                        dropout=0,
+                        dropout=nas_dropout,
                         layer_norm=layer_norm,
                     )
                 ]
@@ -112,17 +111,14 @@ class FlatGNN(nn.Module):
                         in_feats=in_feats if i == 1 else h_feats,
                         out_feats=h_feats,
                         activation=acts[act](),
-                    )
-                    if i != 0
-                    else MLP(
+                    ) if i != 0 else MLP(
                         in_feats=in_feats,
                         h_feats=[h_feats],
                         acts=[acts[act]()],
-                        dropout=0,
+                        dropout=nas_dropout,
                         layer_norm=layer_norm,
                     )
-                )
-                for i in range(N_NIE)
+                ) for i in range(N_NIE)
             )
         elif nie == "gcn-nnie-st":
             self.nei_ind_emb = nn.ModuleList(
@@ -131,17 +127,14 @@ class FlatGNN(nn.Module):
                         in_feats=h_feats,
                         out_feats=h_feats,
                         activation=acts[act](),
-                    )
-                    if i != 0
-                    else MLP(
+                    ) if i != 0 else MLP(
                         in_feats=in_feats,
                         h_feats=[h_feats],
                         acts=[acts[act]()],
-                        dropout=0,
+                        dropout=nas_dropout,
                         layer_norm=layer_norm,
                     )
-                )
-                for i in range(N_NIE)
+                ) for i in range(N_NIE)
             )
 
         self.nei_feats = None
@@ -156,11 +149,41 @@ class FlatGNN(nn.Module):
                         in_feats=h_feats * N_NIE,
                         h_feats=[h_feats],
                         acts=[acts[act]()],
-                        dropout=dropout,
+                        dropout=nss_dropout,
                         layer_norm=layer_norm,
                     )
                 ],
             )
+        if nrl == "ordered-gating":
+            self.linear_trans_in = ModuleList()
+            self.linear_trans_out = Linear(h_feats, h_feats)
+            self.norm_input = ModuleList()
+            self.convs = ModuleList()
+
+            self.tm_norm = ModuleList()
+            self.tm_net = ModuleList()
+
+            global_gating = False
+            self.chunk_size = chunk_size = 128
+            if global_gating == True:
+                tm_net = Linear(2 * h_feats, chunk_size)
+
+            for i in range(n_hops):
+                self.tm_norm.append(LayerNorm(h_feats))
+                if global_gating == True:
+                    self.tm_net.append(tm_net)
+                else:
+                    self.tm_net.append(Linear(2 * h_feats, chunk_size))
+                self.convs.append(
+                    ONGNNConv(
+                        tm_net=self.tm_net[i],
+                        tm_norm=self.tm_norm[i],
+                        simple_gating=False,
+                        tm=True,
+                        diff_or=True,
+                        repeats=int(h_feats / chunk_size),
+                    )
+                )
         elif nrl == "multi-con":
             self.nei_rel_learn = nn.ModuleList(
                 [
@@ -168,10 +191,9 @@ class FlatGNN(nn.Module):
                         in_feats=h_feats * self.interval,
                         h_feats=[h_feats],
                         acts=[acts[act]()],
-                        dropout=dropout,
+                        dropout=nss_dropout,
                         layer_norm=layer_norm,
-                    )
-                    for _ in range(self.n_relations + 1)
+                    ) for _ in range(self.n_relations + 1)
                 ]
             )
         elif nrl in ["max", "sum", "mean"]:
@@ -181,7 +203,7 @@ class FlatGNN(nn.Module):
                         in_feats=h_feats,
                         h_feats=[h_feats],
                         acts=[acts[act]()],
-                        dropout=dropout,
+                        dropout=nss_dropout,
                         layer_norm=layer_norm,
                     )
                 ],
@@ -190,13 +212,13 @@ class FlatGNN(nn.Module):
             self.nei_rel_learn = nn.ModuleList(
                 [
                     nn.Sequential(
-                        nn.Dropout(dropout),
+                        nn.Dropout(nss_dropout),
                         LSTM(
                             input_dim=h_feats,
                             hidden_dim=h_feats,
                             output_dim=h_feats,
                             num_layers=1,
-                            dropout=dropout,
+                            dropout=nss_dropout,
                         ),
                     )
                 ],
@@ -235,6 +257,7 @@ class FlatGNN(nn.Module):
                         sparse_sizes=adj.shape,
                     ),
                     features=features,
+                    row_normalized=graph.row_normalized,
                     name=graph.name,
                     n_hops=self.n_hops,
                     set_diag=True,
@@ -254,11 +277,10 @@ class FlatGNN(nn.Module):
                             row=adj.row.long(),
                             col=adj.col.long(),
                             sparse_sizes=adj.shape,
-                        )
-                        if self.adj is None
-                        else self.adj
+                        ) if self.adj is None else self.adj
                     ),
                     features=features,
+                    row_normalized=graph.row_normalized,
                     name=graph.name,
                     n_hops=self.n_hops,
                     set_diag=True,
@@ -284,61 +306,53 @@ class FlatGNN(nn.Module):
         hops_feats = torch.cat(self.ns, dim=1)
 
         if self.nrl == "none":
-            return [self.ns[-1]]
+            return self.ns[-1]
 
         if self.nrl == "only-concat":
-            return [hops_feats]
+            return hops_feats
 
         if self.nrl == "concat":
-            return [
-                torch.cat(
-                    [nei_rel_learn(hops_feats) for nei_rel_learn in self.nei_rel_learn],
-                    dim=1,
+            return torch.cat(
+                [nei_rel_learn(hops_feats) for nei_rel_learn in self.nei_rel_learn],
+                dim=-1,
+            )
+        if self.nrl == "ordered-gating":
+            check_signal = []
+            h = self.ns[0]
+            tm_signal = h.new_zeros(self.chunk_size)
+            for j, conv in enumerate(self.convs):
+                h = F.dropout(h, p=0.2, training=self.training)
+                m = F.dropout(self.ns[j + 1], p=0.2, training=self.training)
+                h, tm_signal = conv(
+                    h,
+                    m,
+                    last_tm_signal=tm_signal,
                 )
-            ]
-
+                check_signal.append(dict(zip(["tm_signal"], [tm_signal])))
+            return h
         if self.nrl == "multi-con":
-            return [
-                torch.cat(
-                    [
-                        self.nei_rel_learn[i](
-                            hops_feats[:, self.h_feats * i : self.h_feats * (i + self.interval)]
-                        )
-                        for i in range(self.n_relations + 1)
-                    ],
-                    dim=1,
-                )
-            ]
+            return torch.cat(
+                [
+                    self.nei_rel_learn[i](
+                        hops_feats[:, self.h_feats * i:self.h_feats * (i + self.interval)]
+                    ) for i in range(self.n_relations + 1)
+                ],
+                dim=-1,
+            )
         if self.nrl == "max":
-            return [
-                self.nei_rel_learn[0](
-                    torch.max(
-                        torch.stack(self.ns, dim=1),
-                        dim=1,
-                    )[0]
-                )
-            ]
+            return self.nei_rel_learn[0](torch.max(
+                torch.stack(self.ns, dim=1),
+                dim=1,
+            )[0])
         if self.nrl == "mean":
-            return [
-                self.nei_rel_learn[0](
-                    torch.mean(
-                        torch.stack(self.ns, dim=1),
-                        dim=1,
-                    )
-                )
-            ]
+            return self.nei_rel_learn[0](torch.mean(
+                torch.stack(self.ns, dim=1),
+                dim=1,
+            ))
         if self.nrl == "sum":
-            return [
-                self.nei_rel_learn[0](
-                    torch.sum(
-                        torch.stack(self.ns, dim=1),
-                        dim=1,
-                    )
-                )
-            ]
+            return self.nei_rel_learn[0](torch.sum(
+                torch.stack(self.ns, dim=1),
+                dim=1,
+            ))
         if self.nrl == "lstm":
-            return [
-                self.nei_rel_learn[0](
-                    torch.stack(self.ns, dim=1),
-                )
-            ]
+            return self.nei_rel_learn[0](torch.stack(self.ns, dim=1), )

@@ -39,6 +39,62 @@ import time
 from sklearn.metrics import accuracy_score as ACC
 import traceback
 
+norms = {
+    "chameleon": False,
+    "squirrel": True,
+    "actor": False,
+    "flickr": True,
+    "blogcatalog": True,
+    "roman-empire": False,
+    "amazon-ratings": True,
+    "photo": True,
+    "pubmed": True,
+    "wikics": False,
+    "cora": False,
+    "citeseer": False,
+    "texas": False,
+    "cornell": False,
+    "wisconsin": False,
+    "minesweeper": False,
+    "tolokers": False,
+    "questions": False,
+    "Johns Hopkins55": False,
+    "Reed98": False,
+    "Amherst41": False,
+    "Cornell5": False,
+    "corafull": False,
+    "arxiv-year": False,
+    "snap-patents": False,
+}
+
+feats = {
+    "texas": 512,
+    "cornell": 512,
+    "wisconsin": 512,
+    "chameleon": 512,
+    "squirrel": 512,
+    "actor": 512,
+    "cora": 512,
+    "citeseer": 512,
+    "pubmed": 500,
+    "roman-empire": 300,
+    "amazon-ratings": 300,
+    "minesweeper": 512,
+    "tolokers": 512,
+    "questions": 512,
+    "flickr": 512,
+    "blogcatalog": 512,
+    "Johns Hopkins55": 512,
+    "Reed98": 512,
+    "Amherst41": 512,
+    "Cornell5": 512,
+    "corafull": 512,
+    "wikics": 300,
+    "photo": 256,
+    "arxiv-year": 512,
+    "snap-patents": 512,
+}
+
 l2_coefs = {
     "texas": 0.00005,
     "cornell": 0.00005,
@@ -124,14 +180,12 @@ ess = {
     "texas": 100,
     "cornell": 100,
     "wisconsin": 100,
-    # "chameleon": 30,
     "chameleon": 100,
     "squirrel": 200,
     "actor": 100,
     "cora": 100,
     "citeseer": 200,
     "pubmed": 300,
-    # "roman-empire": 300,
     "roman-empire": 100,
     "amazon-ratings": 100,
     "flickr": 100,
@@ -149,16 +203,16 @@ ess = {
     "arxiv-year": 200,
     "snap-patents": 200,
 }
-dropouts = {
+nas_dropouts = {
     "flickr": 0.8,
-    "blogcatalog": 0.8,
+    "blogcatalog": 0.5,
     "chameleon": 0.8,
     "squirrel": 0.8,
-    "actor": 0.5,
+    "actor": 0.0,
     "pubmed": 0.5,
     "photo": 0.4,
     "roman-empire": 0.2,
-    "amazon-ratings": 0.2,
+    "amazon-ratings": 0.0,
     "wikics": 0.2,
     "cora": 0.8,
     "citeseer": 0.8,
@@ -176,16 +230,43 @@ dropouts = {
     "cornell": 0.0,
     "wisconsin": 0.0,
 }
-dropouts2 = {
+nss_dropouts = {
+    "flickr": 0.8,
+    "blogcatalog": 0.8,
+    "chameleon": 0.8,
+    "squirrel": 0.8,
+    "actor": 0.8,
+    "pubmed": 0.5,
+    "photo": 0.8,
+    "roman-empire": 0.2,
+    "amazon-ratings": 0.5,
+    "wikics": 0.2,
+    "cora": 0.8,
+    "citeseer": 0.8,
+    "corafull": 0.4,
+    "arxiv-year": 0.5,
+    "snap-patents": 0.5,
+    "minesweeper": 0.0,
+    "tolokers": 0.0,
+    "questions": 0.0,
+    "Johns Hopkins55": 0.0,
+    "Reed98": 0.0,
+    "Amherst41": 0.0,
+    "Cornell5": 0.0,
+    "texas": 0.8,
+    "cornell": 0.0,
+    "wisconsin": 0.0,
+}
+clf_dropouts = {
     "flickr": 0.9,
     "blogcatalog": 0.9,
     "chameleon": 0.9,
     "squirrel": 0.9,
     "actor": 0.9,
-    "photo": 0.5,
+    "photo": 0.9,
     "pubmed": 0.9,
     "roman-empire": 0.2,
-    "amazon-ratings": 0.5,
+    "amazon-ratings": 0.9,
     "wikics": 0.9,
     "cora": 0.9,
     "citeseer": 0.9,
@@ -208,10 +289,10 @@ n_hopss = {
     "squirrel": 64,
     "actor": 1,
     "flickr": 2,
-    "blogcatalog": 2,
+    "blogcatalog": 10,
     "roman-empire": 1,
-    "amazon-ratings": 8,
-    "photo": 2,
+    "amazon-ratings": 6,
+    "photo": 8,
     "pubmed": 3,
     "wikics": 3,
     "cora": 3,
@@ -260,13 +341,13 @@ n_layers = {
 nrls = {
     "chameleon": "max",
     "squirrel": "concat",
-    "actor": "max",
+    "actor": "concat",
     "flickr": "lstm",
     "blogcatalog": "concat",
     "roman-empire": "lstm",
-    "amazon-ratings": "only-concat",
+    "amazon-ratings": "concat",
     "pubmed": "mean",
-    "photo": "only-concat",
+    "photo": "concat",
     "wikics": "max",
     "cora": "concat",
     "citeseer": "concat",
@@ -410,38 +491,40 @@ def graph_diameter(g):
 # }
 
 DATASETS = {
-    "critical": [
-        # 890
-        "chameleon",
-        # 2,223
-        "squirrel",
-        # # 10,000
-        # "minesweeper",
-        # # 11,758
-        # "tolokers",
-        # # 22,662
-        # "roman-empire",
-        # # 24,492
-        # "amazon-ratings",
-        # 48,921
-        # "questions",
-    ],
+    "critical":
+        [
+            # 890
+            "chameleon",
+            # 2,223
+            "squirrel",
+            # # 10,000
+            # "minesweeper",
+            # # 11,758
+            # "tolokers",
+            # # 22,662
+            # "roman-empire",
+            # # 24,492
+            # "amazon-ratings",
+            # 48,921
+            # "questions",
+        ],
     "cola": [
         "flickr",
         "blogcatalog",
     ],
-    "pyg": [
-        # "texas",
-        # "cornell",
-        # "wisconsin",
-        # "corafull",
-        # "cora",
-        # "citeseer",
-        "photo",
-        "actor",
-        "pubmed",
-        "wikics",
-    ],
+    "pyg":
+        [
+            # "texas",
+            # "cornell",
+            # "wisconsin",
+            # "corafull",
+            # "cora",
+            # "citeseer",
+            "photo",
+            "actor",
+            "pubmed",
+            "wikics",
+        ],
     "Critical": [
         # 22,662
         "roman-empire",
@@ -494,9 +577,9 @@ def main(
         dataset_name=dataset,
         directory=DATA.DATA_DIR,
         source=source,
-        raw_normalize=False,
-        rm_self_loop=True,
-        add_self_loop=False,
+        row_normalize=norms[dataset],
+        rm_self_loop=False,
+        add_self_loop=True,
         to_simple=True,
         verbosity=3,
     )
@@ -522,8 +605,9 @@ def main(
         "lr": lrs[dataset],
         "h_feats": h_feats,
         "l2_coef": l2_coefs[dataset],
-        "dropout": dropouts[dataset],
-        "dropout2": dropouts2[dataset],
+        "nas_dropout": nas_dropouts[dataset],
+        "nss_dropout": nss_dropouts[dataset],
+        "clf_dropout": clf_dropouts[dataset],
         "n_epochs": 2000,
         "n_hops": N_HOPS,
         "n_layers": n_layers[dataset],
@@ -532,7 +616,11 @@ def main(
         "act": acts[dataset],
         "layer_norm": layer_norms[dataset],
     }
-    tab_printer(params)
+    params_all = {
+        "row_normalized": norms[dataset],
+        **params,
+    }
+    tab_printer(params_all)
 
     t_start = time.time()
 
@@ -595,7 +683,7 @@ def main(
             "dataset": dataset,
         },
         append_info={
-            "args": params,
+            "args": params_all,
             "time": elapsed_time,
             "bs": BATCH_SIZE,
             "source": source,
@@ -693,6 +781,7 @@ if __name__ == "__main__":
 
     DIM_BOUND = {
         "pubmed": 500,
+        "photo": 256,
         "roman-empire": 300,
         "amazon-ratings": 300,
         "wikics": 300,
@@ -703,9 +792,8 @@ if __name__ == "__main__":
             dataset=args.dataset,
             source=args.source,
             h_feats=(
-                DIM_BOUND[args.dataset]
-                if args.dataset in DIM_BOUND.keys() and args.h_feats > DIM_BOUND[args.dataset]
-                else args.h_feats
+                DIM_BOUND[args.dataset] if args.dataset in DIM_BOUND.keys() and
+                args.h_feats > DIM_BOUND[args.dataset] else args.h_feats
             ),
             MODEL=args.model,
             BATCH_SIZE=args.batch_size,
@@ -723,9 +811,8 @@ if __name__ == "__main__":
                         dataset=dataset,
                         source=source,
                         h_feats=(
-                            DIM_BOUND[dataset]
-                            if dataset in DIM_BOUND.keys() and args.h_feats > DIM_BOUND[dataset]
-                            else args.h_feats
+                            DIM_BOUND[dataset] if dataset in DIM_BOUND.keys() and
+                            args.h_feats > DIM_BOUND[dataset] else args.h_feats
                         ),
                         MODEL=args.model,
                         BATCH_SIZE=args.batch_size,

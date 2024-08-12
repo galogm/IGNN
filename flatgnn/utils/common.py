@@ -33,19 +33,16 @@ def get_splits_mask(
         split_save_dir=SPLIT_DIR,
     )
     train_mask = (
-        torch.zeros(graph.num_nodes())
-        .scatter_(0, torch.tensor(train_idx, dtype=torch.int64), 1)
-        .bool()
+        torch.zeros(graph.num_nodes()).scatter_(0, torch.tensor(train_idx, dtype=torch.int64),
+                                                1).bool()
     )
     val_mask = (
-        torch.zeros(graph.num_nodes())
-        .scatter_(0, torch.tensor(val_idx, dtype=torch.int64), 1)
-        .bool()
+        torch.zeros(graph.num_nodes()).scatter_(0, torch.tensor(val_idx, dtype=torch.int64),
+                                                1).bool()
     )
     test_mask = (
-        torch.zeros(graph.num_nodes())
-        .scatter_(0, torch.tensor(test_idx, dtype=torch.int64), 1)
-        .bool()
+        torch.zeros(graph.num_nodes()).scatter_(0, torch.tensor(test_idx, dtype=torch.int64),
+                                                1).bool()
     )
 
     return train_mask, val_mask, test_mask
@@ -97,6 +94,7 @@ def preprocess_neighborhoods(
     set_diag=True,
     remove_diag=False,
     symm_norm=False,
+    row_normalized=True,
     device: torch.device = torch.device("cpu"),
     no_save=False,
     return_adj=False,
@@ -125,6 +123,7 @@ def preprocess_neighborhoods(
             deg_inv[deg_inv == float("inf")] = 0
             adj = deg_inv.view(-1, 1) * adj
 
+    # features = F.normalize(features, dim=1) if row_normalized else features
     nei_feats = [features.to(device)]
     if no_save:
         adj = adj.to_torch_sparse_csr_tensor() if process_adj else adj
@@ -139,7 +138,8 @@ def preprocess_neighborhoods(
     x = features.numpy()
     sym = "sym" if symm_norm else "nsy"
     diag = "diag" if set_diag else "ndiag"
-    base = Path(f"{save_dir}/{name}/{diag}/{sym}")
+    norm = "norm" if row_normalized else "nnorm"
+    base = Path(f"{save_dir}/{name}/{norm}/{diag}/{sym}")
     for i in tqdm(range(1, n_hops + 1)):
         file = base.joinpath(f"{i}")
         if file.exists():
