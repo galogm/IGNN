@@ -164,7 +164,7 @@ class FlatGNN(nn.Module):
             self.tm_net = ModuleList()
 
             global_gating = False
-            self.chunk_size = chunk_size = 128
+            self.chunk_size = chunk_size = 64
             if global_gating == True:
                 tm_net = Linear(2 * h_feats, chunk_size)
 
@@ -321,8 +321,8 @@ class FlatGNN(nn.Module):
             h = self.ns[0]
             tm_signal = h.new_zeros(self.chunk_size)
             for j, conv in enumerate(self.convs):
-                h = F.dropout(h, p=0.2, training=self.training)
-                m = F.dropout(self.ns[j + 1], p=0.2, training=self.training)
+                h = F.dropout(h, p=0.1, training=self.training)
+                m = F.dropout(self.ns[j + 1], p=0.1, training=self.training)
                 h, tm_signal = conv(
                     h,
                     m,
