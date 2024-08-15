@@ -3,11 +3,12 @@ from the_utils import csv_to_table
 ROW_ORDER = [
     "FlatGNN-gcn-nie-nst-only-concat",
     "FlatGNN-gcn-nie-nst-concat",
-    "FlatGNN-gcn-nie-nst-lstm",
-    "FlatGNN-gcn-nie-nst-mean",
-    "FlatGNN-gcn-nie-nst-sum",
+    # "FlatGNN-gcn-nie-nst-mean",
+    # "FlatGNN-gcn-nie-nst-sum",
     "FlatGNN-gcn-nie-nst-max",
-    # "FlatGNN-gcn-multi-con",
+    "FlatGNN-gcn-nie-nst-lstm",
+    "FlatGNN-gcn-nie-nst-ordered-gating",
+    # "FlatGNN-gcn-nie-nst-None",
 ]
 
 COL_ORDER = [
