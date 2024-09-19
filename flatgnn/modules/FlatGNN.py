@@ -50,6 +50,7 @@ acts = {
 
 class FlatGNN(nn.Module):
     """FlatGNN."""
+
     def __init__(
         self,
         in_feats,
@@ -58,6 +59,7 @@ class FlatGNN(nn.Module):
         nas_dropout=0.0,
         nss_dropout=0.8,
         n_intervals=3,
+        out_ndim_trans=64,
         no_save=False,
         nie="gcn-nie-nst",
         nrl="concat",
@@ -80,7 +82,8 @@ class FlatGNN(nn.Module):
                     acts=[acts[act]()],
                     dropout=nas_dropout,
                     layer_norm=layer_norm,
-                ) for _ in range(N_NIE)
+                )
+                for _ in range(N_NIE)
             )
         elif nie == "gcn-nie-nst":
             self.nei_ind_emb = nn.ModuleList(
@@ -90,7 +93,8 @@ class FlatGNN(nn.Module):
                     acts=[acts[act]()],
                     dropout=nas_dropout,
                     layer_norm=layer_norm,
-                ) for _ in range(N_NIE)
+                )
+                for _ in range(N_NIE)
             )
         elif nie == "gcn-nie-st":
             self.nei_ind_emb = nn.ModuleList(
@@ -111,14 +115,17 @@ class FlatGNN(nn.Module):
                         in_feats=in_feats if i == 1 else h_feats,
                         out_feats=h_feats,
                         activation=acts[act](),
-                    ) if i != 0 else MLP(
+                    )
+                    if i != 0
+                    else MLP(
                         in_feats=in_feats,
                         h_feats=[h_feats],
                         acts=[acts[act]()],
                         dropout=nas_dropout,
                         layer_norm=layer_norm,
                     )
-                ) for i in range(N_NIE)
+                )
+                for i in range(N_NIE)
             )
         elif nie == "gcn-nnie-st":
             self.nei_ind_emb = nn.ModuleList(
@@ -127,14 +134,17 @@ class FlatGNN(nn.Module):
                         in_feats=h_feats,
                         out_feats=h_feats,
                         activation=acts[act](),
-                    ) if i != 0 else MLP(
+                    )
+                    if i != 0
+                    else MLP(
                         in_feats=in_feats,
                         h_feats=[h_feats],
                         acts=[acts[act]()],
                         dropout=nas_dropout,
                         layer_norm=layer_norm,
                     )
-                ) for i in range(N_NIE)
+                )
+                for i in range(N_NIE)
             )
 
         self.nei_feats = None
@@ -154,36 +164,6 @@ class FlatGNN(nn.Module):
                     )
                 ],
             )
-        if nrl == "ordered-gating":
-            self.linear_trans_in = ModuleList()
-            self.linear_trans_out = Linear(h_feats, h_feats)
-            self.norm_input = ModuleList()
-            self.convs = ModuleList()
-
-            self.tm_norm = ModuleList()
-            self.tm_net = ModuleList()
-
-            global_gating = False
-            self.chunk_size = chunk_size = 64
-            if global_gating == True:
-                tm_net = Linear(2 * h_feats, chunk_size)
-
-            for i in range(n_hops):
-                self.tm_norm.append(LayerNorm(h_feats))
-                if global_gating == True:
-                    self.tm_net.append(tm_net)
-                else:
-                    self.tm_net.append(Linear(2 * h_feats, chunk_size))
-                self.convs.append(
-                    ONGNNConv(
-                        tm_net=self.tm_net[i],
-                        tm_norm=self.tm_norm[i],
-                        simple_gating=False,
-                        tm=True,
-                        diff_or=True,
-                        repeats=int(h_feats / chunk_size),
-                    )
-                )
         elif nrl == "multi-con":
             self.nei_rel_learn = nn.ModuleList(
                 [
@@ -193,7 +173,8 @@ class FlatGNN(nn.Module):
                         acts=[acts[act]()],
                         dropout=nss_dropout,
                         layer_norm=layer_norm,
-                    ) for _ in range(self.n_relations + 1)
+                    )
+                    for _ in range(self.n_relations + 1)
                 ]
             )
         elif nrl in ["max", "sum", "mean"]:
@@ -223,6 +204,85 @@ class FlatGNN(nn.Module):
                     )
                 ],
             )
+        elif nrl == "ordered-gating":
+            self.linear_trans_in = ModuleList()
+            self.linear_trans_out = Linear(h_feats, h_feats)
+            self.norm_input = ModuleList()
+            self.convs = ModuleList()
+
+            self.tm_norm = ModuleList()
+            self.tm_net = ModuleList()
+
+            global_gating = False
+            self.chunk_size = chunk_size = 64
+            if global_gating == True:
+                tm_net = Linear(2 * h_feats, chunk_size)
+
+            for i in range(n_hops):
+                self.tm_norm.append(LayerNorm(h_feats))
+                if global_gating == True:
+                    self.tm_net.append(tm_net)
+                else:
+                    self.tm_net.append(Linear(2 * h_feats, chunk_size))
+                self.convs.append(
+                    ONGNNConv(
+                        tm_net=self.tm_net[i],
+                        tm_norm=self.tm_norm[i],
+                        simple_gating=False,
+                        tm=True,
+                        diff_or=True,
+                        repeats=int(h_feats / chunk_size),
+                    )
+                )
+        elif nrl == "self-attention":
+            self.fc = MLP(
+                in_feats=h_feats * N_NIE,
+                h_feats=[h_feats],
+                acts=[acts[act]()],
+                dropout=nss_dropout,
+                layer_norm=layer_norm,
+            )
+            self.fc1 = MLP(
+                in_feats=h_feats * N_NIE,
+                h_feats=[h_feats],
+                acts=[acts[act]()],
+                dropout=nss_dropout,
+                layer_norm=layer_norm,
+            )
+            self.map = MLP(
+                in_feats=in_feats,
+                h_feats=[h_feats],
+                acts=[acts[act]()],
+                dropout=nss_dropout,
+                layer_norm=layer_norm,
+            )
+
+            self.num_heads = 4
+
+            self.in_ndim_trans=h_feats * N_NIE
+            self.out_ndim_trans = out_ndim_trans
+
+            self.w_q = MLP(
+                in_feats=self.in_ndim_trans,
+                h_feats=[self.out_ndim_trans * self.num_heads],
+                acts=[nn.Identity()],
+                dropout=0.5,
+                layer_norm=False,
+            )
+            self.w_k = MLP(
+                in_feats=self.in_ndim_trans,
+                h_feats=[self.out_ndim_trans * self.num_heads],
+                acts=[nn.Identity()],
+                dropout=0.5,
+                layer_norm=False,
+            )
+            self.w_v = MLP(
+                in_feats=self.in_ndim_trans,
+                h_feats=[self.out_ndim_trans * self.num_heads],
+                acts=[nn.Identity()],
+                dropout=0.5,
+                layer_norm=False,
+            )
         self.adj = None
 
     def forward(
@@ -230,6 +290,7 @@ class FlatGNN(nn.Module):
         graph: dgl.DGLGraph,
         device: torch.device,
         feats=None,
+        batch_idx=None,
     ):
         self.to(device=device)
         self.ns = []
@@ -277,7 +338,9 @@ class FlatGNN(nn.Module):
                             row=adj.row.long(),
                             col=adj.col.long(),
                             sparse_sizes=adj.shape,
-                        ) if self.adj is None else self.adj
+                        )
+                        if self.adj is None
+                        else self.adj
                     ),
                     features=features,
                     row_normalized=graph.row_normalized,
@@ -298,7 +361,11 @@ class FlatGNN(nn.Module):
                 )
             if self.nie in ["deepsets", "gcn-nie-nst"]:
                 for i in range(self.n_hops + 1):
-                    self.ns.append(self.nei_ind_emb[i](self.nei_feats[i]))
+                    self.ns.append(
+                        self.nei_ind_emb[i](
+                            self.nei_feats[i] if batch_idx is None else self.nei_feats[i][batch_idx]
+                        )
+                    )
             elif self.nie in ["gcn-nie-st"]:
                 for i in range(self.n_hops + 1):
                     self.ns.append(self.nei_ind_emb[0](self.nei_feats[i]))
@@ -316,6 +383,41 @@ class FlatGNN(nn.Module):
                 [nei_rel_learn(hops_feats) for nei_rel_learn in self.nei_rel_learn],
                 dim=-1,
             )
+        if self.nrl == "multi-con":
+            return torch.cat(
+                [
+                    self.nei_rel_learn[i](
+                        hops_feats[:, self.h_feats * i : self.h_feats * (i + self.interval)]
+                    )
+                    for i in range(self.n_relations + 1)
+                ],
+                dim=-1,
+            )
+        if self.nrl == "max":
+            return self.nei_rel_learn[0](
+                torch.max(
+                    torch.stack(self.ns, dim=1),
+                    dim=1,
+                )[0]
+            )
+        if self.nrl == "mean":
+            return self.nei_rel_learn[0](
+                torch.mean(
+                    torch.stack(self.ns, dim=1),
+                    dim=1,
+                )
+            )
+        if self.nrl == "sum":
+            return self.nei_rel_learn[0](
+                torch.sum(
+                    torch.stack(self.ns, dim=1),
+                    dim=1,
+                )
+            )
+        if self.nrl == "lstm":
+            return self.nei_rel_learn[0](
+                torch.stack(self.ns, dim=1),
+            )
         if self.nrl == "ordered-gating":
             check_signal = []
             h = self.ns[0]
@@ -330,29 +432,120 @@ class FlatGNN(nn.Module):
                 )
                 check_signal.append(dict(zip(["tm_signal"], [tm_signal])))
             return h
-        if self.nrl == "multi-con":
-            return torch.cat(
-                [
-                    self.nei_rel_learn[i](
-                        hops_feats[:, self.h_feats * i:self.h_feats * (i + self.interval)]
-                    ) for i in range(self.n_relations + 1)
-                ],
-                dim=-1,
+        if self.nrl == "self-attention":
+            # Stack the tensors to get a tensor of shape (N, k, D)
+            # H_stack = torch.stack(self.ns, dim=1)  # Shape: (N, k, D)
+            H_stack = hops_feats  # Shape: (N, k, D)
+
+            H = self.fc(hops_feats)
+            h_trans = H_stack if self.in_ndim_trans == H_stack.shape[1] else H
+            # H_d = H.detach()
+
+            # Apply a linear transformation (optional) before self-attention
+            query = self.w_q(h_trans).reshape(
+                -1,
+                self.num_heads,
+                self.out_ndim_trans ,
+            )  # Shape: (N, k, D)
+            key = self.w_k(h_trans).reshape(
+                -1,
+                self.num_heads,
+                self.out_ndim_trans ,
+            )  # Shape: (N, k, D)
+            # value = self.w_v(H_stack)  # Shape: (N, k, D)
+            value = self.w_v(h_trans).reshape(
+                -1,
+                self.num_heads,
+                self.out_ndim_trans ,
+            )  # Shape: (N, k, D)
+            # value = H.reshape(
+            #     -1,
+            #     1,
+            #     self.h_feats,
+            # )
+            # query = self.w_q(self.ns[0])  # Shape: (N, k, D)
+            # key = self.w_k(self.ns[0])  # Shape: (N, k, D)
+            # value = self.w_v(self.ns[0])  # Shape: (N, k, D)
+
+            # Compute attention scores (Shape: (N, k, k))
+            # attention_scores = torch.matmul(
+            #     query / torch.norm(query, p=2), key.t() / torch.norm(key, p=2)
+            # ) / (key.size(-1) ** 0.5) + torch.eye(
+            #     value.shape[0],
+            #     device=value.device,
+            # )
+
+            attention_output = full_attention_conv(
+                query, key, value, output_attn=False
             )
-        if self.nrl == "max":
-            return self.nei_rel_learn[0](torch.max(
-                torch.stack(self.ns, dim=1),
-                dim=1,
-            )[0])
-        if self.nrl == "mean":
-            return self.nei_rel_learn[0](torch.mean(
-                torch.stack(self.ns, dim=1),
-                dim=1,
-            ))
-        if self.nrl == "sum":
-            return self.nei_rel_learn[0](torch.sum(
-                torch.stack(self.ns, dim=1),
-                dim=1,
-            ))
-        if self.nrl == "lstm":
-            return self.nei_rel_learn[0](torch.stack(self.ns, dim=1), )
+
+            # attention_output = attention_output.mean(dim=1) + 0.5 * torch.matmul(
+            #     sim_matrix(H_stack.detach(), H_stack.detach()), H
+            # )
+            # attention_output = full_attention_conv(query, key, value)
+
+            # Normalize the attention scores to get the attention weights (Shape: (N, k, k))
+            # attention_weights = attention_scores + sim_matrix(H_stack.detach(), H_stack.detach())
+            # print(attention_weights)
+
+            # Compute the attention output by applying the attention weights to the values (Shape: (N, k, D))
+            # bias = sim_matrix(H_stack.detach(), H_stack.detach())
+            # bias_output = torch.matmul(
+            #     F.softmax(bias,dim=-1), value
+            # )
+            # attention_output= attention_output.mean(dim=1)
+
+            # Optionally, you can reduce the attention output to a single embedding vector per node
+            # by averaging or summing over the k dimension
+            # For this case, we'll reduce to (N, k) by summing over the D dimension.
+            # att = attention_output.sum(dim=-1)  # Shape: (N, k)
+
+            # return self.map(torch.cat((attention_output,H),dim=-1))
+            return torch.cat((H, attention_output.mean(dim=1)), dim=-1)
+            # return attention_output.mean(dim=,
+
+
+def sim_matrix(a, b, eps=1e-8):
+    """
+    added eps for numerical stability
+    """
+    a_n, b_n = a.norm(dim=1)[:, None], b.norm(dim=1)[:, None]
+    a_norm = a / torch.clamp(a_n, min=eps)
+    b_norm = b / torch.clamp(b_n, min=eps)
+    sim_mt = torch.mm(a_norm, b_norm.t())
+    return sim_mt
+
+
+def full_attention_conv(qs, ks, vs, output_attn=False):
+    # normalize input
+    qs = qs / torch.norm(qs, p=2)  # [N, H, M]
+    ks = ks / torch.norm(ks, p=2)  # [L, H, M]
+    N = qs.shape[0]
+
+    # numerator
+    kvs = torch.einsum("lhm,lhd->hmd", ks, vs)
+    attention_num = torch.einsum("nhm,hmd->nhd", qs, kvs)  # [N, H, D]
+    attention_num += N * vs
+
+    # denominator
+    all_ones = torch.ones([ks.shape[0]]).to(ks.device)
+    ks_sum = torch.einsum("lhm,l->hm", ks, all_ones)
+    attention_normalizer = torch.einsum("nhm,hm->nh", qs, ks_sum)  # [N, H]
+
+    # attentive aggregated results
+    attention_normalizer = torch.unsqueeze(
+        attention_normalizer, len(attention_normalizer.shape)
+    )  # [N, H, 1]
+    attention_normalizer += torch.ones_like(attention_normalizer) * N
+    attn_output = attention_num / attention_normalizer  # [N, H, D]
+
+    # compute attention for visualization if needed
+    if output_attn:
+        attention = torch.einsum("nhm,lhm->nlh", qs, ks).mean(dim=-1)  # [N, N]
+        normalizer = attention_normalizer.squeeze(dim=-1).mean(dim=-1, keepdims=True)  # [N,1]
+        attention = attention / normalizer
+
+    if output_attn:
+        return attn_output, attention
+    else:
+        return attn_output

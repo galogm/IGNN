@@ -14,6 +14,7 @@ from the_utils import draw_chart
 from the_utils import set_device
 from the_utils import set_seed
 from torch import nn
+from flatgnn.utils import eval_rocauc
 
 torch.set_printoptions(threshold=10_000)
 np.set_printoptions(threshold=10_000)
@@ -65,6 +66,12 @@ norms = {
     "corafull": False,
     "arxiv-year": False,
     "snap-patents": False,
+    "arxiv": False,
+    "proteins": False,
+    "products": False,
+    "Penn94": False,
+    "pokec": False,
+    "wiki": False,
 }
 
 feats = {
@@ -93,6 +100,12 @@ feats = {
     "photo": 256,
     "arxiv-year": 512,
     "snap-patents": 512,
+    "Penn94": 512,
+    "arxiv": 512,
+    "proteins": 512,
+    "products": 512,
+    "pokec": 512,
+    "wiki": 512,
 }
 
 l2_coefs = {
@@ -121,33 +134,45 @@ l2_coefs = {
     "photo": 0.00005,
     "arxiv-year": 0.00005,
     "snap-patents": 0.00005,
+    "arxiv": 0.00005,
+    "proteins": 0.00005,
+    "products": 0.00005,
+    "Penn94": 0.00005,
+    "pokec": 0.00005,
+    "wiki": 0.00005,
 }
 bss = {
-    "texas": 1024,
-    "cornell": 1024,
-    "wisconsin": 1024,
-    "chameleon": 1024,
-    "squirrel": 1024,
-    "actor": 1024,
-    "cora": 1024,
-    "citeseer": 1024,
-    "pubmed": 1024,
-    "roman-empire": 1024,
-    "amazon-ratings": 1024,
-    "minesweeper": 1024,
-    "tolokers": 1024,
-    "questions": 1024,
-    "flickr": 1024,
-    "blogcatalog": 1024,
-    "Johns Hopkins55": 1024,
-    "Reed98": 1024,
-    "Amherst41": 1024,
-    "Cornell5": 1024,
-    "corafull": 1024,
-    "wikics": 1024,
-    "photo": 1024,
-    "arxiv-year": 1024,
-    "snap-patents": 1024,
+    "texas": 100000,
+    "cornell": 100000,
+    "wisconsin": 100000,
+    "chameleon": 100000,
+    "squirrel": 100000,
+    "actor": 100000,
+    "cora": 100000,
+    "citeseer": 100000,
+    "pubmed": 100000,
+    "roman-empire": 100000,
+    "amazon-ratings": 100000,
+    "minesweeper": 100000,
+    "tolokers": 100000,
+    "questions": 100000,
+    "flickr": 100000,
+    "blogcatalog": 100000,
+    "Johns Hopkins55": 100000,
+    "Reed98": 100000,
+    "Amherst41": 100000,
+    "Cornell5": 100000,
+    "corafull": 100000,
+    "wikics": 100000,
+    "photo": 100000,
+    "arxiv-year": 100000,
+    "snap-patents": 100000,
+    "arxiv": 100000,
+    "proteins": 100000,
+    "products": 100000,
+    "Penn94": 100000,
+    "pokec": 100000,
+    "wiki": 100000,
 }
 lrs = {
     "texas": 0.001,
@@ -173,8 +198,14 @@ lrs = {
     "corafull": 0.001,
     "wikics": 0.001,
     "photo": 0.001,
-    "arxiv-year": 0.001,
     "snap-patents": 0.001,
+    "arxiv-year": 0.001,
+    "arxiv": 0.001,
+    "proteins": 0.001,
+    "products": 0.001,
+    "Penn94": 0.001,
+    "pokec": 0.001,
+    "wiki": 0.001,
 }
 ess = {
     "texas": 100,
@@ -200,8 +231,14 @@ ess = {
     "Reed98": 200,
     "Amherst41": 200,
     "Cornell5": 200,
-    "arxiv-year": 200,
     "snap-patents": 200,
+    "arxiv-year": 100,
+    "arxiv": 100,
+    "proteins": 100,
+    "products": 100,
+    "Penn94": 100,
+    "pokec": 100,
+    "wiki": 100,
 }
 nas_dropouts = {
     "flickr": 0.8,
@@ -217,7 +254,6 @@ nas_dropouts = {
     "cora": 0.8,
     "citeseer": 0.8,
     "corafull": 0.4,
-    "arxiv-year": 0.5,
     "snap-patents": 0.5,
     "minesweeper": 0.0,
     "tolokers": 0.0,
@@ -229,6 +265,13 @@ nas_dropouts = {
     "texas": 0.8,
     "cornell": 0.0,
     "wisconsin": 0.0,
+    "arxiv-year": 0.0,
+    "arxiv": 0.,
+    "proteins": 0.0,
+    "products": 0.0,
+    "Penn94": 0.8,
+    "pokec": 0.,
+    "wiki": 0.,
 }
 nss_dropouts = {
     "flickr": 0.8,
@@ -244,7 +287,6 @@ nss_dropouts = {
     "cora": 0.8,
     "citeseer": 0.8,
     "corafull": 0.4,
-    "arxiv-year": 0.5,
     "snap-patents": 0.5,
     "minesweeper": 0.0,
     "tolokers": 0.0,
@@ -256,14 +298,22 @@ nss_dropouts = {
     "texas": 0.8,
     "cornell": 0.0,
     "wisconsin": 0.0,
+    "arxiv-year": 0.5,
+    "arxiv": 0.5,
+    "proteins": 0.5,
+    "products": 0.1,
+    "Penn94": 0.8,
+    "pokec": 0.2,
+    "wiki": 0.4,
 }
+# higher n_feats, higher clf_dropout
 clf_dropouts = {
     "flickr": 0.9,
     "blogcatalog": 0.9,
-    "chameleon": 0.9,
+    "chameleon": 0.8,
     "squirrel": 0.9,
     "actor": 0.9,
-    "photo": 0.9,
+    "photo": 0.5,
     "pubmed": 0.9,
     "roman-empire": 0.2,
     "amazon-ratings": 0.9,
@@ -271,7 +321,6 @@ clf_dropouts = {
     "cora": 0.9,
     "citeseer": 0.9,
     "corafull": 0.5,
-    "arxiv-year": 0.9,
     "snap-patents": 0.9,
     "minesweeper": 0.9,
     "tolokers": 0.9,
@@ -283,6 +332,13 @@ clf_dropouts = {
     "texas": 0.9,
     "cornell": 0.9,
     "wisconsin": 0.9,
+    "arxiv-year": 0.5,
+    "arxiv": 0.5,
+    "proteins": 0.2,
+    "products": 0.1,
+    "Penn94": 0.9,
+    "pokec": 0.2,
+    "wiki": 0.2,
 }
 n_hopss = {
     "chameleon": 10,
@@ -308,8 +364,14 @@ n_hopss = {
     "Amherst41": 8,
     "Cornell5": 8,
     "corafull": 4,
-    "arxiv-year": 8,
     "snap-patents": 8,
+    "arxiv-year": 10,
+    "arxiv": 16,
+    "proteins": 16,
+    "products": 16,
+    "Penn94": 16,
+    "pokec": 16,
+    "wiki": 16,
 }
 n_layers = {
     "chameleon": 1,
@@ -317,7 +379,7 @@ n_layers = {
     "actor": 1,
     "flickr": 1,
     "blogcatalog": 1,
-    "roman-empire": 5,
+    "roman-empire": 3,
     "amazon-ratings": 1,
     "photo": 1,
     "pubmed": 1,
@@ -335,11 +397,17 @@ n_layers = {
     "Amherst41": 1,
     "Cornell5": 1,
     "corafull": 1,
-    "arxiv-year": 1,
     "snap-patents": 1,
+    "arxiv-year": 1,
+    "arxiv": 1,
+    "proteins": 1,
+    "products": 1,
+    "Penn94": 1,
+    "pokec": 1,
+    "wiki": 1,
 }
 nrls = {
-    "chameleon": "max",
+    "chameleon": "concat",
     "squirrel": "concat",
     "actor": "concat",
     "flickr": "concat",
@@ -362,8 +430,14 @@ nrls = {
     "Amherst41": "concat",
     "Cornell5": "concat",
     "corafull": "concat",
-    "arxiv-year": "concat",
     "snap-patents": "concat",
+    "arxiv-year": "concat",
+    "arxiv": "concat",
+    "proteins": "concat",
+    "products": "concat",
+    "Penn94": "concat",
+    "pokec": "concat",
+    "wiki": "concat",
 }
 acts = {
     "chameleon": "relu",
@@ -389,8 +463,14 @@ acts = {
     "Amherst41": "relu",
     "Cornell5": "relu",
     "corafull": "relu",
-    "arxiv-year": "relu",
     "snap-patents": "relu",
+    "arxiv-year": "relu",
+    "arxiv": "relu",
+    "proteins": "relu",
+    "products": "relu",
+    "Penn94": "relu",
+    "pokec": "relu",
+    "wiki": "relu",
 }
 layer_norms = {
     "chameleon": True,
@@ -416,8 +496,14 @@ layer_norms = {
     "Amherst41": True,
     "Cornell5": True,
     "corafull": True,
-    "arxiv-year": True,
     "snap-patents": True,
+    "arxiv-year": True,
+    "arxiv": True,
+    "proteins": True,
+    "products": True,
+    "Penn94": True,
+    "pokec": True,
+    "wiki": True,
 }
 n_intervalss = {
     "chameleon": 3,
@@ -443,12 +529,20 @@ n_intervalss = {
     "Amherst41": 3,
     "Cornell5": 3,
     "corafull": 3,
-    "arxiv-year": 3,
     "snap-patents": 3,
+    "arxiv-year": 3,
+    "arxiv": 3,
+    "proteins": 3,
+    "products": 3,
+    "Penn94": 3,
+    "pokec": 3,
+    "wiki": 3,
 }
 
-TRAIN_RATIO = 48
-VALID_RATIOS = 32
+# TRAIN_RATIO = 10
+# VALID_RATIO = 10
+# TRAIN_RATIO = 50
+# VALID_RATIO = 25
 
 
 def graph_diameter(g):
@@ -491,40 +585,38 @@ def graph_diameter(g):
 # }
 
 DATASETS = {
-    "critical":
-        [
-            # 890
-            "chameleon",
-            # 2,223
-            "squirrel",
-            # # 10,000
-            # "minesweeper",
-            # # 11,758
-            # "tolokers",
-            # # 22,662
-            # "roman-empire",
-            # # 24,492
-            # "amazon-ratings",
-            # 48,921
-            # "questions",
-        ],
+    "critical": [
+        # 890
+        "chameleon",
+        # 2,223
+        "squirrel",
+        # # 10,000
+        # "minesweeper",
+        # # 11,758
+        # "tolokers",
+        # # 22,662
+        # "roman-empire",
+        # # 24,492
+        # "amazon-ratings",
+        # 48,921
+        # "questions",
+    ],
     "cola": [
         "flickr",
         "blogcatalog",
     ],
-    "pyg":
-        [
-            # "texas",
-            # "cornell",
-            # "wisconsin",
-            # "corafull",
-            # "cora",
-            # "citeseer",
-            "photo",
-            "actor",
-            "pubmed",
-            "wikics",
-        ],
+    "pyg": [
+        # "texas",
+        # "cornell",
+        # "wisconsin",
+        # "corafull",
+        # "cora",
+        # "citeseer",
+        "photo",
+        "actor",
+        "pubmed",
+        "wikics",
+    ],
     "Critical": [
         # 22,662
         "roman-empire",
@@ -533,32 +625,38 @@ DATASETS = {
         # 48,921
         # "questions",
     ],
-    # "linkx": [
-    #     # (array([0, 1, 2]), array([ 97, 504, 361]))
-    #     # 962
-    #     # "Reed98",
-    #     # # array([0, 1, 2]), array([ 418, 2153, 2609]
-    #     # # 5,180
-    #     # "Johns Hopkins55",
-    #     # # (array([0, 1, 2]), array([ 203, 1015, 1017]))
-    #     # # 2,235
-    #     # "Amherst41",
-    #     # # (array([0, 1, 2]), array([1838, 8135, 8687]))
-    #     # # 18,660
-    #     # "Cornell5",
-    #     # # 41,554
-    #     # "Penn94",
-    #     # # 168,114
-    #     # "twitch-gamers",
-    #     # 169,343
-    #     "arxiv-year",
-    #     # 421,961
-    #     # "genius",
-    #     # # 1,632,803
-    #     # "pokec",
-    #     # 2,923,922
-    #     "snap-patents",
-    # ],
+    "ogb": [
+        "arxiv",
+        "proteins",
+    ],
+    "linkx": [
+        # (array([0, 1, 2]), array([ 97, 504, 361]))
+        # 962
+        "Reed98",
+        # # array([0, 1, 2]), array([ 418, 2153, 2609]
+        # # 5,180
+        "Johns Hopkins55",
+        # # (array([0, 1, 2]), array([ 203, 1015, 1017]))
+        # # 2,235
+        "Amherst41",
+        # # (array([0, 1, 2]), array([1838, 8135, 8687]))
+        # # 18,660
+        "Cornell5",
+        # # 41,554
+        "Penn94",
+        # # 168,114
+        "twitch-gamers",
+        # 169,343
+        "arxiv-year",
+        # 421,961
+        "genius",
+        # # 1,632,803
+        "pokec",
+        # 2,923,922
+        "snap-patents",
+        # 1,925,342
+        "wiki",
+    ],
 }
 
 
@@ -572,17 +670,23 @@ def main(
     nrl=None,
     n_hops=None,
 ):
-    BATCH_SIZE = BATCH_SIZE or bss[dataset]
+    BATCH_SIZE = BATCH_SIZE
     graph, label, n_clusters = load_data(
         dataset_name=dataset,
         directory=DATA.DATA_DIR,
         source=source,
         row_normalize=norms[dataset],
-        rm_self_loop=False,
-        add_self_loop=True,
-        to_simple=True,
+        rm_self_loop=True,
+        add_self_loop=False,
+        to_simple=True if dataset != "products" else False,
         verbosity=3,
     )
+
+    repeat = 3 if dataset in ['pokec','arxiv','products','proteins', 'wiki'] else 10
+    if dataset in ['pokec','wiki']:
+        print(label.min())
+        labeled_idx = torch.where(label != -1)[0]
+        # label=labeled_nodes
 
     # save_to_csv_files(
     #     results={
@@ -598,12 +702,14 @@ def main(
     #     csv_name=f"diameter.csv",
     # )
 
+    TRAIN_RATIO = 48 if dataset not in ["pokec", 'wiki'] else 10
+    VALID_RATIO = 32 if dataset not in ["pokec", 'wiki'] else 10
     N_HOPS = n_hops if n_hops is not None else n_hopss[dataset]
     params = {
         "nie": nie,
         "nrl": nrl if nrl is not None else nrls[dataset],
         "lr": lrs[dataset],
-        "h_feats": h_feats,
+        "h_feats": min(h_feats, feats[dataset]),
         "l2_coef": l2_coefs[dataset],
         "nas_dropout": nas_dropouts[dataset],
         "nss_dropout": nss_dropouts[dataset],
@@ -615,36 +721,64 @@ def main(
         "n_intervals": min(n_intervalss[dataset], N_HOPS + 1),
         "act": acts[dataset],
         "layer_norm": layer_norms[dataset],
+        "loss": "ce" if dataset not in ["proteins"] else "bce",
+        "out_ndim_trans":64,
     }
     params_all = {
         "row_normalized": norms[dataset],
         **params,
     }
-    tab_printer(params_all)
+    tab_printer(
+        {"bs": BATCH_SIZE, **params_all}
+    )
 
     t_start = time.time()
 
-    repeat = 10
+    seed_list = [random.randint(0, 99999) for i in range(repeat)]
 
     res_list_acc_joint = []
     for i in range(repeat):
         graph.split = i
+        # set_seed(seed_list[i])
         # model.load_state_dict(torch.load(STATE, map_location=DEVICE))
         model = FlatGNN(
             in_feats=graph.ndata["feat"].shape[1],
-            n_clusters=n_clusters,
+            n_clusters=n_clusters if dataset not in ["proteins"] else label.shape[1],
             device=DEVICE,
             **params,
         )
 
-        train_mask, val_mask, test_mask = get_splits_mask(
-            graph=graph,
-            train_ratio=TRAIN_RATIO,
-            valid_ratio=VALID_RATIOS,
-            repeat=10,
-            split_id=i,
-            SPLIT_DIR=DATA.SPLIT_DIR,
-        )
+        if 'train_mask' in graph.ndata and graph.name not in ['actor_pyg','pubmed_pyg','wikics_pyg']:
+            train_mask, val_mask, test_mask = (
+                graph.ndata["train_mask"],
+                graph.ndata["val_mask"],
+                graph.ndata["test_mask"],
+            )
+            split_ratio = (
+                np.array(
+                    [
+                        graph.ndata["train_mask"].sum(),
+                        graph.ndata["val_mask"].sum(),
+                        graph.ndata["test_mask"].sum(),
+                    ]
+                )
+                / graph.num_nodes()
+            )
+            print(
+                f"public split train:val:test = {split_ratio[0]*100:.0f}:{split_ratio[1]*100:.0f}:{split_ratio[2]*100:.0f}"
+            )
+        else:
+            train_mask, val_mask, test_mask = get_splits_mask(
+                name=graph.name,
+                n_nodes=graph.num_nodes(),
+                train_ratio=TRAIN_RATIO,
+                valid_ratio=VALID_RATIO,
+                repeat=10,
+                split_id=i,
+                SPLIT_DIR=DATA.SPLIT_DIR,
+                labeled_idx=labeled_idx if graph.name in ['pokec_linkx'] else None,
+            )
+            print(f"random split train:val:test = {TRAIN_RATIO}:{VALID_RATIO}:{100-TRAIN_RATIO-VALID_RATIO}")
 
         model.fit(
             graph=graph,
@@ -657,19 +791,70 @@ def main(
             device=DEVICE,
         )
 
-        with torch.no_grad():
-            model.train(False)
-            embeddings = model(
-                graph.ndata["feat"],
-                graph=graph,
-                device=DEVICE,
-            )
-            logits_onehot = model.classifier(embeddings)
-            y_pred = torch.argmax(logits_onehot, dim=1)
 
-        acc = ACC(label[test_mask].cpu(), y_pred[test_mask].cpu())
-        res_list_acc_joint.append(acc)
-        print(f"{graph.name} {i} Acc: {acc}\n\n")
+        if BATCH_SIZE is not None:
+            with torch.no_grad():
+                model.train(False)
+                pred_stack = []
+                idx = torch.LongTensor(list(range(graph.num_nodes())))
+                for _, step in enumerate(range(0, graph.num_nodes(), BATCH_SIZE)):
+                    batch_idx = idx[step : step + BATCH_SIZE]
+
+                    embeddings = model.forward(
+                        graph.ndata["feat"],
+                        batch_idx=batch_idx,
+                        graph=graph,
+                        device=DEVICE,
+                    )
+                    logits = model.classifier(embeddings)
+                    pred_stack.append(logits)
+
+                y_pred=torch.cat(pred_stack, dim=0)
+
+                if graph.name in ["Penn94_linxk"]:
+                    label = F.one_hot(label)
+                elif graph.name in ["proteins_ogb"]:
+                    label = label.to(torch.float)
+                else:
+                    label = label
+
+                if graph.name not in (
+                    "yelp-chi",
+                    "deezer-europe",
+                    "twitch-gamers",
+                    "pokec",
+                    # "Penn94_linkx",
+                    "fb100",
+                    "proteins_ogb",
+                    # "pokec_linkx",
+                ):
+                    y_pred = torch.argmax(y_pred, dim=1)
+                    res = ACC(label[test_mask].cpu(), y_pred[test_mask].cpu())
+                else:
+                    if graph.name in [
+                        "proteins_ogb",
+                        # "Penn94_linkx",
+                        # "pokec_linkx",
+                    ]:
+                        res = eval_rocauc(
+                            label[test_mask].cpu().numpy(), y_pred[test_mask].cpu().numpy()
+                        )["rocauc"]
+        else:
+            with torch.no_grad():
+                model.train(False)
+                embeddings = model(
+                    graph.ndata["feat"],
+                    graph=graph,
+                    device=DEVICE,
+                )
+                logits_onehot = model.classifier(embeddings)
+                y_pred = torch.argmax(logits_onehot, dim=1)
+
+                res = ACC(label[test_mask].cpu(), y_pred[test_mask].cpu())
+
+
+        res_list_acc_joint.append(res)
+        print(f"{graph.name} {i} res: {res}\n\n")
 
     elapsed_time = f"{(time.time() - t_start)/repeat:.2f}"
     acc_jl = f"{np.array(res_list_acc_joint).mean() * 100:.2f}±{np.array(res_list_acc_joint).std() * 100:.2f}"
@@ -685,9 +870,9 @@ def main(
         append_info={
             "args": params_all,
             "time": elapsed_time,
-            "bs": BATCH_SIZE,
             "source": source,
             "model": MODEL,
+            "bs": BATCH_SIZE,
         },
         csv_name=f"results_v{VERSION}.csv",
     )
@@ -792,8 +977,9 @@ if __name__ == "__main__":
             dataset=args.dataset,
             source=args.source,
             h_feats=(
-                DIM_BOUND[args.dataset] if args.dataset in DIM_BOUND.keys() and
-                args.h_feats > DIM_BOUND[args.dataset] else args.h_feats
+                DIM_BOUND[args.dataset]
+                if args.dataset in DIM_BOUND.keys() and args.h_feats > DIM_BOUND[args.dataset]
+                else args.h_feats
             ),
             MODEL=args.model,
             BATCH_SIZE=args.batch_size,
@@ -811,8 +997,9 @@ if __name__ == "__main__":
                         dataset=dataset,
                         source=source,
                         h_feats=(
-                            DIM_BOUND[dataset] if dataset in DIM_BOUND.keys() and
-                            args.h_feats > DIM_BOUND[dataset] else args.h_feats
+                            DIM_BOUND[dataset]
+                            if dataset in DIM_BOUND.keys() and args.h_feats > DIM_BOUND[dataset]
+                            else args.h_feats
                         ),
                         MODEL=args.model,
                         BATCH_SIZE=args.batch_size,
@@ -823,3 +1010,10 @@ if __name__ == "__main__":
                 except Exception as e:
                     traceback.print_exc()
                     continue
+# f=512 v=99.0 b=100000
+# nie=gcn-nie-nst
+# g=1
+# nrl=None
+# hops=None
+# d=arxiv-year s=pyg
+# m=FlatGNN-$nie-$nrl; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -b $b -nie $nie  -nrl $nrl -hops $hops > logs/ab/sota/$d.log &

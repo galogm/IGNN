@@ -17,7 +17,8 @@ import scipy.sparse as sp
 import torch
 import torch.nn.functional as F
 from sklearn.cluster import KMeans
-from sklearn.metrics import accuracy_score as ACC
+from sklearn.metrics import accuracy_score as ACC, roc_auc_score
+from ogb.nodeproppred import Evaluator
 from sklearn.preprocessing import normalize
 from the_utils import get_str_time
 from the_utils import make_parent_dirs
@@ -34,10 +35,17 @@ from torch_sparse import SparseTensor
 
 from ..modules import FlatGNN as FlatGNN_layer
 from ..modules import MLP
+from ..utils import eval_rocauc
+
+losses = {
+    "ce": torch.nn.CrossEntropyLoss,
+    "bce": torch.nn.BCEWithLogitsLoss,
+}
 
 
 class FlatGNN(nn.Module):
     """FlatGNN"""
+
     def __init__(
         self,
         in_feats,
@@ -51,6 +59,7 @@ class FlatGNN(nn.Module):
         nas_dropout: float = 0.0,
         nss_dropout: float = 0.8,
         clf_dropout: float = 0.9,
+        out_ndim_trans: int=64,
         lda: float = 1,
         n_hops=6,
         n_intervals=3,
@@ -59,8 +68,12 @@ class FlatGNN(nn.Module):
         n_layers=1,
         act="relu",
         layer_norm=True,
+        loss="ce",
     ) -> None:
         super().__init__()
+
+        assert loss in losses.keys(), f"loss should be in {losses.keys()}"
+
         self.n_intervals = n_intervals
         self.nss_dropout = nss_dropout
 
@@ -83,6 +96,7 @@ class FlatGNN(nn.Module):
             nas_dropout=nas_dropout,
             nss_dropout=nss_dropout,
             n_intervals=n_intervals,
+            out_ndim_trans=out_ndim_trans,
             nie=nie,
             nrl=nrl,
             act=act,
@@ -92,6 +106,7 @@ class FlatGNN(nn.Module):
             "multi-con": max(h_feats * (n_hops - n_intervals + 2), h_feats),
             "concat": h_feats,
             "ordered-gating": h_feats,
+            "self-attention": h_feats + out_ndim_trans,
             "only-concat": h_feats * (n_hops + 1),
             "max": h_feats,
             "mean": h_feats,
@@ -111,33 +126,25 @@ class FlatGNN(nn.Module):
                     nas_dropout=nas_dropout,
                     nss_dropout=nss_dropout,
                     n_intervals=n_intervals,
+                    out_ndim_trans=out_ndim_trans,
                     no_save=True,
                     nie=nie,
                     nrl=nrl,
                     act=act,
                     layer_norm=layer_norm,
-                ) for _ in range(n_layers - 1)
+                )
+                for _ in range(n_layers - 1)
             )
 
         self.classifier = MLP(
-            in_feats={
-                "multi-con": hidden_dim,
-                "concat": h_feats,
-                "ordered-gating": h_feats,
-                "only-concat": h_feats * (n_hops + 1),
-                "max": h_feats,
-                "mean": h_feats,
-                "sum": h_feats,
-                "lstm": h_feats,
-                "none": h_feats,
-            }[nrl],
+            in_feats=hidden_dim,
             h_feats=[n_clusters],
             acts=[nn.Identity()],
             dropout=clf_dropout,
             layer_norm=False,
         )
 
-        self.ce = torch.nn.CrossEntropyLoss()
+        self.criterion = losses[loss]()
 
         self.optimizer = torch.optim.Adam(
             self.parameters(),
@@ -148,34 +155,93 @@ class FlatGNN(nn.Module):
     def forward(
         self,
         features,
+        batch_idx=None,
         graph=None,
         device=None,
     ):
-        z_flat_gnn = self.flat_gnn(graph=graph, device=device)
+        z_flat_gnn = self.flat_gnn(graph=graph, device=device, batch_idx=batch_idx)
         if self.flat_gnn_s is not None:
             for _, flat_gnn_s in enumerate(self.flat_gnn_s):
-                z_flat_gnn = (
-                    self.beta * flat_gnn_s(graph=graph, device=device, feats=z_flat_gnn) +
-                    (1 - self.beta) * z_flat_gnn
-                )
+                # z_flat_gnn = (
+                #     self.beta * flat_gnn_s(graph=graph, device=device, feats=z_flat_gnn)
+                #     + (1 - self.beta) * z_flat_gnn
+                # )
+                z_flat_gnn = flat_gnn_s(graph=graph, device=device, feats=z_flat_gnn)
 
         return z_flat_gnn
 
-    def validate(self, features, labels, train_mask, val_mask, test_mask, graph):
+    def metric(
+        self,
+        name,
+        logits,
+        labels,
+        train_mask,
+        val_mask,
+        test_mask,
+    ):
+
+        if name not in (
+            "yelp-chi",
+            "deezer-europe",
+            "twitch-gamers",
+            "pokec",
+            # "Penn94_linkx",
+            "fb100",
+            "proteins_ogb",
+            # "pokec_linkx",
+        ):
+            y_pred = torch.argmax(logits, dim=1)
+            return (
+                ACC(labels[train_mask].cpu(), y_pred[train_mask].cpu()),
+                ACC(labels[val_mask].cpu(), y_pred[val_mask].cpu()),
+                ACC(labels[test_mask].cpu(), y_pred[test_mask].cpu()),
+            )
+        else:
+            if name in [
+                "proteins_ogb",
+                # "Penn94_linkx",
+                # "pokec_linkx",
+            ]:
+                return (
+                    eval_rocauc(labels[train_mask].cpu().numpy(), logits[train_mask].cpu().numpy())[
+                        "rocauc"
+                    ],
+                    eval_rocauc(labels[val_mask].cpu().numpy(), logits[val_mask].cpu().numpy())[
+                        "rocauc"
+                    ],
+                    eval_rocauc(labels[test_mask].cpu().numpy(), logits[test_mask].cpu().numpy())[
+                        "rocauc"
+                    ],
+                )
+
+    def validate(
+        self,
+        features,
+        labels,
+        train_mask,
+        val_mask,
+        test_mask,
+        graph,
+        batch_idx=None,
+    ):
         self.train(False)
         with torch.no_grad():
             embeddings = self.forward(
                 features,
                 graph=graph,
                 device=self.device,
+                batch_idx=batch_idx,
             )
-            logits_onehot = self.classifier(embeddings)
-            y_pred = torch.argmax(logits_onehot, dim=1)
-        return (
-            ACC(labels[train_mask].cpu(), y_pred[train_mask].cpu()),
-            ACC(labels[val_mask].cpu(), y_pred[val_mask].cpu()),
-            ACC(labels[test_mask].cpu(), y_pred[test_mask].cpu()),
-        )
+            logits = self.classifier(embeddings)
+
+            return self.metric(
+                graph.name,
+                logits,
+                labels,
+                train_mask,
+                val_mask,
+                test_mask,
+            )
 
     def fit(
         self,
@@ -184,54 +250,130 @@ class FlatGNN(nn.Module):
         train_mask,
         val_mask,
         test_mask,
-        bs=2048,
+        bs=None,
         split_id=None,
         device: torch.device = torch.device("cpu"),
     ):
 
         self.device = device
         self.to(self.device)
-        labels = labels.to(device)
+
+        if graph.name in ["proteins_ogb"]:
+            labels = labels.to(torch.float).to(device)
+        else:
+            labels = labels.to(device)
 
         best_epoch = 0
         best_acc = 0.0
         cnt = 0
         best_state_dict = None
-        writer = SummaryWriter(
-            log_dir=
-            f"logs/runs/{get_str_time()[:10]}/joint_{graph.name}_{split_id}_{self.h_feats}_{get_str_time()[11:]}"
-        )
+        # writer = SummaryWriter(
+        #     log_dir=f"logs/runs/{get_str_time()[:10]}/joint_{graph.name}_{split_id}_{self.h_feats}_{get_str_time()[11:]}"
+        # )
 
         t_start = time.time()
         for epoch in range(self.n_epochs):
-            self.train()
-            self.optimizer.zero_grad()
 
-            embeddings = self.forward(
-                graph.ndata["feat"],
-                graph=graph,
-                device=device,
-            )
+            n = graph.num_nodes()
+            shf = torch.randperm(n)
 
-            logits_onehot = self.classifier(embeddings)
-            loss = self.ce(logits_onehot[train_mask], labels[train_mask])
-            loss_val = self.ce(logits_onehot[val_mask], labels[val_mask])
-            loss_test = self.ce(logits_onehot[test_mask], labels[test_mask])
+            loss_value = 0
+            loss_val_value = 0
+            loss_test_value = 0
 
-            loss.backward()
-            self.optimizer.step()
+            if bs is not None:
+                for i, step in enumerate(range(0, n, bs)):
+                    batch_idx = shf[step : step + bs]
 
-            (train_acc, valid_acc, test_acc) = self.validate(
-                graph.ndata["feat"],
-                labels,
-                train_mask,
-                val_mask,
-                test_mask,
-                graph=graph,
-            )
+                    batch_labels = labels[batch_idx]
+                    batch_train_mask = train_mask[batch_idx]
+                    batch_val_mask = val_mask[batch_idx]
+                    batch_test_mask = test_mask[batch_idx]
+
+                    self.train()
+                    self.optimizer.zero_grad()
+
+                    embeddings = self.forward(
+                        graph.ndata["feat"],
+                        batch_idx=batch_idx,
+                        graph=graph,
+                        device=device,
+                    )
+
+                    logits = self.classifier(embeddings)
+                    loss = self.criterion(logits[batch_train_mask], batch_labels[batch_train_mask])
+                    loss_val = self.criterion(logits[batch_val_mask], batch_labels[batch_val_mask])
+                    loss_test = self.criterion(
+                        logits[batch_test_mask], batch_labels[batch_test_mask]
+                    )
+
+                    loss.backward()
+                    self.optimizer.step()
+
+                    loss_value += loss.item()
+                    loss_val_value += loss_val.item()
+                    loss_test_value += loss_test.item()
+
+                with torch.no_grad():
+                    self.train(False)
+                    pred_stack = []
+                    idx = torch.LongTensor(list(range(n)))
+                    for i, step in enumerate(range(0, n, bs)):
+                        batch_idx = idx[step : step + bs]
+
+                        embeddings = self.forward(
+                            graph.ndata["feat"],
+                            batch_idx=batch_idx,
+                            graph=graph,
+                            device=device,
+                        )
+                        logits = self.classifier(embeddings)
+                        pred_stack.append(logits)
+
+                    pred_stack=torch.cat(pred_stack, dim=0)
+
+                    train_acc, valid_acc, test_acc = self.metric(
+                        graph.name,
+                        logits=pred_stack,
+                        labels=labels,
+                        train_mask=train_mask,
+                        val_mask=val_mask,
+                        test_mask=test_mask,
+                    )
+
+            else:
+                self.train()
+                self.optimizer.zero_grad()
+
+                embeddings = self.forward(
+                    graph.ndata["feat"],
+                    batch_idx=None,
+                    graph=graph,
+                    device=device,
+                )
+
+                logits = self.classifier(embeddings)
+                loss = self.criterion(logits[train_mask], labels[train_mask])
+                loss_val = self.criterion(logits[val_mask], labels[val_mask])
+                loss_test = self.criterion(logits[test_mask], labels[test_mask])
+
+                loss.backward()
+                self.optimizer.step()
+
+                loss_value = loss.item()
+
+                (train_acc, valid_acc, test_acc) = self.validate(
+                    graph.ndata["feat"],
+                    labels,
+                    train_mask,
+                    val_mask,
+                    test_mask,
+                    graph=graph,
+                    batch_idx=None,
+                )
 
             print(
-                f"epoch:{epoch},loss: {loss.item()}, train acc: {train_acc:.3f}, valid acc: {valid_acc:.3f}, test acc: {test_acc:.3f}"
+                f"epoch:{epoch},loss: {loss_value}, train acc: {train_acc:.3f}, valid acc: {valid_acc:.3f}, test acc: {test_acc:.3f}"
             )
             if valid_acc >= best_acc:
                 cnt = 0

@@ -12,37 +12,108 @@ from the_utils import make_parent_dirs
 from the_utils import split_train_test_nodes
 from torch_sparse import SparseTensor
 from tqdm import tqdm
+from sklearn.metrics import roc_auc_score
+
+
+def eval_rocauc(y_true, y_pred):
+    """
+    compute ROC-AUC and AP score averaged across tasks
+    """
+
+    rocauc_list = []
+
+    for i in range(y_true.shape[1]):
+        # AUC is only defined when there is at least one positive data.
+        if np.sum(y_true[:, i] == 1) > 0 and np.sum(y_true[:, i] == 0) > 0:
+            is_labeled = y_true[:, i] == y_true[:, i]
+            rocauc_list.append(roc_auc_score(y_true[is_labeled, i], y_pred[is_labeled, i]))
+
+    if len(rocauc_list) == 0:
+        raise RuntimeError("No positively labeled data available. Cannot compute ROC-AUC.")
+
+    return {"rocauc": sum(rocauc_list) / len(rocauc_list)}
 
 
 def get_splits_mask(
-    graph,
+    name,
+    n_nodes,
     train_ratio,
     valid_ratio,
     repeat,
     split_id,
     SPLIT_DIR,
+    labeled_idx=None,
 ):
-    train_idx, val_idx, test_idx = split_train_test_nodes(
-        num_nodes=graph.num_nodes(),
-        train_ratio=train_ratio,
-        valid_ratio=valid_ratio,
-        data_name=graph.name,
-        split_id=split_id,
-        split_times=repeat,
-        fixed_split=True,
-        split_save_dir=SPLIT_DIR,
-    )
+    if labeled_idx is not None:
+        train_idx, val_idx, test_idx = split_train_test_nodes(
+            num_nodes=len(labeled_idx),
+            train_ratio=train_ratio,
+            valid_ratio=valid_ratio,
+            data_name=name,
+            split_id=split_id,
+            split_times=repeat,
+            fixed_split=True,
+            split_save_dir=SPLIT_DIR,
+        )
+        train_idx = labeled_idx[train_idx]
+        val_idx = labeled_idx[val_idx]
+        test_idx = labeled_idx[test_idx]
+    else:
+        train_idx, val_idx, test_idx = split_train_test_nodes(
+            num_nodes=n_nodes,
+            train_ratio=train_ratio,
+            valid_ratio=valid_ratio,
+            data_name=name,
+            split_id=split_id,
+            split_times=repeat,
+            fixed_split=True,
+            split_save_dir=SPLIT_DIR,
+        )
+
     train_mask = (
-        torch.zeros(graph.num_nodes()).scatter_(0, torch.tensor(train_idx, dtype=torch.int64),
-                                                1).bool()
+        torch.zeros(n_nodes)
+        .scatter_(
+            0,
+            (
+                train_idx.to(torch.int64)
+                if isinstance(train_idx, torch.Tensor)
+                else torch.LongTensor(
+                    train_idx,
+                )
+            ),
+            1,
+        )
+        .bool()
     )
     val_mask = (
-        torch.zeros(graph.num_nodes()).scatter_(0, torch.tensor(val_idx, dtype=torch.int64),
-                                                1).bool()
+        torch.zeros(n_nodes)
+        .scatter_(
+            0,
+            (
+                val_idx.to(torch.int64)
+                if isinstance(val_idx, torch.Tensor)
+                else torch.LongTensor(
+                    val_idx,
+                )
+            ),
+            1,
+        )
+        .bool()
     )
     test_mask = (
-        torch.zeros(graph.num_nodes()).scatter_(0, torch.tensor(test_idx, dtype=torch.int64),
-                                                1).bool()
+        torch.zeros(n_nodes)
+        .scatter_(
+            0,
+            (
+                test_idx.to(torch.int64)
+                if isinstance(test_idx, torch.Tensor)
+                else torch.LongTensor(
+                    test_idx,
+                )
+            ),
+            1,
+        )
+        .bool()
     )
 
     return train_mask, val_mask, test_mask
