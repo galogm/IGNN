@@ -35,7 +35,8 @@ from torch_sparse import SparseTensor
 
 from ..modules import FlatGNN as FlatGNN_layer
 from ..modules import MLP
-from ..utils import eval_rocauc
+from ..utils import eval_rocauc, metric
+from tqdm import tqdm
 
 losses = {
     "ce": torch.nn.CrossEntropyLoss,
@@ -59,7 +60,7 @@ class FlatGNN(nn.Module):
         nas_dropout: float = 0.0,
         nss_dropout: float = 0.8,
         clf_dropout: float = 0.9,
-        out_ndim_trans: int=64,
+        out_ndim_trans: int = 64,
         lda: float = 1,
         n_hops=6,
         n_intervals=3,
@@ -69,6 +70,11 @@ class FlatGNN(nn.Module):
         act="relu",
         layer_norm=True,
         loss="ce",
+        n_nodes=None,
+        ndim_h_a=64,
+        num_heads=1,
+        transform_first=False,
+        trans_layer_num=5,
     ) -> None:
         super().__init__()
 
@@ -81,6 +87,7 @@ class FlatGNN(nn.Module):
         self.n_epochs = n_epochs
         self.h_feats = h_feats
         self.l2_coef = l2_coef
+        self.n_nodes = n_nodes
 
         # URL
         self.lr = lr
@@ -101,12 +108,33 @@ class FlatGNN(nn.Module):
             nrl=nrl,
             act=act,
             layer_norm=layer_norm,
+            n_nodes=n_nodes,
+            ndim_h_a=ndim_h_a,
+            num_heads=num_heads,
+            transform_first=transform_first,
+            trans_layer_num=trans_layer_num,
+            ignn_layer_num=n_layers,
         )
+
         hidden_dim = {
             "multi-con": max(h_feats * (n_hops - n_intervals + 2), h_feats),
-            "concat": h_feats,
+            "concat": h_feats + ndim_h_a if n_nodes is not None else h_feats,
+            # "concat": h_feats,
             "ordered-gating": h_feats,
-            "self-attention": h_feats + out_ndim_trans,
+            # "self-attention": h_feats + out_ndim_trans * num_heads + ndim_h_a if n_nodes is not None else h_feats + out_ndim_trans * num_heads,
+            # "self-attention":h_feats,
+            "self-attention": out_ndim_trans * num_heads if trans_layer_num else h_feats,
+            # "self-attention":out_ndim_trans * num_heads + ndim_h_a if n_nodes is not None else out_ndim_trans * num_heads,
+            # "self-attention": (
+            #     (
+            #         out_ndim_trans * num_heads + h_feats + ndim_h_a
+            #         if n_nodes is not None
+            #         else out_ndim_trans * num_heads + h_feats
+            #     )
+            #     if trans_layer_num != 0
+            #     else h_feats + ndim_h_a if n_nodes is not None else h_feats
+            # ),
+            # "self-attention": out_ndim_trans * num_heads,
             "only-concat": h_feats * (n_hops + 1),
             "max": h_feats,
             "mean": h_feats,
@@ -115,26 +143,31 @@ class FlatGNN(nn.Module):
             "none": h_feats,
         }[nrl]
 
-        self.flat_gnn_s = None
-        if n_layers > 1:
-            self.beta = lda / n_layers
-            self.flat_gnn_s = nn.ModuleList(
-                FlatGNN_layer(
-                    in_feats=hidden_dim,
-                    h_feats=h_feats,
-                    n_hops=n_hops,
-                    nas_dropout=nas_dropout,
-                    nss_dropout=nss_dropout,
-                    n_intervals=n_intervals,
-                    out_ndim_trans=out_ndim_trans,
-                    no_save=True,
-                    nie=nie,
-                    nrl=nrl,
-                    act=act,
-                    layer_norm=layer_norm,
-                )
-                for _ in range(n_layers - 1)
-            )
+        # self.flat_gnn_s = None
+        # if n_layers > 1:
+        #     self.beta = lda / n_layers
+        #     self.flat_gnn_s = nn.ModuleList(
+        #         FlatGNN_layer(
+        #             in_feats=hidden_dim,
+        #             h_feats=h_feats,
+        #             n_hops=n_hops,
+        #             nas_dropout=nas_dropout,
+        #             nss_dropout=nss_dropout,
+        #             n_intervals=n_intervals,
+        #             out_ndim_trans=out_ndim_trans,
+        #             no_save=True,
+        #             nie=nie,
+        #             nrl=nrl,
+        #             act=act,
+        #             layer_norm=layer_norm,
+        #             n_nodes=n_nodes,
+        #             ndim_h_a=ndim_h_a,
+        #             num_heads=num_heads,
+        #             transform_first=transform_first,
+        #             trans_layer_num=trans_layer_num,
+        #         )
+        #         for _ in range(n_layers - 1)
+        #     )
 
         self.classifier = MLP(
             in_feats=hidden_dim,
@@ -160,59 +193,15 @@ class FlatGNN(nn.Module):
         device=None,
     ):
         z_flat_gnn = self.flat_gnn(graph=graph, device=device, batch_idx=batch_idx)
-        if self.flat_gnn_s is not None:
-            for _, flat_gnn_s in enumerate(self.flat_gnn_s):
-                # z_flat_gnn = (
-                #     self.beta * flat_gnn_s(graph=graph, device=device, feats=z_flat_gnn)
-                #     + (1 - self.beta) * z_flat_gnn
-                # )
-                z_flat_gnn = flat_gnn_s(graph=graph, device=device, feats=z_flat_gnn)
+        # if self.flat_gnn_s is not None:
+        #     for _, flat_gnn_s in enumerate(self.flat_gnn_s):
+        #         # z_flat_gnn = (
+        #         #     self.beta * flat_gnn_s(graph=graph, device=device, feats=z_flat_gnn)
+        #         #     + (1 - self.beta) * z_flat_gnn
+        #         # )
+        #         z_flat_gnn = flat_gnn_s(graph=graph, device=device, feats=z_flat_gnn)
 
         return z_flat_gnn
-
-    def metric(
-        self,
-        name,
-        logits,
-        labels,
-        train_mask,
-        val_mask,
-        test_mask,
-    ):
-
-        if name not in (
-            "yelp-chi",
-            "deezer-europe",
-            "twitch-gamers",
-            "pokec",
-            # "Penn94_linkx",
-            "fb100",
-            "proteins_ogb",
-            # "pokec_linkx",
-        ):
-            y_pred = torch.argmax(logits, dim=1)
-            return (
-                ACC(labels[train_mask].cpu(), y_pred[train_mask].cpu()),
-                ACC(labels[val_mask].cpu(), y_pred[val_mask].cpu()),
-                ACC(labels[test_mask].cpu(), y_pred[test_mask].cpu()),
-            )
-        else:
-            if name in [
-                "proteins_ogb",
-                # "Penn94_linkx",
-                # "pokec_linkx",
-            ]:
-                return (
-                    eval_rocauc(labels[train_mask].cpu().numpy(), logits[train_mask].cpu().numpy())[
-                        "rocauc"
-                    ],
-                    eval_rocauc(labels[val_mask].cpu().numpy(), logits[val_mask].cpu().numpy())[
-                        "rocauc"
-                    ],
-                    eval_rocauc(labels[test_mask].cpu().numpy(), logits[test_mask].cpu().numpy())[
-                        "rocauc"
-                    ],
-                )
 
     def validate(
         self,
@@ -226,6 +215,12 @@ class FlatGNN(nn.Module):
     ):
         self.train(False)
         with torch.no_grad():
+            # H,embeddings = self.forward(
+            #     features,
+            #     graph=graph,
+            #     device=self.device,
+            #     batch_idx=batch_idx,
+            # )
             embeddings = self.forward(
                 features,
                 graph=graph,
@@ -234,7 +229,7 @@ class FlatGNN(nn.Module):
             )
             logits = self.classifier(embeddings)
 
-            return self.metric(
+            return metric(
                 graph.name,
                 logits,
                 labels,
@@ -282,7 +277,8 @@ class FlatGNN(nn.Module):
             loss_test_value = 0
 
             if bs is not None:
-                for i, step in enumerate(range(0, n, bs)):
+                pred_stack = []
+                for step in tqdm(range(0, n, bs), "training step"):
                     batch_idx = shf[step : step + bs]
 
                     batch_labels = labels[batch_idx]
@@ -299,9 +295,17 @@ class FlatGNN(nn.Module):
                         graph=graph,
                         device=device,
                     )
+                    # H,embeddings = self.forward(
+                    #     graph.ndata["feat"],
+                    #     batch_idx=batch_idx,
+                    #     graph=graph,
+                    #     device=device,
+                    # )
 
                     logits = self.classifier(embeddings)
                     loss = self.criterion(logits[batch_train_mask], batch_labels[batch_train_mask])
+                    # logits_1 = self.classifier_1(H)
+                    # loss = self.criterion(logits[batch_train_mask], batch_labels[batch_train_mask]) + self.criterion(logits_1[batch_train_mask], batch_labels[batch_train_mask])
                     loss_val = self.criterion(logits[batch_val_mask], batch_labels[batch_val_mask])
                     loss_test = self.criterion(
                         logits[batch_test_mask], batch_labels[batch_test_mask]
@@ -314,31 +318,51 @@ class FlatGNN(nn.Module):
                     loss_val_value += loss_val.item()
                     loss_test_value += loss_test.item()
 
-                with torch.no_grad():
-                    self.train(False)
-                    pred_stack = []
-                    idx = torch.LongTensor(list(range(n)))
-                    for i, step in enumerate(range(0, n, bs)):
-                        batch_idx = idx[step : step + bs]
+                    pred_stack.append(logits.detach().clone().cpu())
 
-                        embeddings = self.forward(
-                            graph.ndata["feat"],
-                            batch_idx=batch_idx,
-                            graph=graph,
-                            device=device,
+                if epoch % 9 == 0:
+                    with torch.no_grad():
+                        self.train(False)
+                        pred_stack = []
+                        idx = torch.LongTensor(list(range(n)))
+                        for step in tqdm(range(0, n, bs), "validate step"):
+                            batch_idx = idx[step : step + bs]
+
+                            embeddings = self.forward(
+                                graph.ndata["feat"],
+                                batch_idx=batch_idx,
+                                graph=graph,
+                                device=device,
+                            )
+                            # H, embeddings = self.forward(
+                            #     graph.ndata["feat"],
+                            #     batch_idx=batch_idx,
+                            #     graph=graph,
+                            #     device=device,
+                            # )
+                            logits = self.classifier(embeddings)
+                            pred_stack.append(logits)
+
+                        pred_stack = torch.cat(pred_stack, dim=0)
+
+                        train_acc, valid_acc, test_acc = metric(
+                            graph.name,
+                            logits=pred_stack,
+                            labels=labels,
+                            train_mask=train_mask,
+                            val_mask=val_mask,
+                            test_mask=test_mask,
                         )
-                        logits = self.classifier(embeddings)
-                        pred_stack.append(logits)
+                else:
+                    pred_stack = torch.cat(pred_stack, dim=0)
 
-                    pred_stack=torch.cat(pred_stack, dim=0)
-
-                    train_acc, valid_acc, test_acc = self.metric(
+                    train_acc, valid_acc, test_acc = metric(
                         graph.name,
                         logits=pred_stack,
-                        labels=labels,
-                        train_mask=train_mask,
-                        val_mask=val_mask,
-                        test_mask=test_mask,
+                        labels=labels[shf],
+                        train_mask=train_mask[shf],
+                        val_mask=val_mask[shf],
+                        test_mask=test_mask[shf],
                     )
 
             else:
@@ -351,9 +375,18 @@ class FlatGNN(nn.Module):
                     graph=graph,
                     device=device,
                 )
+                # H, embeddings = self.forward(
+                #     graph.ndata["feat"],
+                #     batch_idx=None,
+                #     graph=graph,
+                #     device=device,
+                # )
 
                 logits = self.classifier(embeddings)
                 loss = self.criterion(logits[train_mask], labels[train_mask])
+                # logits_1 = self.classifier_1(H)
+                # loss = self.criterion(logits[train_mask], labels[train_mask]) + self.criterion(logits_1[train_mask], labels[train_mask])
+                # loss = self.criterion(logits[train_mask], labels[train_mask])
                 loss_val = self.criterion(logits[val_mask], labels[val_mask])
                 loss_test = self.criterion(logits[test_mask], labels[test_mask])
 

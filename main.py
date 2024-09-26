@@ -23,7 +23,7 @@ from flatgnn.models import FlatGNN
 from flatgnn.modules import Data
 from flatgnn.utils import get_splits_mask
 from flatgnn.utils import read_configs
-from flatgnn.utils import set_args_wrt_dataset
+from flatgnn.utils import set_args_wrt_dataset, metric
 
 from the_utils import (
     evaluate_from_embeddings,
@@ -51,7 +51,7 @@ norms = {
     "photo": True,
     "pubmed": True,
     "wikics": False,
-    "cora": False,
+    "cora": True,
     "citeseer": False,
     "texas": False,
     "cornell": False,
@@ -64,14 +64,16 @@ norms = {
     "Amherst41": False,
     "Cornell5": False,
     "corafull": False,
-    "arxiv-year": False,
-    "snap-patents": False,
     "arxiv": False,
     "proteins": False,
-    "products": False,
     "Penn94": False,
     "pokec": False,
     "wiki": False,
+    "twitch-gamers": False,
+    "snap-patents": False,
+    "arxiv-year": False,
+    "genius": False,
+    "products": False,
 }
 
 feats = {
@@ -98,14 +100,16 @@ feats = {
     "corafull": 512,
     "wikics": 300,
     "photo": 256,
-    "arxiv-year": 512,
-    "snap-patents": 512,
     "Penn94": 512,
     "arxiv": 512,
     "proteins": 512,
-    "products": 512,
     "pokec": 512,
     "wiki": 512,
+    "twitch-gamers": 512,
+    "snap-patents": 512,
+    "arxiv-year": 512,
+    "genius": 512,
+    "products": 512,
 }
 
 l2_coefs = {
@@ -114,7 +118,7 @@ l2_coefs = {
     "wisconsin": 0.00005,
     "chameleon": 0.00005,
     "squirrel": 0.00005,
-    "actor": 0.00005,
+    "actor": 0.0000,
     "cora": 0.00005,
     "citeseer": 0.00005,
     "pubmed": 0.00005,
@@ -132,14 +136,16 @@ l2_coefs = {
     "corafull": 0.00005,
     "wikics": 0.00005,
     "photo": 0.00005,
-    "arxiv-year": 0.00005,
-    "snap-patents": 0.00005,
-    "arxiv": 0.00005,
+    "arxiv": 0.0000,
     "proteins": 0.00005,
-    "products": 0.00005,
     "Penn94": 0.00005,
     "pokec": 0.00005,
     "wiki": 0.00005,
+    "twitch-gamers": 0.00005,
+    "snap-patents": 0.00005,
+    "arxiv-year": 0.00005,
+    "genius": 0.00005,
+    "products": 0.00005,
 }
 bss = {
     "texas": 100000,
@@ -165,14 +171,16 @@ bss = {
     "corafull": 100000,
     "wikics": 100000,
     "photo": 100000,
-    "arxiv-year": 100000,
-    "snap-patents": 100000,
     "arxiv": 100000,
     "proteins": 100000,
-    "products": 100000,
     "Penn94": 100000,
     "pokec": 100000,
     "wiki": 100000,
+    "twitch-gamers": 100000,
+    "snap-patents": 100000,
+    "arxiv-year": 100000,
+    "genius": 100000,
+    "products": 100000,
 }
 lrs = {
     "texas": 0.001,
@@ -180,7 +188,7 @@ lrs = {
     "wisconsin": 0.001,
     "chameleon": 0.001,
     "squirrel": 0.001,
-    "actor": 0.001,
+    "actor": 0.0005,
     "cora": 0.001,
     "citeseer": 0.001,
     "pubmed": 0.001,
@@ -198,32 +206,34 @@ lrs = {
     "corafull": 0.001,
     "wikics": 0.001,
     "photo": 0.001,
-    "snap-patents": 0.001,
-    "arxiv-year": 0.001,
-    "arxiv": 0.001,
+    "arxiv": 0.0005,
     "proteins": 0.001,
-    "products": 0.001,
     "Penn94": 0.001,
     "pokec": 0.001,
     "wiki": 0.001,
+    "twitch-gamers": 0.001,
+    "snap-patents": 0.001,
+    "arxiv-year": 0.001,
+    "genius": 0.001,
+    "products": 0.001,
 }
 ess = {
     "texas": 100,
     "cornell": 100,
     "wisconsin": 100,
     "chameleon": 100,
-    "squirrel": 200,
-    "actor": 100,
+    "squirrel": 50,
+    "actor": 200,
     "cora": 100,
-    "citeseer": 200,
-    "pubmed": 300,
+    "citeseer": 100,
+    "pubmed": 100,
     "roman-empire": 100,
     "amazon-ratings": 100,
     "flickr": 100,
     "blogcatalog": 100,
     "corafull": 400,
     "wikics": 200,
-    "photo": 200,
+    "photo": 100,
     "minesweeper": 200,
     "tolokers": 200,
     "questions": 200,
@@ -231,19 +241,21 @@ ess = {
     "Reed98": 200,
     "Amherst41": 200,
     "Cornell5": 200,
-    "snap-patents": 200,
-    "arxiv-year": 100,
     "arxiv": 100,
     "proteins": 100,
-    "products": 100,
     "Penn94": 100,
     "pokec": 100,
     "wiki": 100,
+    "twitch-gamers": 100,
+    "arxiv-year": 100,
+    "genius": 100,
+    "products": 100,
+    "snap-patents": 100,
 }
 nas_dropouts = {
     "flickr": 0.8,
     "blogcatalog": 0.8,
-    "chameleon": 0.8,
+    "chameleon": 0.,
     "squirrel": 0.8,
     "actor": 0.0,
     "pubmed": 0.2,
@@ -254,7 +266,6 @@ nas_dropouts = {
     "cora": 0.8,
     "citeseer": 0.8,
     "corafull": 0.4,
-    "snap-patents": 0.5,
     "minesweeper": 0.0,
     "tolokers": 0.0,
     "questions": 0.0,
@@ -265,13 +276,16 @@ nas_dropouts = {
     "texas": 0.8,
     "cornell": 0.0,
     "wisconsin": 0.0,
-    "arxiv-year": 0.0,
-    "arxiv": 0.,
+    "arxiv": 0.0,
     "proteins": 0.0,
-    "products": 0.0,
     "Penn94": 0.8,
-    "pokec": 0.,
-    "wiki": 0.,
+    "pokec": 0.0,
+    "wiki": 0.0,
+    "twitch-gamers": 0.0,
+    "snap-patents": 0.0,
+    "arxiv-year": 0.0,
+    "genius": 0.0,
+    "products": 0.0,
 }
 nss_dropouts = {
     "flickr": 0.8,
@@ -280,14 +294,13 @@ nss_dropouts = {
     "squirrel": 0.8,
     "actor": 0.8,
     "pubmed": 0.8,
-    "photo": 0.8,
+    "photo": 0.5,
     "roman-empire": 0.2,
     "amazon-ratings": 0.5,
     "wikics": 0.5,
     "cora": 0.8,
     "citeseer": 0.8,
     "corafull": 0.4,
-    "snap-patents": 0.5,
     "minesweeper": 0.0,
     "tolokers": 0.0,
     "questions": 0.0,
@@ -298,13 +311,16 @@ nss_dropouts = {
     "texas": 0.8,
     "cornell": 0.0,
     "wisconsin": 0.0,
-    "arxiv-year": 0.5,
     "arxiv": 0.5,
     "proteins": 0.5,
-    "products": 0.1,
-    "Penn94": 0.8,
+    "Penn94": 0.5,
     "pokec": 0.2,
     "wiki": 0.4,
+    "snap-patents": 0.2,
+    "arxiv-year": 0.8,
+    "genius": 0.2,
+    "twitch-gamers": 0.5,
+    "products": 0.8,
 }
 # higher n_feats, higher clf_dropout
 clf_dropouts = {
@@ -321,7 +337,6 @@ clf_dropouts = {
     "cora": 0.9,
     "citeseer": 0.9,
     "corafull": 0.5,
-    "snap-patents": 0.9,
     "minesweeper": 0.9,
     "tolokers": 0.9,
     "questions": 0.9,
@@ -332,13 +347,16 @@ clf_dropouts = {
     "texas": 0.9,
     "cornell": 0.9,
     "wisconsin": 0.9,
-    "arxiv-year": 0.5,
     "arxiv": 0.5,
     "proteins": 0.2,
-    "products": 0.1,
-    "Penn94": 0.9,
+    "Penn94": 0.5,
     "pokec": 0.2,
     "wiki": 0.2,
+    "snap-patents": 0.2,
+    "arxiv-year": 0.9,
+    "genius": 0.2,
+    "twitch-gamers": 0.5,
+    "products": 0.5,
 }
 n_hopss = {
     "chameleon": 10,
@@ -351,7 +369,7 @@ n_hopss = {
     "photo": 10,
     "pubmed": 4,
     "wikics": 8,
-    "cora": 3,
+    "cora": 64,
     "citeseer": 8,
     "texas": 8,
     "cornell": 8,
@@ -364,14 +382,16 @@ n_hopss = {
     "Amherst41": 8,
     "Cornell5": 8,
     "corafull": 4,
-    "snap-patents": 8,
-    "arxiv-year": 10,
     "arxiv": 16,
     "proteins": 16,
-    "products": 16,
     "Penn94": 16,
     "pokec": 16,
     "wiki": 16,
+    "twitch-gamers": 16,
+    "snap-patents": 16,
+    "arxiv-year": 16,
+    "genius": 16,
+    "products": 16,
 }
 n_layers = {
     "chameleon": 1,
@@ -397,14 +417,16 @@ n_layers = {
     "Amherst41": 1,
     "Cornell5": 1,
     "corafull": 1,
-    "snap-patents": 1,
-    "arxiv-year": 1,
     "arxiv": 1,
     "proteins": 1,
-    "products": 1,
     "Penn94": 1,
     "pokec": 1,
     "wiki": 1,
+    "twitch-gamers": 1,
+    "snap-patents": 1,
+    "arxiv-year": 1,
+    "genius": 1,
+    "products": 1,
 }
 nrls = {
     "chameleon": "concat",
@@ -430,14 +452,16 @@ nrls = {
     "Amherst41": "concat",
     "Cornell5": "concat",
     "corafull": "concat",
-    "snap-patents": "concat",
-    "arxiv-year": "concat",
     "arxiv": "concat",
     "proteins": "concat",
-    "products": "concat",
     "Penn94": "concat",
     "pokec": "concat",
     "wiki": "concat",
+    "twitch-gamers": "concat",
+    "snap-patents": "concat",
+    "arxiv-year": "concat",
+    "genius": "concat",
+    "products": "concat",
 }
 acts = {
     "chameleon": "relu",
@@ -463,14 +487,16 @@ acts = {
     "Amherst41": "relu",
     "Cornell5": "relu",
     "corafull": "relu",
-    "snap-patents": "relu",
-    "arxiv-year": "relu",
     "arxiv": "relu",
     "proteins": "relu",
-    "products": "relu",
     "Penn94": "relu",
     "pokec": "relu",
     "wiki": "relu",
+    "twitch-gamers": "relu",
+    "snap-patents": "relu",
+    "arxiv-year": "relu",
+    "genius": "relu",
+    "products": "relu",
 }
 layer_norms = {
     "chameleon": True,
@@ -496,14 +522,16 @@ layer_norms = {
     "Amherst41": True,
     "Cornell5": True,
     "corafull": True,
-    "snap-patents": True,
-    "arxiv-year": True,
     "arxiv": True,
     "proteins": True,
-    "products": True,
     "Penn94": True,
     "pokec": True,
     "wiki": True,
+    "twitch-gamers": True,
+    "snap-patents": True,
+    "arxiv-year": True,
+    "genius": True,
+    "products": True,
 }
 n_intervalss = {
     "chameleon": 3,
@@ -529,15 +557,125 @@ n_intervalss = {
     "Amherst41": 3,
     "Cornell5": 3,
     "corafull": 3,
-    "snap-patents": 3,
-    "arxiv-year": 3,
     "arxiv": 3,
     "proteins": 3,
-    "products": 3,
     "Penn94": 3,
     "pokec": 3,
     "wiki": 3,
+    "twitch-gamers": 3,
+    "snap-patents": 3,
+    "arxiv-year": 3,
+    "genius": 3,
+    "products": 3,
 }
+trans_layer_nums = {
+    "chameleon": 4,
+    "squirrel": 2,
+    "actor": 2,
+    "flickr": 3,
+    "blogcatalog": 3,
+    "roman-empire": 3,
+    "amazon-ratings": 3,
+    "photo": 4,
+    "pubmed": 3,
+    "wikics": 3,
+    "cora": 3,
+    "citeseer": 3,
+    "texas": 3,
+    "cornell": 3,
+    "wisconsin": 3,
+    "minesweeper": 3,
+    "tolokers": 3,
+    "questions": 3,
+    "Johns Hopkins55": 3,
+    "Reed98": 3,
+    "Amherst41": 3,
+    "Cornell5": 3,
+    "corafull": 3,
+    "arxiv": 2,
+    "proteins": 3,
+    "Penn94": 4,
+    "pokec": 0,
+    "wiki": 3,
+    "twitch-gamers": 3,
+    "snap-patents": 3,
+    "arxiv-year": 3,
+    "genius": 3,
+    "products": 2,
+}
+
+num_headss = {
+    "chameleon": 4,
+    "squirrel": 4,
+    "actor": 4,
+    "flickr": 8,
+    "blogcatalog": 8,
+    "roman-empire": 8,
+    "amazon-ratings": 8,
+    "photo": 4,
+    "pubmed": 8,
+    "wikics": 8,
+    "cora": 8,
+    "citeseer": 8,
+    "texas": 8,
+    "cornell": 8,
+    "wisconsin": 8,
+    "minesweeper": 8,
+    "tolokers": 8,
+    "questions": 8,
+    "Johns Hopkins55": 8,
+    "Reed98": 8,
+    "Amherst41": 8,
+    "Cornell5": 8,
+    "corafull": 8,
+    "arxiv": 4,
+    "proteins": 8,
+    "Penn94": 1,
+    "pokec": 1,
+    "wiki": 8,
+    "twitch-gamers": 8,
+    "snap-patents": 8,
+    "arxiv-year": 8,
+    "genius": 8,
+    "products": 4,
+}
+
+out_ndim_transs = {
+    "texas": 64,
+    "cornell": 64,
+    "wisconsin": 64,
+    "chameleon": 64,
+    "squirrel": 64,
+    "actor": 64,
+    "cora": 64,
+    "citeseer": 64,
+    "pubmed": 64,
+    "roman-empire": 64,
+    "amazon-ratings": 64,
+    "minesweeper": 64,
+    "tolokers": 64,
+    "questions": 64,
+    "flickr": 64,
+    "blogcatalog": 64,
+    "Johns Hopkins55": 64,
+    "Reed98": 64,
+    "Amherst41": 64,
+    "Cornell5": 64,
+    "corafull": 64,
+    "wikics": 64,
+    "photo": 64,
+    "Penn94": 64,
+    "arxiv": 32,
+    "proteins": 64,
+    "pokec": 256,
+    "wiki": 64,
+    "twitch-gamers": 64,
+    "snap-patents": 64,
+    "arxiv-year": 64,
+    "genius": 64,
+    "products": 64,
+}
+
 
 # TRAIN_RATIO = 10
 # VALID_RATIO = 10
@@ -676,14 +814,31 @@ def main(
         directory=DATA.DATA_DIR,
         source=source,
         row_normalize=norms[dataset],
-        rm_self_loop=True,
+        rm_self_loop=False,
         add_self_loop=False,
-        to_simple=True if dataset != "products" else False,
+        to_simple=True if dataset not in ["products", "arxiv-year"] else False,
         verbosity=3,
     )
 
-    repeat = 3 if dataset in ['pokec','arxiv','products','proteins', 'wiki'] else 10
-    if dataset in ['pokec','wiki']:
+    repeat = (
+        3
+        if dataset
+        in [
+            "pokec",
+            "arxiv",
+            "products",
+            "proteins",
+            "wiki",
+            "twitch-gamers",
+            "snap-patents",
+            "arxiv-year",
+            "genius",
+            "Penn94",
+        ]
+        else 10
+    )
+
+    if dataset in ["pokec", "wiki", "Penn94"]:
         print(label.min())
         labeled_idx = torch.where(label != -1)[0]
         # label=labeled_nodes
@@ -702,8 +857,25 @@ def main(
     #     csv_name=f"diameter.csv",
     # )
 
-    TRAIN_RATIO = 48 if dataset not in ["pokec", 'wiki'] else 10
-    VALID_RATIO = 32 if dataset not in ["pokec", 'wiki'] else 10
+    TRAIN_RATIO = 48
+    VALID_RATIO = 32
+    if dataset in ["wiki"]:
+        TRAIN_RATIO = 10
+        VALID_RATIO = 10
+    elif dataset in [
+        "twitch-gamers",
+        "snap-patents",
+        "arxiv-year",
+        "Penn94",
+        "genius",
+        "pokec",
+    ]:
+        TRAIN_RATIO = 50
+        VALID_RATIO = 25
+    elif dataset in ["cora", "pubmed"]:
+        TRAIN_RATIO = 60
+        VALID_RATIO = 20
+
     N_HOPS = n_hops if n_hops is not None else n_hopss[dataset]
     params = {
         "nie": nie,
@@ -722,21 +894,57 @@ def main(
         "act": acts[dataset],
         "layer_norm": layer_norms[dataset],
         "loss": "ce" if dataset not in ["proteins"] else "bce",
-        "out_ndim_trans":64,
+        "out_ndim_trans": out_ndim_transs[dataset],
+        "n_nodes": (
+            graph.num_nodes()
+            if dataset
+            not in [
+                "genius",
+                "cora",
+                "actor",
+                "arxiv",
+                "pokec",
+                "Penn94",
+                "snap-patents",
+                "products",
+            ]
+            and graph.num_nodes() >= 4e4
+            else None
+        ),
+        "ndim_h_a": (
+            32
+            if dataset
+            in [
+                # "pokec",
+                # "Penn94",
+                # "snap-patents",
+            ]
+            else 64
+        ),
+        "num_heads": num_headss[dataset],
+        "transform_first": (
+            True
+            if dataset
+            in [
+                # "Penn94",
+            ]
+            else False
+        ),
+        "trans_layer_num": trans_layer_nums[dataset],
     }
     params_all = {
         "row_normalized": norms[dataset],
         **params,
     }
-    tab_printer(
-        {"bs": BATCH_SIZE, **params_all}
-    )
+    tab_printer({"bs": BATCH_SIZE, **params_all})
 
     t_start = time.time()
 
     seed_list = [random.randint(0, 99999) for i in range(repeat)]
 
     res_list_acc_joint = []
+    print("train_mask exists:", "train_mask" in graph.ndata)
+
     for i in range(repeat):
         graph.split = i
         # set_seed(seed_list[i])
@@ -748,7 +956,13 @@ def main(
             **params,
         )
 
-        if 'train_mask' in graph.ndata and graph.name not in ['actor_pyg','pubmed_pyg','wikics_pyg']:
+        if "train_mask" in graph.ndata and graph.name not in [
+            "cora_pyg",
+            "actor_pyg",
+            "pubmed_pyg",
+            "wikics_pyg",
+            "arxiv-year_linkx",
+        ]:
             train_mask, val_mask, test_mask = (
                 graph.ndata["train_mask"],
                 graph.ndata["val_mask"],
@@ -776,10 +990,13 @@ def main(
                 repeat=10,
                 split_id=i,
                 SPLIT_DIR=DATA.SPLIT_DIR,
-                labeled_idx=labeled_idx if graph.name in ['pokec_linkx'] else None,
+                labeled_idx=labeled_idx if graph.name in ["pokec_linkx", "wiki_linkx"] else None,
             )
-            print(f"random split train:val:test = {TRAIN_RATIO}:{VALID_RATIO}:{100-TRAIN_RATIO-VALID_RATIO}")
+            print(
+                f"random split train:val:test = {TRAIN_RATIO}:{VALID_RATIO}:{100-TRAIN_RATIO-VALID_RATIO}"
+            )
 
+        # print(label[train_mask].min(), label[val_mask].min(), label[test_mask].min())
         model.fit(
             graph=graph,
             labels=label,
@@ -790,7 +1007,6 @@ def main(
             bs=BATCH_SIZE,
             device=DEVICE,
         )
-
 
         if BATCH_SIZE is not None:
             with torch.no_grad():
@@ -806,39 +1022,47 @@ def main(
                         graph=graph,
                         device=DEVICE,
                     )
+                    # H,embeddings = model.forward(
+                    #     graph.ndata["feat"],
+                    #     batch_idx=batch_idx,
+                    #     graph=graph,
+                    #     device=DEVICE,
+                    # )
                     logits = model.classifier(embeddings)
                     pred_stack.append(logits)
 
-                y_pred=torch.cat(pred_stack, dim=0)
+                y_pred = torch.cat(pred_stack, dim=0)
 
-                if graph.name in ["Penn94_linxk"]:
-                    label = F.one_hot(label)
-                elif graph.name in ["proteins_ogb"]:
-                    label = label.to(torch.float)
-                else:
-                    label = label
+                train_acc, val_acc, res = metric(
+                    graph.name,
+                    logits=y_pred,
+                    labels=label,
+                    train_mask=train_mask,
+                    val_mask=val_mask,
+                    test_mask=test_mask,
+                )
 
-                if graph.name not in (
-                    "yelp-chi",
-                    "deezer-europe",
-                    "twitch-gamers",
-                    "pokec",
-                    # "Penn94_linkx",
-                    "fb100",
-                    "proteins_ogb",
-                    # "pokec_linkx",
-                ):
-                    y_pred = torch.argmax(y_pred, dim=1)
-                    res = ACC(label[test_mask].cpu(), y_pred[test_mask].cpu())
-                else:
-                    if graph.name in [
-                        "proteins_ogb",
-                        # "Penn94_linkx",
-                        # "pokec_linkx",
-                    ]:
-                        res = eval_rocauc(
-                            label[test_mask].cpu().numpy(), y_pred[test_mask].cpu().numpy()
-                        )["rocauc"]
+                # if graph.name not in (
+                #     "yelp-chi",
+                #     "deezer-europe",
+                #     "twitch-gamers",
+                #     "pokec",
+                #     "Penn94_linkx",
+                #     "fb100",
+                #     "proteins_ogb",
+                #     "pokec_linkx",
+                # ):
+                #     y_pred = torch.argmax(y_pred, dim=1)
+                #     res = ACC(label[test_mask].cpu(), y_pred[test_mask].cpu())
+                # else:
+                #     if graph.name in [
+                #         "proteins_ogb",
+                #         # "Penn94_linkx",
+                #         # "pokec_linkx",
+                #     ]:
+                #         res = eval_rocauc(
+                #             label[test_mask].cpu().numpy(), y_pred[test_mask].cpu().numpy()
+                #         )["rocauc"]
         else:
             with torch.no_grad():
                 model.train(False)
@@ -847,11 +1071,47 @@ def main(
                     graph=graph,
                     device=DEVICE,
                 )
-                logits_onehot = model.classifier(embeddings)
-                y_pred = torch.argmax(logits_onehot, dim=1)
+                # H,embeddings = model(
+                #     graph.ndata["feat"],
+                #     graph=graph,
+                #     device=DEVICE,
+                # )
+                y_pred = model.classifier(embeddings)
+                # y_pred = torch.argmax(logits_onehot, dim=1)
 
-                res = ACC(label[test_mask].cpu(), y_pred[test_mask].cpu())
+                train_acc, val_acc, res = metric(
+                    graph.name,
+                    logits=y_pred,
+                    labels=label,
+                    train_mask=train_mask,
+                    val_mask=val_mask,
+                    test_mask=test_mask,
+                )
 
+                # if graph.name not in (
+                #     "yelp-chi",
+                #     "deezer-europe",
+                #     "twitch-gamers",
+                #     "pokec",
+                #     "Penn94_linkx",
+                #     "fb100",
+                #     "proteins_ogb",
+                #     "pokec_linkx",
+                # ):
+                #     print(f'Evaluate {graph.name} with accuracy.')
+                #     y_pred = torch.argmax(y_pred, dim=1)
+                #     res = ACC(label[test_mask].cpu(), y_pred[test_mask].cpu())
+                # else:
+                #     if graph.name in [
+                #         "proteins_ogb",
+                #         "genius_linkx"
+                #         # "Penn94_linkx",
+                #         # "pokec_linkx",
+                #     ]:
+                #         print(f'Evaluate {graph.name} with rocauc.')
+                #         res = eval_rocauc(
+                #             label[test_mask].cpu().numpy(), y_pred[test_mask].cpu().numpy()
+                #         )["rocauc"]
 
         res_list_acc_joint.append(res)
         print(f"{graph.name} {i} res: {res}\n\n")
