@@ -287,7 +287,7 @@ def preprocess_neighborhoods(
     adj = adj.to_scipy(layout="csr")
     x = features.cpu().numpy()
     print(f"Load aggregated feats from {base}") if verbose else None
-    hops = os.listdir(base)
+    hops = os.listdir(base) if base.exists() else []
     if f"{n_hops}" not in hops:
         for i in range(1, n_hops + 1):
             file = base.joinpath(f"{i}")

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "py_setting"
 version = "0.0.1"
-authors = [{ name = "galo.gm", email = "galo.gm.work@gmail.com" }]
+authors = [{ name = "", email = "" }]
 keywords = [""]
 description = ""
 readme = "README.md"

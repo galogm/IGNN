@@ -1,22 +1,24 @@
-# Python Package Template
+#  IGNN
 
 <div align="center">
-
-<!-- [![Latest Release](https://img.shields.io/github/v/tag/galogm/py_setting)](https://github.com/galogm/py_setting/tags) -->
 
 </div>
 
 ## Installation
 
 - python>=3.8
+- for intallation scripts see `.ci/install-dev.sh`, `.ci/install.sh`
+
+```bash
+bash .ci/install-dev.sh
+bash .ci/install.sh
+```
 
 ## Usage
 
+see `scripts/00sota.sh` for running scripts.
 
 ## Requirements
 
 See [requirements-dev.txt](./requirements-dev.txt), [requirements.txt](./requirements.txt) and [pyproject.toml:dependencies](./pyproject.toml).
 
-## Contributing
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md).
