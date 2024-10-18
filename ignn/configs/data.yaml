@@ -1,2 +1,2 @@
-DATA_DIR: /data2/guming/projects/graph_datasets/data
+DATA_DIR: data
 SPLIT_DIR: data/random_splits
