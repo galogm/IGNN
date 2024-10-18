@@ -175,6 +175,7 @@ tmp/
 
 .vscode/*
 !.vscode/extensions.json
+!data/random_splits/*
 
 docs/_build
 docs/rst_tmp
