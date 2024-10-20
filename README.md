@@ -7,7 +7,7 @@
 ## Installation
 
 - python>=3.8
-- for intallation scripts see `.ci/install-dev.sh`, `.ci/install.sh`
+- for installation scripts see `.ci/install-dev.sh`, `.ci/install.sh`
 
 ```bash
 bash .ci/install-dev.sh
@@ -21,4 +21,3 @@ see `scripts/00sota.sh` for running scripts.
 ## Requirements
 
 See [requirements-dev.txt](./requirements-dev.txt), [requirements.txt](./requirements.txt) and [pyproject.toml:dependencies](./pyproject.toml).
-

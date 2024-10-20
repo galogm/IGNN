@@ -103,7 +103,7 @@ lrs = {
     "wikics": 0.001,
 }
 ess = {
-    "chameleon": 100,
+    "chameleon": 30,
     "squirrel": 50,
     "actor": 200,
     "pubmed": 100,
@@ -117,7 +117,7 @@ ess = {
 nas_dropouts = {
     "flickr": 0.8,
     "blogcatalog": 0.8,
-    "chameleon": 0.,
+    "chameleon": 0.8,
     "squirrel": 0.8,
     "actor": 0.0,
     "pubmed": 0.2,
@@ -142,7 +142,7 @@ nss_dropouts = {
 clf_dropouts = {
     "flickr": 0.9,
     "blogcatalog": 0.9,
-    "chameleon": 0.8,
+    "chameleon": 0.9,
     "squirrel": 0.9,
     "actor": 0.9,
     "photo": 0.5,
@@ -152,7 +152,7 @@ clf_dropouts = {
     "wikics": 0.9,
 }
 n_hopss = {
-    "chameleon": 12,
+    "chameleon": 64,
     "squirrel": 64,
     "actor": 1,
     "flickr": 10,
