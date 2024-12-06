@@ -436,9 +436,11 @@ class FlatGNN(nn.Module):
             # writer.add_scalar("joint/loss/test", loss_test.item(), epoch)
 
         t_finish = time.time()
+        tm = (t_finish-t_start)/epoch * 10
         print(f"10 epoch cost: {(t_finish-t_start)/epoch * 10:.4f}s")
         if best_state_dict is not None:
             self.load_state_dict(best_state_dict)
+        return tm
 
     def get_embeddings(self):
         with torch.no_grad():

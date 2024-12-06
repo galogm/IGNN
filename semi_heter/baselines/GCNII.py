@@ -65,6 +65,8 @@ class GCNII(nn.Module):
         cnt = 0
         best_state_dict = None
 
+        import time
+        t_start = time.time()
         for epoch in range(self.epochs):
             self.train()
             optimizer.zero_grad()
@@ -91,6 +93,10 @@ class GCNII(nn.Module):
                     break
         self.load_state_dict(best_state_dict)
         self.best_epoch = best_epoch
+
+        t_finish = time.time()
+        t_m = (t_finish-t_start)/epoch * 10
+        return t_m
 
     def forward(self, x, adj, return_Z=False):
         _layers = []

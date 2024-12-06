@@ -103,6 +103,32 @@ DATASETS = {
     # ],
 }
 
+model_keys = {
+    "GCN": "layers",
+    "SGC": "k",
+    "GAT": "layers",
+    "GraphSAGE": "layers",
+    "APPNP": "iterations",
+    "SIGN": "n_hops",
+    "IncepGCN": "n_layers",
+    "JKNet": "n_layers",
+    "MixHop": None,
+    "DAGNN": "k",
+    "GCNII": "layers",
+    "H2GCN": "k",
+    "GBKGCNN": None,
+    "GGNN": "nlayers",
+    "GloGNN": "orders",
+    "HOGGCN": None,
+    "GPRGNN": "nlayers",
+    "ACMGCN": None,
+    "OrderedGNN": "num_layers",
+    "NodeFormer": "num_layers",
+    "DIFFormer": "num_layers",
+    "SGFormer": "num_layers",
+    "IGNN": "n_hops",
+}
+
 
 def main(dataset, source):
     DEVICE = set_device(args.gpu)
@@ -354,7 +380,25 @@ def main(dataset, source):
     # else:
 
     res_list_acc = []
+    if model_keys[args.model] is not None:
+        setattr(args, model_keys[args.model], args.n_hops)
     tab_printer(args)
+    tms = {
+        "model": args.model,
+        "hops": getattr(args, model_keys[args.model]),
+        "0": 0,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0,
+        "mean": 0,
+    }
+    ts = []
     for run in range(args.runs):
         print(f"\nRun: {run}\n")
         set_seed(seed_list[run])
@@ -384,18 +428,30 @@ def main(dataset, source):
             device=DEVICE,
             args=args,
         )
-        model.fit(
+        t_m = model.fit(
             graph,
             label,
             train_mask,
             val_mask,
             test_mask,
         )
+        tms[f'{run}'] = t_m
+        ts.append(t_m)
         res, C, Z = model.predict(graph)
         acc = ACC(label[test_mask], res[test_mask])
         res_list_acc.append(acc)
         print(f"Acc: {acc}")
 
+
+    save_to_csv_files(
+        results={
+            **tms
+        },
+        append_info={
+            "mean": f"{np.array(ts).mean():.2f}±{np.array(ts).std():.2f}",
+        },
+        csv_name="times.csv",
+    )
     elapsed_time = f"{time.time() - t_start:.2f}"
     print(f"Train cost: {elapsed_time}s")
     acc_ = f"{np.array(res_list_acc).mean() * 100:.2f}±{np.array(res_list_acc).std() * 100:.2f}"
@@ -416,12 +472,15 @@ def main(dataset, source):
         csv_name="baselines.csv",
     )
 
+
 def set_args(args):
     if args.model == "GloGNN":
-        args.nhid = 64
+        # args.nhid = 64
+        args.nhid = 256
         args.orders_func_id = 2
     elif args.model == "GCNII":
-        args.nhidden = 64
+        # args.nhidden = 64
+        args.nhidden = 256
     elif args.model == "GGCN":
         args.use_degree = True
         args.use_sign = True
@@ -432,7 +491,8 @@ def set_args(args):
         args.scale_init = 0.5
         args.deg_intercept_init = 0.5
     elif args.model == "ACMGCN":
-        args.nhid = 64
+        # args.nhid = 64
+        args.nhid = 256
         args.nlayers = 1
         args.init_layers_X = 1
         args.acm_model = "acmgcnp"
@@ -447,17 +507,20 @@ def set_args(args):
     elif args.model == "GPRGNN":
         args.init = "PPR"
         args.dropout = 0.5
-        args.nhidden = 64
+        # args.nhidden = 64
+        args.nhidden = 256
         args.gamma = None
     elif args.model == "GBKGNN":
-        args.dim_size = 16
+        # args.dim_size = 16
+        args.dim_size = 256
     elif args.model == "HOGGCN":
-        args.nhid1 = 512
+        args.nhid1 = 256
         args.nhid2 = 256
         args.dropout = 0.5
     elif args.model == "H2GCN":
         args.k = 1
-        args.hidden_dim = 512
+        # args.hidden_dim = 512
+        args.hidden_dim = 256
     elif args.model == "MixHop":
         args.layers_1 = [200, 200, 200]
         args.dropout = 0.5
@@ -466,7 +529,8 @@ def set_args(args):
         args.cut_off = 0.1
         args.budget = 60
     elif args.model == "APPNP":
-        args.layers = [512, 512]
+        # args.layers = [512, 512]
+        args.layers = [256, 256]
     elif args.model in [
         "MLP",
         "GCN",
@@ -517,6 +581,7 @@ if __name__ == "__main__":
         "--normalize", type=int, default=-1, help="feature norm, -1 for without normalize"
     )
     parser.add_argument("--layers", type=int, default=1, help="layers of model")
+    parser.add_argument("--n_hops", type=int, default=1, help="hops")
     parser.add_argument("--model", type=str, default="MLP", help="")
 
     args = parser.parse_args()
@@ -536,11 +601,12 @@ if __name__ == "__main__":
         args.model = args_dict["model"]
         set_args(args)
 
-        args.nhidden = (
-            DIM_BOUND[args.dataset]
-            if args.dataset in DIM_BOUND.keys() and args.nhidden > DIM_BOUND[args.dataset]
-            else args.nhidden
-        )
+        # args.nhidden = (
+        #     DIM_BOUND[args.dataset]
+        #     if args.dataset in DIM_BOUND.keys() and args.nhidden > DIM_BOUND[args.dataset]
+        #     else args.nhidden
+        # )
+        args.nhidden = 256
 
         # tab_printer(args_dict)
         main(
@@ -560,12 +626,13 @@ if __name__ == "__main__":
                     args.model = args_dict["model"]
                     set_args(args)
 
-                    args.nhidden = (
-                        DIM_BOUND[args.dataset]
-                        if args.dataset in DIM_BOUND.keys()
-                        and args.nhidden > DIM_BOUND[args.dataset]
-                        else args.nhidden
-                    )
+                    # args.nhidden = (
+                    #     DIM_BOUND[args.dataset]
+                    #     if args.dataset in DIM_BOUND.keys()
+                    #     and args.nhidden > DIM_BOUND[args.dataset]
+                    #     else args.nhidden
+                    # )
+                    args.nhidden = 256
                     # tab_printer(args_dict)
                     main(
                         dataset=dataset,

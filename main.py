@@ -471,6 +471,22 @@ def main(
     res_list_acc_joint = []
     print("train_mask exists:", "train_mask" in graph.ndata)
 
+    tms = {
+        "model": "IGNN",
+        "hops": N_HOPS,
+        "0": 0,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0,
+        "mean": 0,
+    }
+    ts = []
     for i in range(repeat):
         graph.split = i
         # set_seed(seed_list[i])
@@ -523,7 +539,7 @@ def main(
             )
 
         # print(label[train_mask].min(), label[val_mask].min(), label[test_mask].min())
-        model.fit(
+        tm = model.fit(
             graph=graph,
             labels=label,
             train_mask=train_mask,
@@ -638,10 +654,22 @@ def main(
                 #         res = eval_rocauc(
                 #             label[test_mask].cpu().numpy(), y_pred[test_mask].cpu().numpy()
                 #         )["rocauc"]
+        tms[f'{i}'] = tm
+        ts.append(tm)
 
         res_list_acc_joint.append(res)
         print(f"{graph.name} {i} res: {res}\n\n")
 
+
+    save_to_csv_files(
+        results={
+            **tms
+        },
+        append_info={
+            "mean": f"{np.array(ts).mean():.2f}±{np.array(ts).std():.2f}",
+        },
+        csv_name="times.csv",
+    )
     elapsed_time = f"{(time.time() - t_start)/repeat:.2f}"
     acc_jl = f"{np.array(res_list_acc_joint).mean() * 100:.2f}±{np.array(res_list_acc_joint).std() * 100:.2f}"
 

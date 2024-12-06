@@ -95,6 +95,7 @@ class OrderedGNN(nn.Module):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.l2_coef)
         best_state_dict = None
 
+        t_start = time.time()
         for epoch in range(self.epochs):
             self.train()
             optimizer.zero_grad()
@@ -122,8 +123,13 @@ class OrderedGNN(nn.Module):
                 if cnt == self.patience:
                     print(f"Early Stopping! Best Epoch: {best_epoch}, best val acc: {best_acc}")
                     break
+        t_finish = time.time()
+        t_m = (t_finish-t_start)/epoch * 10
+        print(f"10 epoch cost: {t_m:.4f}s")
         self.load_state_dict(best_state_dict)
         self.best_epoch = best_epoch
+
+        return t_m
 
     def forward(self, x, edge_index, return_Z=False):
         check_signal = []

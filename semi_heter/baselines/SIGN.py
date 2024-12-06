@@ -116,6 +116,9 @@ class SIGN(nn.Module):
         loss_fn = torch.nn.CrossEntropyLoss()
         best_state_dict = None
         self.feats = preprocess(graph, graph.ndata["feat"], self.hops)
+
+        import time
+        t_start = time.time()
         for epoch in range(self.epochs):
             self.train()
 
@@ -148,6 +151,10 @@ class SIGN(nn.Module):
 
         self.load_state_dict(best_state_dict)
         self.best_epoch = best_epoch
+
+        t_finish = time.time()
+        t_m = (t_finish-t_start)/epoch * 10
+        return t_m
 
     def test(self, graph, X, labels, index_list):
         self.eval()
