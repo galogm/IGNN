@@ -362,7 +362,7 @@ def main(
         source=source,
         row_normalize=norms[dataset],
         rm_self_loop=False,
-        add_self_loop=False,
+        add_self_loop=False if nrl!="residual" else True,
         to_simple=True if dataset not in ["products", "arxiv-year"] else False,
         verbosity=3,
     )
@@ -677,6 +677,7 @@ def main(
     save_to_csv_files(
         results={
             "acc_hl": acc_jl,
+            "hop": N_HOPS,
         },
         insert_info={
             "dataset": dataset,

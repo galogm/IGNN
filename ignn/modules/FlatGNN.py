@@ -104,6 +104,22 @@ class IGNNConv(nn.Module):
                 )
                 for _ in range(N_NIE)
             )
+        elif nie == "gcn":
+            self.nei_ind_emb = nn.ModuleList(
+                GraphConv(
+                    in_feats=h_feats,
+                    out_feats=h_feats,
+                    activation=acts[act](),
+                ) if i!=0 else
+                MLP(
+                    in_feats=in_feats,
+                    h_feats=[h_feats],
+                    acts=[acts[act]()],
+                    dropout=nas_dropout,
+                    layer_norm=layer_norm,
+                )
+                for i in range(N_NIE)
+            )
 
         elif nie == "gcn-nie-nst":
             if transform_first:
@@ -198,6 +214,19 @@ class IGNNConv(nn.Module):
             )
 
         if nrl == "concat":
+            self.nei_rel_learn = nn.ModuleList(
+                [
+                    MLP(
+                        in_feats=ndim_fc,
+                        h_feats=[h_feats],
+                        acts=[acts[act]()],
+                        dropout=nss_dropout,
+                        layer_norm=layer_norm,
+                    )
+                ],
+            )
+
+        elif nrl == "residual":
             self.nei_rel_learn = nn.ModuleList(
                 [
                     MLP(
@@ -305,7 +334,12 @@ class IGNNConv(nn.Module):
         else:
             h_a = None
 
-        if self.nie == "gcn-nnie-nst":
+        if self.nie == "gcn" and self.nrl == "residual":
+            h = features.to(device)
+            h = self.nei_ind_emb[0](h)
+            for i in range(1, self.n_hops + 1):
+                h = self.nei_ind_emb[i](graph=graph.to(device), feat=h) + h
+        elif self.nie == "gcn-nnie-nst":
             h = features.to(device)
             self.ns.append(self.nei_ind_emb[0](h))
             for i in range(1, self.n_hops + 1):
@@ -399,6 +433,9 @@ class IGNNConv(nn.Module):
             elif self.nie in ["gcn-nie-st"]:
                 for i in range(self.n_hops + 1):
                     self.ns.append(self.nei_ind_emb[0](self.nei_feats[i]))
+
+        if self.nrl == "residual":
+            return h, None, None
 
         hops_feats = (
             torch.cat(self.ns, dim=1)
@@ -554,7 +591,7 @@ class FlatGNN(nn.Module):
             self.in_ndim_trans = {"concat": h_feats + ndim_h_a, "only-concat": ndim_fc}[nrl]
             # ndim_fc = h_feats * N_NIE
         else:
-            self.in_ndim_trans = {"concat": h_feats, "only-concat": ndim_fc}[nrl]
+            self.in_ndim_trans = {"concat": h_feats, "only-concat": ndim_fc, "residual": h_feats,}[nrl]
 
     def forward(
         self,
