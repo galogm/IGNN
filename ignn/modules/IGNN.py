@@ -541,8 +541,8 @@ class IGNNConv(nn.Module):
         return H, hops_feats, h_a
 
 
-class FlatGNN(nn.Module):
-    """FlatGNN."""
+class IGNN(nn.Module):
+    """IGNN."""
 
     def __init__(
         self,

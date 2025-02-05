@@ -1,3 +1,3 @@
 """models"""
 
-from .FlatGNN import FlatGNN
+from .IGNN import IGNN

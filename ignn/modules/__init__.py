@@ -2,6 +2,6 @@
 """
 
 from .Data import Data
-from .FlatGNN import FlatGNN
+from .IGNN import IGNN
 from .MLP import MLP
 from .orderedGating import ONGNNConv

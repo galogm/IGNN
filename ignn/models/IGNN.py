@@ -1,4 +1,4 @@
-"""FlatGNN"""
+"""IGNN"""
 
 # pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals
 import copy
@@ -33,7 +33,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch_sparse import fill_diag
 from torch_sparse import SparseTensor
 
-from ..modules import FlatGNN as FlatGNN_layer
+from ..modules import IGNN as IGNN_layer
 from ..modules import MLP
 from ..utils import eval_rocauc, metric
 from tqdm import tqdm
@@ -44,8 +44,8 @@ losses = {
 }
 
 
-class FlatGNN(nn.Module):
-    """FlatGNN"""
+class IGNN(nn.Module):
+    """IGNN"""
 
     def __init__(
         self,
@@ -83,7 +83,7 @@ class FlatGNN(nn.Module):
         self.n_intervals = n_intervals
         self.nss_dropout = nss_dropout
 
-        # FlatGNN
+        # IGNN
         self.n_epochs = n_epochs
         self.h_feats = h_feats
         self.l2_coef = l2_coef
@@ -96,7 +96,7 @@ class FlatGNN(nn.Module):
         self.device = device
         self.best_model = None
 
-        self.flat_gnn = FlatGNN_layer(
+        self.flat_gnn = IGNN_layer(
             in_feats=in_feats,
             h_feats=h_feats,
             n_hops=n_hops,
@@ -149,7 +149,7 @@ class FlatGNN(nn.Module):
         # if n_layers > 1:
         #     self.beta = lda / n_layers
         #     self.flat_gnn_s = nn.ModuleList(
-        #         FlatGNN_layer(
+        #         IGNN_layer(
         #             in_feats=hidden_dim,
         #             h_feats=h_feats,
         #             n_hops=n_hops,

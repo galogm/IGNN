@@ -19,7 +19,7 @@ from ignn.utils import eval_rocauc
 torch.set_printoptions(threshold=10_000)
 np.set_printoptions(threshold=10_000)
 
-from ignn.models import FlatGNN
+from ignn.models import IGNN
 from ignn.modules import Data
 from ignn.utils import get_splits_mask
 from ignn.utils import read_configs
@@ -531,7 +531,7 @@ def main(
         graph.split = i
         # set_seed(seed_list[i])
         # model.load_state_dict(torch.load(STATE, map_location=DEVICE))
-        model = FlatGNN(
+        model = IGNN(
             in_feats=graph.ndata["feat"].shape[1],
             n_clusters=n_clusters if dataset not in ["proteins"] else label.shape[1],
             device=DEVICE,
@@ -736,7 +736,7 @@ def main(
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
-        prog="FlatGNN",
+        prog="IGNN",
         description="",
     )
     parser.add_argument(
@@ -871,4 +871,4 @@ if __name__ == "__main__":
 # nrl=None
 # hops=None
 # d=arxiv-year s=pyg
-# m=FlatGNN-$nie-$nrl; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -b $b -nie $nie  -nrl $nrl -hops $hops > logs/ab/sota/$d.log &
+# m=IGNN-$nie-$nrl; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -b $b -nie $nie  -nrl $nrl -hops $hops > logs/ab/sota/$d.log &

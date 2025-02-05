@@ -235,7 +235,7 @@ def preprocess_neighborhoods(
     no_save=False,
     return_adj=False,
     process_adj=True,
-    save_dir: str = "tmp/flatgnn/neighborhoods",
+    save_dir: str = "tmp/ignn/neighborhoods",
     batch_idx=None,
     verbose=True,
 ):
