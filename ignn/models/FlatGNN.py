@@ -142,6 +142,7 @@ class FlatGNN(nn.Module):
             "lstm": h_feats,
             "none": h_feats,
             "residual": h_feats,
+            "attentive": h_feats,
         }[nrl]
 
         # self.flat_gnn_s = None

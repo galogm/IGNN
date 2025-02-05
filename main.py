@@ -362,7 +362,7 @@ def main(
         source=source,
         row_normalize=norms[dataset],
         rm_self_loop=False,
-        add_self_loop=False if nrl!="residual" else True,
+        add_self_loop=False if nrl not in ["residual", "attentive"] else True,
         to_simple=True if dataset not in ["products", "arxiv-year"] else False,
         verbosity=3,
     )

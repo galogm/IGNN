@@ -48,6 +48,7 @@ acts = {
     "prelu": nn.PReLU,
     "sigmoid": nn.Sigmoid,
     "none": nn.Identity,
+    "tanh": nn.Tanh,
 }
 
 class IGNNConv(nn.Module):
@@ -80,6 +81,9 @@ class IGNNConv(nn.Module):
         self.adj = None
         self.adj_und = None
         self.a_feat = None
+        self.nss_dropout=nss_dropout
+        self.nas_dropout=nas_dropout
+
 
         N_NIE = self.n_hops + 1
         super().__init__()
@@ -109,6 +113,8 @@ class IGNNConv(nn.Module):
                 GraphConv(
                     in_feats=h_feats,
                     out_feats=h_feats,
+                    weight=False if self.nrl=="attentive" else True,
+                    allow_zero_in_degree=True if self.nrl=="attentive" else False,
                     activation=acts[act](),
                 ) if i!=0 else
                 MLP(
@@ -238,6 +244,20 @@ class IGNNConv(nn.Module):
                     )
                 ],
             )
+
+        elif nrl == "attentive":
+            self.nei_rel_learn = nn.ModuleList(
+                [
+                    MLP(
+                        in_feats=h_feats * 2,
+                        h_feats=[1],
+                        acts=[acts["tanh"]()],
+                        dropout=0,
+                        layer_norm=True,
+                    )
+                    for i in range(N_NIE)
+                ],
+            )
         elif nrl in ["max", "sum", "mean"]:
             self.nei_rel_learn = nn.ModuleList(
                 [
@@ -339,6 +359,14 @@ class IGNNConv(nn.Module):
             h = self.nei_ind_emb[0](h)
             for i in range(1, self.n_hops + 1):
                 h = self.nei_ind_emb[i](graph=graph.to(device), feat=h) + h
+        elif self.nie == "gcn" and self.nrl == "attentive":
+            h = features.to(device)
+            # h = self.nei_ind_emb[0](F.dropout(h,p=self.nas_dropout,training=self.training))
+            h = self.nei_ind_emb[0](h)
+            for i in range(1, self.n_hops + 1):
+                h_k = self.nei_ind_emb[i](graph=graph.to(device), feat=h)
+                a = self.nei_rel_learn[i](F.dropout(torch.cat([h_k, h], dim=-1),p=0,training=self.training))
+                h = a*h_k + (1-a)*h
         elif self.nie == "gcn-nnie-nst":
             h = features.to(device)
             self.ns.append(self.nei_ind_emb[0](h))
@@ -434,7 +462,7 @@ class IGNNConv(nn.Module):
                 for i in range(self.n_hops + 1):
                     self.ns.append(self.nei_ind_emb[0](self.nei_feats[i]))
 
-        if self.nrl == "residual":
+        if self.nrl in ["residual", "attentive"]:
             return h, None, None
 
         hops_feats = (
@@ -591,7 +619,7 @@ class FlatGNN(nn.Module):
             self.in_ndim_trans = {"concat": h_feats + ndim_h_a, "only-concat": ndim_fc}[nrl]
             # ndim_fc = h_feats * N_NIE
         else:
-            self.in_ndim_trans = {"concat": h_feats, "only-concat": ndim_fc, "residual": h_feats,}[nrl]
+            self.in_ndim_trans = {"concat": h_feats, "only-concat": ndim_fc, "residual": h_feats,"attentive": h_feats,}[nrl]
 
     def forward(
         self,
