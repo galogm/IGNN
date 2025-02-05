@@ -325,7 +325,6 @@ class IGNNConv(nn.Module):
         batch_idx=None,
     ):
         if self.device is None:
-            print("device None")
             self.to(device=device)
             self.device = device
         self.ns = []
