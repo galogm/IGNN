@@ -435,7 +435,7 @@ def main(
         "clf_dropout": clf_dropouts[dataset],
         "n_epochs": 2000,
         "n_hops": N_HOPS,
-        "n_layers": n_layers[dataset],
+        "n_layers": n_layers[dataset] if nrl not in ["residual","attentive"] else 1,
         "early_stop": ess[dataset],
         "n_intervals": min(n_intervalss[dataset], N_HOPS + 1),
         "act": acts[dataset],
