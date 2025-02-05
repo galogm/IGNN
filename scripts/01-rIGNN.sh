@@ -1,7 +1,7 @@
 log_path=logs/residual
 mkdir -p $log_path
 
-f=512 v=1.0
+f=512 v=1.1
 nie=gcn
 
 g=0
@@ -28,7 +28,7 @@ hops=2
 d=flickr s=cola
 m=FlatGNN-$nie-$nrl; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -nie $nie  -nrl $nrl -hops $hops > $log_path/$d.log &
 
-g=2
+g=4
 nrl=residual
 hops=4
 d=blogcatalog s=cola
@@ -52,13 +52,13 @@ hops=4
 d=photo s=pyg
 m=FlatGNN-$nie-$nrl; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -nie $nie  -nrl $nrl -hops $hops > $log_path/$d.log &
 
-g=5
+g=6
 nrl=residual
 hops=2
 d=pubmed s=pyg
 m=FlatGNN-$nie-$nrl; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -nie $nie  -nrl $nrl -hops $hops > $log_path/$d.log &
 
-g=5
+g=0
 nrl=residual
 hops=4
 d=wikics s=pyg

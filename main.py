@@ -211,6 +211,20 @@ layer_norms = {
     "pubmed": True,
     "wikics": True,
 }
+
+layer_norms_att = {
+    "chameleon": False,
+    "squirrel": False,
+    "actor": True,
+    "flickr": False,
+    "blogcatalog": True,
+    "roman-empire": False,
+    "amazon-ratings": True,
+    "photo": True,
+    "pubmed": True,
+    "wikics": False,
+}
+
 n_intervalss = {
     "chameleon": 3,
     "squirrel": 3,
@@ -222,6 +236,30 @@ n_intervalss = {
     "photo": 3,
     "pubmed": 3,
     "wikics": 3,
+}
+# self_loop_attentive = {
+#     "chameleon": False,
+#     "squirrel": False,
+#     "actor": True,
+#     "flickr": False,
+#     "blogcatalog": True,
+#     "roman-empire": False,
+#     "amazon-ratings": True,
+#     "photo": False,
+#     "pubmed": True,
+#     "wikics": True,
+# }
+self_loop_attentive = {
+    "chameleon": False,
+    "squirrel": False,
+    "actor": False,
+    "flickr": False,
+    "blogcatalog": False,
+    "roman-empire": False,
+    "amazon-ratings": False,
+    "photo": False,
+    "pubmed": False,
+    "wikics": False,
 }
 
 # TRAIN_RATIO = 10
@@ -361,8 +399,10 @@ def main(
         directory=DATA.DATA_DIR,
         source=source,
         row_normalize=norms[dataset],
-        rm_self_loop=False,
-        add_self_loop=False if nrl not in ["residual", "attentive"] else True,
+        rm_self_loop=False if nrl!="attentive" else (not self_loop_attentive[dataset]),
+        # rm_self_loop=False,
+        # add_self_loop=False if nrl not in ["residual", "attentive"] else True,
+        add_self_loop=True if nrl!="attentive" else self_loop_attentive[dataset],
         to_simple=True if dataset not in ["products", "arxiv-year"] else False,
         verbosity=3,
     )
@@ -406,22 +446,22 @@ def main(
 
     TRAIN_RATIO = 48
     VALID_RATIO = 32
-    if dataset in ["wiki"]:
-        TRAIN_RATIO = 10
-        VALID_RATIO = 10
-    elif dataset in [
-        "twitch-gamers",
-        "snap-patents",
-        "arxiv-year",
-        "Penn94",
-        "genius",
-        "pokec",
-    ]:
-        TRAIN_RATIO = 50
-        VALID_RATIO = 25
-    elif dataset in ["cora", "pubmed"]:
-        TRAIN_RATIO = 60
-        VALID_RATIO = 20
+    # if dataset in ["wiki"]:
+    #     TRAIN_RATIO = 10
+    #     VALID_RATIO = 10
+    # elif dataset in [
+    #     "twitch-gamers",
+    #     "snap-patents",
+    #     "arxiv-year",
+    #     "Penn94",
+    #     "genius",
+    #     "pokec",
+    # ]:
+    #     TRAIN_RATIO = 50
+    #     VALID_RATIO = 25
+    # elif dataset in ["cora", "pubmed"]:
+    #     TRAIN_RATIO = 60
+    #     VALID_RATIO = 20
 
     N_HOPS = n_hops if n_hops is not None else n_hopss[dataset]
     params = {
@@ -439,7 +479,7 @@ def main(
         "early_stop": ess[dataset],
         "n_intervals": min(n_intervalss[dataset], N_HOPS + 1),
         "act": acts[dataset],
-        "layer_norm": layer_norms[dataset],
+        "layer_norm": layer_norms[dataset] if nrl!="attentive" else layer_norms_att[dataset],
         "loss": "ce" if dataset not in ["proteins"] else "bce",
         "n_nodes": (
             graph.num_nodes()

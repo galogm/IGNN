@@ -16,11 +16,11 @@ bash .ci/install.sh
 
 ## Usage
 
-- c-IGNN: see `scripts/00-cIGNN.sh` for running scripts.
+- c-IGNN: see `scripts/00-cIGNN.sh` for running scripts of each dataset.
 
-- r-IGNN: see `scripts/01-rIGNN.sh` for running scripts.
+- r-IGNN: see `scripts/01-rIGNN.sh` for running scripts of each dataset.
 
-- a-IGNN: see `scripts/02-aIGNN.sh` for running scripts.
+- a-IGNN: see `scripts/02-aIGNN.sh` for running scripts of each dataset.
 
 ## Requirements
 

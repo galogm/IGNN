@@ -1,7 +1,7 @@
 log_path=logs/attentive
 mkdir -p $log_path
 
-f=512 v=1.0
+f=512 v=1.2
 nie=gcn
 
 g=0

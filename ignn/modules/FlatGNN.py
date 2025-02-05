@@ -122,7 +122,7 @@ class IGNNConv(nn.Module):
                     h_feats=[h_feats],
                     acts=[acts[act]()],
                     dropout=nas_dropout,
-                    layer_norm=layer_norm,
+                    layer_norm=True,
                 )
                 for i in range(N_NIE)
             )
@@ -252,8 +252,8 @@ class IGNNConv(nn.Module):
                         in_feats=h_feats * 2,
                         h_feats=[1],
                         acts=[acts["tanh"]()],
-                        dropout=0,
-                        layer_norm=True,
+                        dropout=nss_dropout,
+                        layer_norm=layer_norm,
                     )
                     for i in range(N_NIE)
                 ],
@@ -364,7 +364,7 @@ class IGNNConv(nn.Module):
             h = self.nei_ind_emb[0](h)
             for i in range(1, self.n_hops + 1):
                 h_k = self.nei_ind_emb[i](graph=graph.to(device), feat=h)
-                a = self.nei_rel_learn[i](F.dropout(torch.cat([h_k, h], dim=-1),p=0,training=self.training))
+                a = self.nei_rel_learn[i](torch.cat([h_k, h], dim=-1))
                 h = a*h_k + (1-a)*h
         elif self.nie == "gcn-nnie-nst":
             h = features.to(device)
