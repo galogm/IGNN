@@ -51,6 +51,8 @@ norms = {
     "photo": True,
     "pubmed": True,
     "wikics": False,
+
+    "arxiv": False,
 }
 
 feats = {
@@ -64,6 +66,8 @@ feats = {
     "flickr": 512,
     "blogcatalog": 512,
     "wikics": 300,
+
+    "arxiv": 512,
 }
 
 l2_coefs = {
@@ -77,6 +81,8 @@ l2_coefs = {
     "flickr": 0.00005,
     "blogcatalog": 0.00005,
     "wikics": 0.00005,
+
+    "arxiv": 0.00005,
 }
 bss = {
     "chameleon": 100000,
@@ -89,6 +95,8 @@ bss = {
     "flickr": 100000,
     "blogcatalog": 100000,
     "wikics": 100000,
+
+    "arxiv": 100000,
 }
 lrs = {
     "chameleon": 0.001,
@@ -101,6 +109,8 @@ lrs = {
     "flickr": 0.001,
     "blogcatalog": 0.001,
     "wikics": 0.001,
+
+    "arxiv": 0.001,
 }
 ess = {
     "chameleon": 30,
@@ -113,6 +123,8 @@ ess = {
     "flickr": 100,
     "blogcatalog": 100,
     "wikics": 200,
+
+    "arxiv": 200,
 }
 nas_dropouts = {
     "flickr": 0.8,
@@ -125,6 +137,8 @@ nas_dropouts = {
     "roman-empire": 0.2,
     "amazon-ratings": 0.0,
     "wikics": 0.2,
+
+    "arxiv": 0.,
 }
 nss_dropouts = {
     "flickr": 0.8,
@@ -137,6 +151,8 @@ nss_dropouts = {
     "roman-empire": 0.2,
     "amazon-ratings": 0.5,
     "wikics": 0.5,
+
+    "arxiv": 0.8,
 }
 # higher n_feats, higher clf_dropout
 clf_dropouts = {
@@ -150,6 +166,8 @@ clf_dropouts = {
     "roman-empire": 0.2,
     "amazon-ratings": 0.9,
     "wikics": 0.9,
+
+    "arxiv": 0.5,
 }
 n_hopss = {
     "chameleon": 64,
@@ -162,6 +180,8 @@ n_hopss = {
     "photo": 10,
     "pubmed": 4,
     "wikics": 8,
+
+    "arxiv": 10,
 }
 n_layers = {
     "chameleon": 1,
@@ -174,6 +194,8 @@ n_layers = {
     "photo": 1,
     "pubmed": 1,
     "wikics": 1,
+
+    "arxiv": 1,
 }
 nrls = {
     "chameleon": "concat",
@@ -186,6 +208,8 @@ nrls = {
     "pubmed": "concat",
     "photo": "concat",
     "wikics": "concat",
+
+    "arxiv": "concat",
 }
 acts = {
     "chameleon": "relu",
@@ -198,6 +222,8 @@ acts = {
     "photo": "relu",
     "pubmed": "relu",
     "wikics": "relu",
+
+    "arxiv": "relu",
 }
 layer_norms = {
     "chameleon": True,
@@ -210,6 +236,8 @@ layer_norms = {
     "photo": True,
     "pubmed": True,
     "wikics": True,
+
+    "arxiv": True,
 }
 
 layer_norms_att = {
@@ -223,6 +251,8 @@ layer_norms_att = {
     "photo": True,
     "pubmed": True,
     "wikics": False,
+
+    "arxiv": False,
 }
 
 n_intervalss = {
@@ -236,6 +266,8 @@ n_intervalss = {
     "photo": 3,
     "pubmed": 3,
     "wikics": 3,
+
+    "arxiv": 3,
 }
 # self_loop_attentive = {
 #     "chameleon": False,
@@ -260,6 +292,8 @@ self_loop_attentive = {
     "photo": False,
     "pubmed": False,
     "wikics": False,
+
+    "arxiv": False,
 }
 
 # TRAIN_RATIO = 10
@@ -392,6 +426,12 @@ def main(
     nie=None,
     nrl=None,
     n_hops=None,
+    n_layers=None,
+    lr=None,
+    l2_coefs=None,
+    nas_dropout=None,
+    nss_dropout=None,
+    clf_dropout=None,
 ):
     BATCH_SIZE = BATCH_SIZE
     graph, label, n_clusters = load_data(
@@ -464,18 +504,24 @@ def main(
     #     VALID_RATIO = 20
 
     N_HOPS = n_hops if n_hops is not None else n_hopss[dataset]
+    N_LAYERS = n_layers if n_layers is not None else n_layers[dataset] if nrl not in ["residual","attentive"] else 1
+    LR = lr if lr is not None else lrs[dataset]
+    COEF = l2_coefs if l2_coefs is not None else l2_coefs[dataset]
+    DNAS = nas_dropout if nas_dropout is not None else nas_dropouts[dataset]
+    DNSS = nss_dropout if nss_dropout is not None else nss_dropouts[dataset]
+    DCLF = clf_dropout if clf_dropout is not None else clf_dropouts[dataset]
     params = {
         "nie": nie,
         "nrl": nrl if nrl is not None else nrls[dataset],
-        "lr": lrs[dataset],
+        "lr": LR,
         "h_feats": min(h_feats, feats[dataset]),
-        "l2_coef": l2_coefs[dataset],
-        "nas_dropout": nas_dropouts[dataset],
-        "nss_dropout": nss_dropouts[dataset],
-        "clf_dropout": clf_dropouts[dataset],
+        "l2_coef": COEF,
+        "nas_dropout": DNAS,
+        "nss_dropout": DNSS,
+        "clf_dropout": DCLF,
         "n_epochs": 2000,
         "n_hops": N_HOPS,
-        "n_layers": n_layers[dataset] if nrl not in ["residual","attentive"] else 1,
+        "n_layers": N_LAYERS,
         "early_stop": ess[dataset],
         "n_intervals": min(n_intervalss[dataset], N_HOPS + 1),
         "act": acts[dataset],
@@ -809,6 +855,48 @@ if __name__ == "__main__":
         default=None,
         help="n_hops",
     )
+    parser.add_argument(
+        "-layers",
+        "--n_layers",
+        type=lambda x: None if x == "None" else int(x),
+        default=None,
+        help="n_layers",
+    )
+    parser.add_argument(
+        "-lr",
+        "--lr",
+        type=lambda x: None if x == "None" else float(x),
+        default=None,
+        help="lr",
+    )
+    parser.add_argument(
+        "-l2_coefs",
+        "--l2_coefs",
+        type=lambda x: None if x == "None" else float(x),
+        default=None,
+        help="l2_coefs",
+    )
+    parser.add_argument(
+        "-nas_dropout",
+        "--nas_dropout",
+        type=lambda x: None if x == "None" else float(x),
+        default=None,
+        help="nas_dropout",
+    )
+    parser.add_argument(
+        "-nss_dropout",
+        "--nss_dropout",
+        type=lambda x: None if x == "None" else float(x),
+        default=None,
+        help="nss_dropout",
+    )
+    parser.add_argument(
+        "-clf_dropout",
+        "--clf_dropout",
+        type=lambda x: None if x == "None" else float(x),
+        default=None,
+        help="clf_dropout",
+    )
     args = parser.parse_args()
 
     DATA = Data(**read_configs("data"))
@@ -841,6 +929,12 @@ if __name__ == "__main__":
             nie=args.nie,
             nrl=args.nrl,
             n_hops=args.n_hops,
+            n_layers=args.n_layers,
+            lr=args.lr,
+            l2_coefs=args.l2_coefs,
+            nas_dropout=args.nas_dropout,
+            nss_dropout=args.nss_dropout,
+            clf_dropout=args.clf_dropout,
         )
     else:
         for source, datasets in DATASETS.items():
@@ -865,10 +959,3 @@ if __name__ == "__main__":
                 except Exception as e:
                     traceback.print_exc()
                     continue
-# f=512 v=99.0 b=100000
-# nie=gcn-nie-nst
-# g=1
-# nrl=None
-# hops=None
-# d=arxiv-year s=pyg
-# m=IGNN-$nie-$nrl; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -b $b -nie $nie  -nrl $nrl -hops $hops > logs/ab/sota/$d.log &
