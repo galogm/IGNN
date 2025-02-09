@@ -22,6 +22,9 @@ bash .ci/install.sh
 
 - a-IGNN: see `scripts/02-aIGNN.sh` for running scripts of each dataset.
 
+For large datasets, see `scripts/00-lcIGNN.sh` for running scripts.
+
+
 ## Requirements
 
 See [requirements-dev.txt](./requirements-dev.txt), [requirements.txt](./requirements.txt) and [pyproject.toml:dependencies](./pyproject.toml).
