@@ -53,6 +53,8 @@ norms = {
     "wikics": False,
 
     "arxiv": False,
+    "products": False,
+    "pokec": False,
 }
 
 feats = {
@@ -68,6 +70,8 @@ feats = {
     "wikics": 300,
 
     "arxiv": 512,
+    "products": 512,
+    "pokec": 512,
 }
 
 l2_coefs = {
@@ -83,6 +87,8 @@ l2_coefs = {
     "wikics": 0.00005,
 
     "arxiv": 0.00005,
+    "products": 0.00005,
+    "pokec": 0.00005,
 }
 bss = {
     "chameleon": 100000,
@@ -97,6 +103,8 @@ bss = {
     "wikics": 100000,
 
     "arxiv": 100000,
+    "products": 100000,
+    "pokec": 100000,
 }
 lrs = {
     "chameleon": 0.001,
@@ -111,6 +119,8 @@ lrs = {
     "wikics": 0.001,
 
     "arxiv": 0.001,
+    "products": 0.001,
+    "pokec": 0.001,
 }
 ess = {
     "chameleon": 30,
@@ -125,6 +135,8 @@ ess = {
     "wikics": 200,
 
     "arxiv": 200,
+    "products": 200,
+    "pokec": 200,
 }
 nas_dropouts = {
     "flickr": 0.8,
@@ -139,6 +151,8 @@ nas_dropouts = {
     "wikics": 0.2,
 
     "arxiv": 0.,
+    "products": 0.,
+    "pokec": 0.,
 }
 nss_dropouts = {
     "flickr": 0.8,
@@ -153,6 +167,8 @@ nss_dropouts = {
     "wikics": 0.5,
 
     "arxiv": 0.8,
+    "products": 0.8,
+    "pokec": 0.8,
 }
 # higher n_feats, higher clf_dropout
 clf_dropouts = {
@@ -168,6 +184,8 @@ clf_dropouts = {
     "wikics": 0.9,
 
     "arxiv": 0.5,
+    "products": 0.5,
+    "pokec": 0.5,
 }
 n_hopss = {
     "chameleon": 64,
@@ -182,6 +200,8 @@ n_hopss = {
     "wikics": 8,
 
     "arxiv": 10,
+    "products": 10,
+    "pokec": 10,
 }
 n_layers = {
     "chameleon": 1,
@@ -196,6 +216,8 @@ n_layers = {
     "wikics": 1,
 
     "arxiv": 1,
+    "products": 1,
+    "pokec": 1,
 }
 nrls = {
     "chameleon": "concat",
@@ -210,6 +232,8 @@ nrls = {
     "wikics": "concat",
 
     "arxiv": "concat",
+    "products": "concat",
+    "pokec": "concat",
 }
 acts = {
     "chameleon": "relu",
@@ -224,6 +248,8 @@ acts = {
     "wikics": "relu",
 
     "arxiv": "relu",
+    "products": "relu",
+    "pokec": "relu",
 }
 layer_norms = {
     "chameleon": True,
@@ -238,6 +264,8 @@ layer_norms = {
     "wikics": True,
 
     "arxiv": True,
+    "products": True,
+    "pokec": True,
 }
 
 layer_norms_att = {
@@ -253,6 +281,8 @@ layer_norms_att = {
     "wikics": False,
 
     "arxiv": False,
+    "products": False,
+    "pokec": False,
 }
 
 n_intervalss = {
@@ -268,19 +298,9 @@ n_intervalss = {
     "wikics": 3,
 
     "arxiv": 3,
+    "products": 3,
+    "pokec": 3,
 }
-# self_loop_attentive = {
-#     "chameleon": False,
-#     "squirrel": False,
-#     "actor": True,
-#     "flickr": False,
-#     "blogcatalog": True,
-#     "roman-empire": False,
-#     "amazon-ratings": True,
-#     "photo": False,
-#     "pubmed": True,
-#     "wikics": True,
-# }
 self_loop_attentive = {
     "chameleon": False,
     "squirrel": False,
@@ -294,6 +314,8 @@ self_loop_attentive = {
     "wikics": False,
 
     "arxiv": False,
+    "products": False,
+    "pokec": False,
 }
 
 # TRAIN_RATIO = 10
@@ -326,20 +348,6 @@ def graph_diameter(g):
                 max_length = lengths[src][dst]
 
     return max_length
-
-
-# DATASETS = {
-#     "critical": [
-#         # 890
-#         "chameleon",
-#         # 2,223
-#         "squirrel",
-#     ],
-#     "pyg": [
-#         "actor",
-#         "pubmed",
-#     ],
-# }
 
 DATASETS = {
     "critical": [
@@ -443,6 +451,7 @@ def main(
         # rm_self_loop=False,
         # add_self_loop=False if nrl not in ["residual", "attentive"] else True,
         add_self_loop=True if nrl!="attentive" else self_loop_attentive[dataset],
+        # products and arxiv-year are already simple graphs
         to_simple=True if dataset not in ["products", "arxiv-year"] else False,
         verbosity=3,
     )
