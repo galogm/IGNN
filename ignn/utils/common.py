@@ -2,20 +2,19 @@
 common utils
 """
 
-from pathlib import Path
 import os
+from pathlib import Path
 
 import numpy as np
 import scipy.sparse as sp
 import torch
 import torch.nn.functional as F
+from sklearn.metrics import accuracy_score as ACC
+from sklearn.metrics import roc_auc_score
 from the_utils import make_parent_dirs
 from the_utils import split_train_test_nodes
 from torch_sparse import SparseTensor
 from tqdm import tqdm
-from sklearn.metrics import roc_auc_score
-from sklearn.metrics import accuracy_score as ACC
-
 
 flag = True
 
@@ -73,15 +72,18 @@ def metric(
             "pokec_linkx",
         ]:
             return (
-                eval_rocauc(labels[train_mask].cpu().numpy(), logits[train_mask].cpu().numpy())[
-                    "rocauc"
-                ],
-                eval_rocauc(labels[val_mask].cpu().numpy(), logits[val_mask].cpu().numpy())[
-                    "rocauc"
-                ],
-                eval_rocauc(labels[test_mask].cpu().numpy(), logits[test_mask].cpu().numpy())[
-                    "rocauc"
-                ],
+                eval_rocauc(
+                    labels[train_mask].cpu().numpy(),
+                    logits[train_mask].cpu().numpy(),
+                )["rocauc"],
+                eval_rocauc(
+                    labels[val_mask].cpu().numpy(),
+                    logits[val_mask].cpu().numpy(),
+                )["rocauc"],
+                eval_rocauc(
+                    labels[test_mask].cpu().numpy(),
+                    logits[test_mask].cpu().numpy(),
+                )["rocauc"],
             )
 
 
@@ -125,10 +127,9 @@ def get_splits_mask(
             fixed_split=True,
             split_save_dir=SPLIT_DIR,
         )
-        if name!='pokec_linkx':
-            train_idx = labeled_idx[train_idx]
-            val_idx = labeled_idx[val_idx]
-            test_idx = labeled_idx[test_idx]
+        train_idx = labeled_idx[train_idx]
+        val_idx = labeled_idx[val_idx]
+        test_idx = labeled_idx[test_idx]
     else:
         train_idx, val_idx, test_idx = split_train_test_nodes(
             num_nodes=n_nodes,
