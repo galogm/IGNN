@@ -546,6 +546,7 @@ def main(
             and graph.num_nodes() >= 4e4
             else None
         ),
+        "transform_first": False,
     }
     params_all = {
         "row_normalized": norms[dataset],
@@ -612,93 +613,92 @@ def main(
             print(
                 f"public split train:val:test = {split_ratio[0]*100:.0f}:{split_ratio[1]*100:.0f}:{split_ratio[2]*100:.0f}"
             )
-        else:
-            if False and graph.name == "pokec_linkx":
-                # splits_lst = []
-                split = np.load(
-                    f"data/random_splits/fixed_splits/pokec-splits.npy", allow_pickle=True
-                )
-                print("split num:", split.shape)
-                train_idx = torch.from_numpy(np.asarray(split[i]["train"]))
-                val_idx = torch.from_numpy(np.asarray(split[i]["valid"]))
-                test_idx = torch.from_numpy(np.asarray(split[i]["test"]))
+        elif graph.name == "pokec_linkx":
+            # splits_lst = []
+            split = np.load(
+                f"data/random_splits/fixed_splits/pokec-splits.npy", allow_pickle=True
+            )
+            print("split num:", split.shape)
+            train_idx = torch.from_numpy(np.asarray(split[i]["train"]))
+            val_idx = torch.from_numpy(np.asarray(split[i]["valid"]))
+            test_idx = torch.from_numpy(np.asarray(split[i]["test"]))
 
-                train_idx = train_idx[label[train_idx] != -1]
-                val_idx = val_idx[label[val_idx] != -1]
-                test_idx = test_idx[label[test_idx] != -1]
+            train_idx = train_idx[label[train_idx] != -1]
+            val_idx = val_idx[label[val_idx] != -1]
+            test_idx = test_idx[label[test_idx] != -1]
 
-                # train_idx = labeled_idx[train_idx]
-                # val_idx = labeled_idx[val_idx]
-                # test_idx = labeled_idx[test_idx]
+            # train_idx = labeled_idx[train_idx]
+            # val_idx = labeled_idx[val_idx]
+            # test_idx = labeled_idx[test_idx]
 
-                train_mask = (
-                    torch.zeros(graph.num_nodes())
-                    .scatter_(
-                        0,
-                        (
-                            train_idx.to(torch.int64)
-                            if isinstance(train_idx, torch.Tensor)
-                            else torch.LongTensor(train_idx)
-                        ),
-                        1,
-                    )
-                    .bool()
-                )
-                val_mask = (
-                    torch.zeros(graph.num_nodes())
-                    .scatter_(
-                        0,
-                        (
-                            val_idx.to(torch.int64)
-                            if isinstance(val_idx, torch.Tensor)
-                            else torch.LongTensor(val_idx)
-                        ),
-                        1,
-                    )
-                    .bool()
-                )
-                test_mask = (
-                    torch.zeros(graph.num_nodes())
-                    .scatter_(
-                        0,
-                        (
-                            test_idx.to(torch.int64)
-                            if isinstance(test_idx, torch.Tensor)
-                            else torch.LongTensor(test_idx)
-                        ),
-                        1,
-                    )
-                    .bool()
-                )
-                split_ratio = (
-                    np.array(
-                        [
-                            train_mask.sum().item(),
-                            val_mask.sum().item(),
-                            test_mask.sum().item(),
-                        ]
-                    )
-                    / graph.num_nodes()
-                )
-                print(
-                    f"public split train:val:test = {split_ratio[0]*100:.0f}:{split_ratio[1]*100:.0f}:{split_ratio[2]*100:.0f}"
-                )
-            else:
-                train_mask, val_mask, test_mask = get_splits_mask(
-                    name=graph.name,
-                    n_nodes=graph.num_nodes(),
-                    train_ratio=TRAIN_RATIO,
-                    valid_ratio=VALID_RATIO,
-                    repeat=10,
-                    split_id=i,
-                    SPLIT_DIR=DATA.SPLIT_DIR,
-                    labeled_idx=(
-                        labeled_idx if graph.name in ["wiki_linkx", "pokec_linkx"] else None
+            train_mask = (
+                torch.zeros(graph.num_nodes())
+                .scatter_(
+                    0,
+                    (
+                        train_idx.to(torch.int64)
+                        if isinstance(train_idx, torch.Tensor)
+                        else torch.LongTensor(train_idx)
                     ),
+                    1,
                 )
-                print(
-                    f"random split train:val:test = {TRAIN_RATIO}:{VALID_RATIO}:{100-TRAIN_RATIO-VALID_RATIO}"
+                .bool()
+            )
+            val_mask = (
+                torch.zeros(graph.num_nodes())
+                .scatter_(
+                    0,
+                    (
+                        val_idx.to(torch.int64)
+                        if isinstance(val_idx, torch.Tensor)
+                        else torch.LongTensor(val_idx)
+                    ),
+                    1,
                 )
+                .bool()
+            )
+            test_mask = (
+                torch.zeros(graph.num_nodes())
+                .scatter_(
+                    0,
+                    (
+                        test_idx.to(torch.int64)
+                        if isinstance(test_idx, torch.Tensor)
+                        else torch.LongTensor(test_idx)
+                    ),
+                    1,
+                )
+                .bool()
+            )
+            split_ratio = (
+                np.array(
+                    [
+                        train_mask.sum().item(),
+                        val_mask.sum().item(),
+                        test_mask.sum().item(),
+                    ]
+                )
+                / graph.num_nodes()
+            )
+            print(
+                f"public split train:val:test = {split_ratio[0]*100:.0f}:{split_ratio[1]*100:.0f}:{split_ratio[2]*100:.0f}"
+            )
+        else:
+            train_mask, val_mask, test_mask = get_splits_mask(
+                name=graph.name,
+                n_nodes=graph.num_nodes(),
+                train_ratio=TRAIN_RATIO,
+                valid_ratio=VALID_RATIO,
+                repeat=10,
+                split_id=i,
+                SPLIT_DIR=DATA.SPLIT_DIR,
+                labeled_idx=(
+                    labeled_idx if graph.name in ["wiki_linkx", "pokec_linkx"] else None
+                ),
+            )
+            print(
+                f"random split train:val:test = {TRAIN_RATIO}:{VALID_RATIO}:{100-TRAIN_RATIO-VALID_RATIO}"
+            )
 
         # print(label[train_mask].min(), label[val_mask].min(), label[test_mask].min())
         tm = model.fit(
