@@ -15,6 +15,9 @@ from the_utils import make_parent_dirs
 from the_utils import split_train_test_nodes
 from torch_sparse import SparseTensor
 from tqdm import tqdm
+from ogb.nodeproppred import Evaluator
+
+evaluator = Evaluator(name="ogbn-products")
 
 flag = True
 
@@ -53,6 +56,30 @@ def metric(
         "genius_linkx",
     ):
         y_pred = torch.argmax(logits, dim=1)
+
+        if name == "products_ogb":
+            train_acc = evaluator.eval(
+                {
+                    "y_true": labels[train_mask].cpu().unsqueeze(1),
+                    "y_pred": y_pred[train_mask].cpu().unsqueeze(1),
+                }
+            )["acc"]
+
+            valid_acc = evaluator.eval(
+                {
+                    "y_true": labels[val_mask].cpu().unsqueeze(1),
+                    "y_pred": y_pred[val_mask].cpu().unsqueeze(1),
+                }
+            )["acc"]
+
+            test_acc = evaluator.eval(
+                {
+                    "y_true": labels[test_mask].cpu().unsqueeze(1),
+                    "y_pred": y_pred[test_mask].cpu().unsqueeze(1),
+                }
+            )["acc"]
+            return train_acc, valid_acc, test_acc
+
         return (
             ACC(labels[train_mask].cpu(), y_pred[train_mask].cpu()),
             ACC(labels[val_mask].cpu(), y_pred[val_mask].cpu()),
