@@ -1,4 +1,4 @@
 # torch
-the_utils
+the_utils>=0.8.0
 graph_datasets>=0.14.1
 torch_geometric==2.4

@@ -42,3 +42,6 @@ version_variables = ["py_setting/__init__.py:__version__", "docs/conf.py:release
 version_toml = ["pyproject.toml:project.version"]
 major_on_zero = false
 changelog_file = "CHANGELOG.md"
+
+[tool.isort]
+profile = "black"

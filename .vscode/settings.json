@@ -6,5 +6,10 @@
     "pylint.interpreter": [".env/bin/python"],
     "black-formatter.path": [".env/bin/black"],
     "black-formatter.interpreter": [".env/bin/python"],
-    "editor.defaultFormatter": "ms-python.black-formatter",
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": true
+        }
+    },
 }

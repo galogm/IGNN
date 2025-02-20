@@ -5,38 +5,29 @@ import copy
 import math
 import time
 from pathlib import Path
-from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 import dgl
 import numpy as np
 import scipy.sparse as sp
 import torch
 import torch.nn.functional as F
-from sklearn.cluster import KMeans
-from sklearn.metrics import accuracy_score as ACC, roc_auc_score
 from ogb.nodeproppred import Evaluator
+from sklearn.cluster import KMeans
+from sklearn.metrics import accuracy_score as ACC
+from sklearn.metrics import roc_auc_score
 from sklearn.preprocessing import normalize
-from the_utils import get_str_time
-from the_utils import make_parent_dirs
-from the_utils import save_to_csv_files
+from the_utils import get_str_time, make_parent_dirs, save_to_csv_files
 from torch import nn
 from torch.distributions.normal import Normal
-from torch.nn import LayerNorm
-from torch.nn import Linear
-from torch.nn import Module
-from torch.nn import ModuleList
+from torch.nn import LayerNorm, Linear, Module, ModuleList
 from torch.utils.tensorboard import SummaryWriter
-from torch_sparse import fill_diag
-from torch_sparse import SparseTensor
+from torch_sparse import SparseTensor, fill_diag
+from tqdm import tqdm
 
 from ..modules import IGNN as IGNN_layer
 from ..modules import MLP
 from ..utils import eval_rocauc, metric
-from tqdm import tqdm
 
 losses = {
     "ce": torch.nn.CrossEntropyLoss,
@@ -46,7 +37,6 @@ losses = {
 
 class IGNN(nn.Module):
     """IGNN"""
-
     def __init__(
         self,
         in_feats,
@@ -96,7 +86,7 @@ class IGNN(nn.Module):
         self.device = device
         self.best_model = None
 
-        self.flat_gnn = IGNN_layer(
+        self.ignn = IGNN_layer(
             in_feats=in_feats,
             h_feats=h_feats,
             n_hops=n_hops,
@@ -118,23 +108,9 @@ class IGNN(nn.Module):
 
         hidden_dim = {
             "multi-con": max(h_feats * (n_hops - n_intervals + 2), h_feats),
-            "concat": h_feats + ndim_h_a if n_nodes is not None else h_feats,
-            # "concat": h_feats,
+            "concat": h_feats,
             "ordered-gating": h_feats,
-            # "self-attention": h_feats + out_ndim_trans * num_heads + ndim_h_a if n_nodes is not None else h_feats + out_ndim_trans * num_heads,
-            # "self-attention":h_feats,
             "self-attention": out_ndim_trans * num_heads if trans_layer_num else h_feats,
-            # "self-attention":out_ndim_trans * num_heads + ndim_h_a if n_nodes is not None else out_ndim_trans * num_heads,
-            # "self-attention": (
-            #     (
-            #         out_ndim_trans * num_heads + h_feats + ndim_h_a
-            #         if n_nodes is not None
-            #         else out_ndim_trans * num_heads + h_feats
-            #     )
-            #     if trans_layer_num != 0
-            #     else h_feats + ndim_h_a if n_nodes is not None else h_feats
-            # ),
-            # "self-attention": out_ndim_trans * num_heads,
             "only-concat": h_feats * (n_hops + 1),
             "max": h_feats,
             "mean": h_feats,
@@ -144,32 +120,6 @@ class IGNN(nn.Module):
             "residual": h_feats,
             "attentive": h_feats,
         }[nrl]
-
-        # self.flat_gnn_s = None
-        # if n_layers > 1:
-        #     self.beta = lda / n_layers
-        #     self.flat_gnn_s = nn.ModuleList(
-        #         IGNN_layer(
-        #             in_feats=hidden_dim,
-        #             h_feats=h_feats,
-        #             n_hops=n_hops,
-        #             nas_dropout=nas_dropout,
-        #             nss_dropout=nss_dropout,
-        #             n_intervals=n_intervals,
-        #             out_ndim_trans=out_ndim_trans,
-        #             no_save=True,
-        #             nie=nie,
-        #             nrl=nrl,
-        #             act=act,
-        #             layer_norm=layer_norm,
-        #             n_nodes=n_nodes,
-        #             ndim_h_a=ndim_h_a,
-        #             num_heads=num_heads,
-        #             transform_first=transform_first,
-        #             trans_layer_num=trans_layer_num,
-        #         )
-        #         for _ in range(n_layers - 1)
-        #     )
 
         self.classifier = MLP(
             in_feats=hidden_dim,
@@ -194,16 +144,9 @@ class IGNN(nn.Module):
         graph=None,
         device=None,
     ):
-        z_flat_gnn = self.flat_gnn(graph=graph, device=device, batch_idx=batch_idx)
-        # if self.flat_gnn_s is not None:
-        #     for _, flat_gnn_s in enumerate(self.flat_gnn_s):
-        #         # z_flat_gnn = (
-        #         #     self.beta * flat_gnn_s(graph=graph, device=device, feats=z_flat_gnn)
-        #         #     + (1 - self.beta) * z_flat_gnn
-        #         # )
-        #         z_flat_gnn = flat_gnn_s(graph=graph, device=device, feats=z_flat_gnn)
+        z_ignn = self.ignn(graph=graph, device=device, batch_idx=batch_idx)
 
-        return z_flat_gnn
+        return z_ignn
 
     def validate(
         self,
@@ -217,12 +160,6 @@ class IGNN(nn.Module):
     ):
         self.train(False)
         with torch.no_grad():
-            # H,embeddings = self.forward(
-            #     features,
-            #     graph=graph,
-            #     device=self.device,
-            #     batch_idx=batch_idx,
-            # )
             embeddings = self.forward(
                 features,
                 graph=graph,
@@ -281,7 +218,7 @@ class IGNN(nn.Module):
             if bs is not None:
                 pred_stack = []
                 for step in tqdm(range(0, n, bs), "training step"):
-                    batch_idx = shf[step : step + bs]
+                    batch_idx = shf[step:step + bs]
 
                     batch_labels = labels[batch_idx]
                     batch_train_mask = train_mask[batch_idx]
@@ -297,17 +234,8 @@ class IGNN(nn.Module):
                         graph=graph,
                         device=device,
                     )
-                    # H,embeddings = self.forward(
-                    #     graph.ndata["feat"],
-                    #     batch_idx=batch_idx,
-                    #     graph=graph,
-                    #     device=device,
-                    # )
-
                     logits = self.classifier(embeddings)
                     loss = self.criterion(logits[batch_train_mask], batch_labels[batch_train_mask])
-                    # logits_1 = self.classifier_1(H)
-                    # loss = self.criterion(logits[batch_train_mask], batch_labels[batch_train_mask]) + self.criterion(logits_1[batch_train_mask], batch_labels[batch_train_mask])
                     loss_val = self.criterion(logits[batch_val_mask], batch_labels[batch_val_mask])
                     loss_test = self.criterion(
                         logits[batch_test_mask], batch_labels[batch_test_mask]
@@ -328,7 +256,7 @@ class IGNN(nn.Module):
                         pred_stack = []
                         idx = torch.LongTensor(list(range(n)))
                         for step in tqdm(range(0, n, bs), "validate step"):
-                            batch_idx = idx[step : step + bs]
+                            batch_idx = idx[step:step + bs]
 
                             embeddings = self.forward(
                                 graph.ndata["feat"],
@@ -336,12 +264,6 @@ class IGNN(nn.Module):
                                 graph=graph,
                                 device=device,
                             )
-                            # H, embeddings = self.forward(
-                            #     graph.ndata["feat"],
-                            #     batch_idx=batch_idx,
-                            #     graph=graph,
-                            #     device=device,
-                            # )
                             logits = self.classifier(embeddings)
                             pred_stack.append(logits)
 
@@ -377,18 +299,9 @@ class IGNN(nn.Module):
                     graph=graph,
                     device=device,
                 )
-                # H, embeddings = self.forward(
-                #     graph.ndata["feat"],
-                #     batch_idx=None,
-                #     graph=graph,
-                #     device=device,
-                # )
 
                 logits = self.classifier(embeddings)
                 loss = self.criterion(logits[train_mask], labels[train_mask])
-                # logits_1 = self.classifier_1(H)
-                # loss = self.criterion(logits[train_mask], labels[train_mask]) + self.criterion(logits_1[train_mask], labels[train_mask])
-                # loss = self.criterion(logits[train_mask], labels[train_mask])
                 loss_val = self.criterion(logits[val_mask], labels[val_mask])
                 loss_test = self.criterion(logits[test_mask], labels[test_mask])
 
@@ -408,7 +321,7 @@ class IGNN(nn.Module):
                 )
 
             print(
-                f"epoch:{epoch},loss: {loss_value}, train acc: {train_acc:.3f}, valid acc: {valid_acc:.3f}, test acc: {test_acc:.3f}"
+                f"epoch:{epoch},loss: {loss_value}, train acc: {train_acc:.4f}, valid acc: {valid_acc:.4f}, test acc: {test_acc:.4f}"
             )
             if valid_acc >= best_acc:
                 cnt = 0
@@ -416,15 +329,11 @@ class IGNN(nn.Module):
                 best_acc_t = test_acc
                 best_epoch = epoch
                 best_state_dict = copy.deepcopy(self.state_dict())
-                # print(f"\nEpoch:{epoch}, Loss:{loss.item()}")
-                # print(
-                #     f"train acc: {train_acc:.3f}, valid acc: {valid_acc:.3f}, test acc: {test_acc:.3f}"
-                # )
             else:
                 cnt += 1
                 if cnt == self.estop_steps:
                     print(
-                        f"{graph.name} Early Stopping! Best Epoch: {best_epoch}, best val acc: {best_acc:.3f}, test acc: {best_acc_t:.3f}"
+                        f"{graph.name} Early Stopping! Best Epoch: {best_epoch}, best val acc: {best_acc:.4f}, test acc: {best_acc_t:.4f}"
                     )
                     break
 
@@ -438,7 +347,7 @@ class IGNN(nn.Module):
             # writer.add_scalar("joint/loss/test", loss_test.item(), epoch)
 
         t_finish = time.time()
-        tm = (t_finish-t_start)/epoch * 10
+        tm = (t_finish - t_start) / epoch * 10
         print(f"10 epoch cost: {(t_finish-t_start)/epoch * 10:.4f}s")
         if best_state_dict is not None:
             self.load_state_dict(best_state_dict)

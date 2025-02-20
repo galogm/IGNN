@@ -8,18 +8,16 @@ from pathlib import Path
 import numpy as np
 import scipy.sparse as sp
 import torch
-import torch.nn.functional as F
+from ogb.nodeproppred import Evaluator
 from sklearn.metrics import accuracy_score as ACC
 from sklearn.metrics import roc_auc_score
-from the_utils import make_parent_dirs
-from the_utils import split_train_test_nodes
+from the_utils import make_parent_dirs, onetime_reminder
 from torch_sparse import SparseTensor
-from tqdm import tqdm
-from ogb.nodeproppred import Evaluator
 
-evaluator = Evaluator(name="ogbn-products")
-
-flag = True
+evaluators = {
+    "products_ogb": Evaluator(name="ogbn-products"),
+    "arxiv_ogb": Evaluator(name="ogbn-arxiv"),
+}
 
 
 def metric(
@@ -30,7 +28,6 @@ def metric(
     val_mask,
     test_mask,
 ):
-
     if name in [
         "Penn94_linxk",
         "genius_linkx",
@@ -40,8 +37,8 @@ def metric(
     ]:
         if labels.min().item() == -1:
             labels[labels == -1] = 0
-        if name in ["genius_linkx"]:
-            labels = F.one_hot(labels)
+        # if name in ["genius_linkx"]:
+        #     labels = F.one_hot(labels)
     elif name in ["proteins_ogb"]:
         labels = labels.to(torch.float)
 
@@ -49,7 +46,6 @@ def metric(
         "yelp-chi_linkx",
         "deezer-europe_linkx",
         # "twitch-gamers_linkx",
-        # "pokec_linkx",
         # "Penn94_linkx",
         "fb100_linkx",
         "proteins_ogb",
@@ -57,22 +53,23 @@ def metric(
     ):
         y_pred = torch.argmax(logits, dim=1)
 
-        if name == "products_ogb":
-            train_acc = evaluator.eval(
+        if name in evaluators.keys():
+            onetime_reminder(f"Evaluate {name} with OGB Evaluator.\n")
+            train_acc = evaluators[name].eval(
                 {
                     "y_true": labels[train_mask].cpu().unsqueeze(1),
                     "y_pred": y_pred[train_mask].cpu().unsqueeze(1),
                 }
             )["acc"]
 
-            valid_acc = evaluator.eval(
+            valid_acc = evaluators[name].eval(
                 {
                     "y_true": labels[val_mask].cpu().unsqueeze(1),
                     "y_pred": y_pred[val_mask].cpu().unsqueeze(1),
                 }
             )["acc"]
 
-            test_acc = evaluator.eval(
+            test_acc = evaluators[name].eval(
                 {
                     "y_true": labels[test_mask].cpu().unsqueeze(1),
                     "y_pred": y_pred[test_mask].cpu().unsqueeze(1),
@@ -80,38 +77,28 @@ def metric(
             )["acc"]
             return train_acc, valid_acc, test_acc
 
+        onetime_reminder(f"Evaluate {name} with ACC.\n")
         return (
             ACC(labels[train_mask].cpu(), y_pred[train_mask].cpu()),
             ACC(labels[val_mask].cpu(), y_pred[val_mask].cpu()),
             ACC(labels[test_mask].cpu(), y_pred[test_mask].cpu()),
         )
     else:
-        global flag
-        if flag:
-            print(f"Evaluate {name} with rocauc.")
-            flag = False
-        if name in [
-            "Penn94_linkx",
-            "proteins_ogb",
-            "genius_linkx",
-            # "twitch-gamers_linkx",
-            # "Penn94_linkx",
-            "pokec_linkx",
-        ]:
-            return (
-                eval_rocauc(
-                    labels[train_mask].cpu().numpy(),
-                    logits[train_mask].cpu().numpy(),
-                )["rocauc"],
-                eval_rocauc(
-                    labels[val_mask].cpu().numpy(),
-                    logits[val_mask].cpu().numpy(),
-                )["rocauc"],
-                eval_rocauc(
-                    labels[test_mask].cpu().numpy(),
-                    logits[test_mask].cpu().numpy(),
-                )["rocauc"],
-            )
+        onetime_reminder(f"Evaluate {name} with ROCAUC.\n")
+        return (
+            eval_rocauc(
+                labels[train_mask].cpu().numpy(),
+                logits[train_mask].cpu().numpy(),
+            )["rocauc"],
+            eval_rocauc(
+                labels[val_mask].cpu().numpy(),
+                logits[val_mask].cpu().numpy(),
+            )["rocauc"],
+            eval_rocauc(
+                labels[test_mask].cpu().numpy(),
+                logits[test_mask].cpu().numpy(),
+            )["rocauc"],
+        )
 
 
 def eval_rocauc(y_true, y_pred):
@@ -131,85 +118,6 @@ def eval_rocauc(y_true, y_pred):
         raise RuntimeError("No positively labeled data available. Cannot compute ROC-AUC.")
 
     return {"rocauc": sum(rocauc_list) / len(rocauc_list)}
-
-
-def get_splits_mask(
-    name,
-    n_nodes,
-    train_ratio,
-    valid_ratio,
-    repeat,
-    split_id,
-    SPLIT_DIR,
-    labeled_idx=None,
-):
-    if labeled_idx is not None:
-        train_idx, val_idx, test_idx = split_train_test_nodes(
-            num_nodes=len(labeled_idx),
-            train_ratio=train_ratio,
-            valid_ratio=valid_ratio,
-            data_name=name,
-            split_id=split_id,
-            split_times=repeat,
-            fixed_split=True,
-            split_save_dir=SPLIT_DIR,
-        )
-        train_idx = labeled_idx[train_idx]
-        val_idx = labeled_idx[val_idx]
-        test_idx = labeled_idx[test_idx]
-    else:
-        train_idx, val_idx, test_idx = split_train_test_nodes(
-            num_nodes=n_nodes,
-            train_ratio=train_ratio,
-            valid_ratio=valid_ratio,
-            data_name=name,
-            split_id=split_id,
-            split_times=repeat,
-            fixed_split=True,
-            split_save_dir=SPLIT_DIR,
-        )
-
-    train_mask = (
-        torch.zeros(n_nodes)
-        .scatter_(
-            0,
-            (
-                train_idx.to(torch.int64)
-                if isinstance(train_idx, torch.Tensor)
-                else torch.LongTensor(train_idx)
-            ),
-            1,
-        )
-        .bool()
-    )
-    val_mask = (
-        torch.zeros(n_nodes)
-        .scatter_(
-            0,
-            (
-                val_idx.to(torch.int64)
-                if isinstance(val_idx, torch.Tensor)
-                else torch.LongTensor(val_idx)
-            ),
-            1,
-        )
-        .bool()
-    )
-    test_mask = (
-        torch.zeros(n_nodes)
-        .scatter_(
-            0,
-            (
-                test_idx.to(torch.int64)
-                if isinstance(test_idx, torch.Tensor)
-                else torch.LongTensor(test_idx)
-            ),
-            1,
-        )
-        .bool()
-    )
-
-    return train_mask, val_mask, test_mask
 
 
 def row_normalized_adjacency(adj, return_deg=False):

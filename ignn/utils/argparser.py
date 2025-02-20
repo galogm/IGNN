@@ -2,8 +2,7 @@
 
 import argparse
 import os
-from pathlib import Path
-from pathlib import PurePath
+from pathlib import Path, PurePath
 from typing import Dict
 
 import yaml
@@ -47,9 +46,9 @@ def set_args_wrt_dataset(args, args_dict):
     return args
 
 
-def read_configs(model: str = None) -> Dict:
+def read_configs(type: str = None) -> Dict:
     pkg_dir = get_pkg_dir()
-    config_path: PurePath = Path(f"{pkg_dir}/configs/{model}.yaml")
+    config_path: PurePath = Path(f"{pkg_dir}/configs/{type}.yaml")
     if not config_path.exists():
         return {}
     with open(config_path, encoding="utf-8") as f:
@@ -138,3 +137,130 @@ def get_default_args(model: str) -> Dict:
         args[key] = default_val
 
     return args
+
+
+def parse_ignn_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="IGNN",
+        description="",
+    )
+    parser.add_argument(
+        "-g",
+        "--gpu_id",
+        type=int,
+        default=0,
+        help="gpu id",
+    )
+    parser.add_argument(
+        "-seed",
+        "--seed",
+        type=int,
+        default=42,
+        help="random seed",
+    )
+    parser.add_argument(
+        "-f",
+        "--h_feats",
+        type=int,
+        default=512,
+        help="h feats",
+    )
+    parser.add_argument(
+        "-d",
+        "--dataset",
+        type=str,
+        default=None,
+        help="dataset",
+    )
+    parser.add_argument(
+        "-s",
+        "--source",
+        type=str,
+        default=None,
+        help="source",
+    )
+    parser.add_argument(
+        "-m",
+        "--model",
+        type=str,
+        default="gcn-nie-nst",
+        help="model",
+    )
+    parser.add_argument(
+        "-nie",
+        "--nie",
+        type=str,
+        default="gcn-nie-nst",
+        help="nie",
+    )
+    parser.add_argument(
+        "-nrl",
+        "--nrl",
+        type=lambda x: None if x == "None" else x,
+        default=None,
+        help="nrl",
+    )
+    parser.add_argument(
+        "-v",
+        "--version",
+        type=float,
+        default=1,
+        help="version",
+    )
+    parser.add_argument(
+        "-b",
+        "--batch_size",
+        type=lambda x: None if x == "None" else int(x),
+        default=None,
+        help="batch size",
+    )
+    parser.add_argument(
+        "-hops",
+        "--n_hops",
+        type=lambda x: None if x == "None" else int(x),
+        default=None,
+        help="n_hops",
+    )
+    parser.add_argument(
+        "-layers",
+        "--n_layers",
+        type=lambda x: None if x == "None" else int(x),
+        default=None,
+        help="n_layers",
+    )
+    parser.add_argument(
+        "-lr",
+        "--lr",
+        type=lambda x: None if x == "None" else float(x),
+        default=None,
+        help="lr",
+    )
+    parser.add_argument(
+        "-l2_coefs",
+        "--l2_coefs",
+        type=lambda x: None if x == "None" else float(x),
+        default=None,
+        help="l2_coefs",
+    )
+    parser.add_argument(
+        "-nas_dropout",
+        "--nas_dropout",
+        type=lambda x: None if x == "None" else float(x),
+        default=None,
+        help="nas_dropout",
+    )
+    parser.add_argument(
+        "-nss_dropout",
+        "--nss_dropout",
+        type=lambda x: None if x == "None" else float(x),
+        default=None,
+        help="nss_dropout",
+    )
+    parser.add_argument(
+        "-clf_dropout",
+        "--clf_dropout",
+        type=lambda x: None if x == "None" else float(x),
+        default=None,
+        help="clf_dropout",
+    )
+    return parser.parse_args()
