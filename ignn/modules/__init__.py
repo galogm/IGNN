@@ -2,6 +2,6 @@
 """
 
 from .Data import Data
-from .IGNN import IGNN
+from .IGNN import IGNN_layer
 from .MLP import MLP
-from .orderedGating import ONGNNConv
+from .OrderedGating import ONGNNConv

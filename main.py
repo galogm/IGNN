@@ -187,8 +187,7 @@ def main(
                 for _, step in enumerate(range(0, graph.num_nodes(), BATCH_SIZE)):
                     batch_idx = idx[step:step + BATCH_SIZE]
 
-                    embeddings = model.forward(
-                        graph.ndata["feat"],
+                    embeddings = model(
                         batch_idx=batch_idx,
                         graph=graph,
                         device=DEVICE,
@@ -209,7 +208,6 @@ def main(
             else:
                 model.train(False)
                 embeddings = model(
-                    graph.ndata["feat"],
                     graph=graph,
                     device=DEVICE,
                 )

@@ -9,8 +9,7 @@ from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from ..modules import IGNN as IGNN_layer
-from ..modules import MLP
+from ..modules import MLP, IGNN_layer
 from ..utils import metric
 
 losses = {
@@ -35,7 +34,6 @@ class IGNN(nn.Module):
         nss_dropout: float = 0.8,
         clf_dropout: float = 0.9,
         out_ndim_trans: int = 64,
-        lda: float = 1,
         n_hops=6,
         IN="gcn",
         RN="concat",
@@ -111,9 +109,8 @@ class IGNN(nn.Module):
 
     def forward(
         self,
-        features,
-        batch_idx=None,
         graph=None,
+        batch_idx=None,
         device=None,
     ):
         z_ignn = self.ignn(graph=graph, device=device, batch_idx=batch_idx)
@@ -122,7 +119,6 @@ class IGNN(nn.Module):
 
     def validate(
         self,
-        features,
         labels,
         train_mask,
         val_mask,
@@ -133,7 +129,6 @@ class IGNN(nn.Module):
         self.train(False)
         with torch.no_grad():
             embeddings = self.forward(
-                features,
                 graph=graph,
                 device=self.device,
                 batch_idx=batch_idx,
@@ -202,7 +197,6 @@ class IGNN(nn.Module):
                     self.optimizer.zero_grad()
 
                     embeddings = self.forward(
-                        graph.ndata["feat"],
                         batch_idx=batch_idx,
                         graph=graph,
                         device=device,
@@ -232,7 +226,6 @@ class IGNN(nn.Module):
                             batch_idx = idx[step:step + bs]
 
                             embeddings = self.forward(
-                                graph.ndata["feat"],
                                 batch_idx=batch_idx,
                                 graph=graph,
                                 device=device,
@@ -267,7 +260,6 @@ class IGNN(nn.Module):
                 self.optimizer.zero_grad()
 
                 embeddings = self.forward(
-                    graph.ndata["feat"],
                     batch_idx=None,
                     graph=graph,
                     device=device,
@@ -284,7 +276,6 @@ class IGNN(nn.Module):
                 loss_value = loss.item()
 
                 (train_acc, valid_acc, test_acc) = self.validate(
-                    graph.ndata["feat"],
                     labels,
                     train_mask,
                     val_mask,

@@ -112,7 +112,7 @@ def get_splits(
             graph.ndata["test_mask"],
         )
         onetime_reminder(
-            f"split num: {1}\n"
+            f"split num: {1} repeat time: {5}\n"
             f"public split train:val:test = {train_mask.sum()/ graph.num_nodes()*100:.0f}:"
             f"{val_mask.sum()/ graph.num_nodes()*100:.0f}:"
             f"{test_mask.sum()/ graph.num_nodes()*100:.0f}\n"

@@ -14,7 +14,7 @@ from torch_sparse import SparseTensor
 from ..utils import preprocess_neighborhoods
 from .LSTM import LSTM
 from .MLP import MLP
-from .orderedGating import ONGNNConv
+from .OrderedGating import ONGNNConv
 
 acts = {
     "relu": nn.ReLU,
@@ -26,6 +26,8 @@ acts = {
 
 
 class IGNNConv(nn.Module):
+    """IGNN Conv.
+    """
     def __init__(
         self,
         IN,
@@ -374,36 +376,33 @@ class IGNNConv(nn.Module):
                 for i in range(self.n_hops + 1):
                     self.ns.append(self.nei_ind_emb[0](self.nei_feats[i]))
 
-        if self.RN in ["residual", "attentive"]:
-            return h, None, None
-
-        hops_feats = torch.cat(self.ns, dim=1)
-
         if self.RN == "none":
-            H = self.ns[-1]
-
+            return torch.cat(self.ns, dim=1)
+        if self.RN in ["residual", "attentive"]:
+            return h
         if self.RN == "concat":
-            H = torch.cat(
+            hops_feats = torch.cat(self.ns, dim=1)
+            return torch.cat(
                 [nei_rel_leaRN(hops_feats) for nei_rel_leaRN in self.nei_rel_leaRN],
                 dim=-1,
             )
         if self.RN == "max":
-            H = self.nei_rel_leaRN[0](torch.max(
+            return self.nei_rel_leaRN[0](torch.max(
                 torch.stack(self.ns, dim=1),
                 dim=1,
             )[0])
         if self.RN == "mean":
-            H = self.nei_rel_leaRN[0](torch.mean(
+            return self.nei_rel_leaRN[0](torch.mean(
                 torch.stack(self.ns, dim=1),
                 dim=1,
             ))
         if self.RN == "sum":
-            H = self.nei_rel_leaRN[0](torch.sum(
+            return self.nei_rel_leaRN[0](torch.sum(
                 torch.stack(self.ns, dim=1),
                 dim=1,
             ))
         if self.RN == "lstm":
-            H = self.nei_rel_leaRN[0](torch.stack(self.ns, dim=1), )
+            return self.nei_rel_leaRN[0](torch.stack(self.ns, dim=1), )
         if self.RN == "ordered-gating":
             check_signal = []
             h = self.ns[0]
@@ -417,13 +416,11 @@ class IGNNConv(nn.Module):
                     last_tm_signal=tm_signal,
                 )
                 check_signal.append(dict(zip(["tm_signal"], [tm_signal])))
-            H = h
-
-        return H, hops_feats
+            return h
 
 
-class IGNN(nn.Module):
-    """IGNN."""
+class IGNN_layer(nn.Module):
+    """IGNN_layer."""
     def __init__(
         self,
         in_feats,
@@ -490,13 +487,11 @@ class IGNN(nn.Module):
     ):
         H = None
         for i, ignnconv in enumerate(self.ignnconvs):
-            H, hops_feats = ignnconv(
+            H = ignnconv(
                 device=device,
                 graph=graph,
                 feats=feats if i == 0 else H,
                 batch_idx=batch_idx,
             )
 
-        h_trans = H
-
-        return h_trans
+        return H

@@ -46,7 +46,7 @@ hops=10
 d=amazon-ratings s=critical
 m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops > $log_path/$d.log &
 
-g=0
+g=1
 RN=concat
 hops=10
 d=photo s=pyg
@@ -58,7 +58,7 @@ hops=4
 d=pubmed s=pyg
 m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops > $log_path/$d.log &
 
-g=1
+g=0
 RN=concat
 hops=8
 d=wikics s=pyg
