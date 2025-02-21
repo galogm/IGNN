@@ -1,35 +1,18 @@
 """Full Batch"""
 
 # pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals
-import argparse
-import copy
 import random
 import time
 import traceback
-from pathlib import Path
 
-import networkx as nx
 import numpy as np
 import torch
-import torch.nn.functional as F
 from graph_datasets import load_data
-from sklearn.metrics import accuracy_score as ACC
-from the_utils import (
-    check_modelfile_exists,
-    draw_chart,
-    evaluate_from_embeddings,
-    make_parent_dirs,
-    save_to_csv_files,
-    set_device,
-    set_seed,
-    split_train_test_nodes,
-    tab_printer,
-)
-from torch import nn
+from the_utils import save_to_csv_files, set_device, set_seed, tab_printer
 
 from ignn.configs.params import (
+    RNs,
     acts,
-    bss,
     clf_dropouts,
     ess,
     feats,
@@ -38,53 +21,18 @@ from ignn.configs.params import (
     layer_norms_att,
     lrs,
     n_hopss,
-    n_intervalss,
-    n_layers,
+    n_layerss,
     nas_dropouts,
     norms,
-    nrls,
     nss_dropouts,
     self_loop_attentive,
 )
 from ignn.models import IGNN
 from ignn.modules import Data
-from ignn.utils import (
-    eval_rocauc,
-    get_splits,
-    metric,
-    parse_ignn_args,
-    read_configs,
-    set_args_wrt_dataset,
-)
+from ignn.utils import get_splits, metric, parse_ignn_args, read_configs
 
 torch.set_printoptions(threshold=10_000)
 np.set_printoptions(threshold=10_000)
-
-
-def graph_diameter(g):
-    """
-    Computes the diameter of a given graph.
-
-    Parameters:
-    g (DGLGraph): The input graph.
-
-    Returns:
-    int: The diameter of the graph.
-    """
-    # Convert the DGL graph to a NetworkX graph
-    nx_graph = g.to_networkx()
-
-    # Use NetworkX to compute the all-pairs shortest path lengths
-    lengths = dict(nx.all_pairs_shortest_path_length(nx_graph))
-
-    # Find the maximum shortest path length
-    max_length = 0
-    for src in lengths:
-        for dst in lengths[src]:
-            if lengths[src][dst] > max_length:
-                max_length = lengths[src][dst]
-
-    return max_length
 
 
 def main(
@@ -93,33 +41,35 @@ def main(
     h_feats,
     MODEL,
     BATCH_SIZE=None,
-    nie=None,
-    nrl=None,
+    IN=None,
+    RN=None,
     n_hops=None,
     n_layers=None,
     lr=None,
-    l2_coefs=None,
+    l2_coef=None,
     nas_dropout=None,
     nss_dropout=None,
     clf_dropout=None,
+    eval_start=1,
 ):
-    BATCH_SIZE = BATCH_SIZE
     graph, label, n_clusters = load_data(
         dataset_name=dataset,
         directory=DATA.DATA_DIR,
         source=source,
         row_normalize=norms[dataset],
-        rm_self_loop=False if nrl != "attentive" else (not self_loop_attentive[dataset]),
-        # rm_self_loop=False,
-        # add_self_loop=False if nrl not in ["residual", "attentive"] else True,
-        add_self_loop=True if nrl != "attentive" else self_loop_attentive[dataset],
+        rm_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
+        add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
         # products and arxiv-year are already simple graphs
         to_simple=True if dataset not in ["products", "arxiv-year"] else False,
         verbosity=3,
     )
 
     repeat = (
-        3 if dataset in [
+        {
+            "pokec": 5,
+            "arxiv": 3,
+            "products": 3,
+        }[dataset] if dataset in [
             "pokec",
             "arxiv",
             "products",
@@ -141,16 +91,16 @@ def main(
     N_HOPS = n_hops if n_hops is not None else n_hopss[dataset]
     N_LAYERS = (
         n_layers if n_layers is not None else
-        n_layers[dataset] if nrl not in ["residual", "attentive"] else 1
+        n_layerss[dataset] if RN not in ["residual", "attentive"] else 1
     )
     LR = lr if lr is not None else lrs[dataset]
-    COEF = l2_coefs if l2_coefs is not None else l2_coefs[dataset]
+    COEF = l2_coef if l2_coef is not None else l2_coefs[dataset]
     DNAS = nas_dropout if nas_dropout is not None else nas_dropouts[dataset]
     DNSS = nss_dropout if nss_dropout is not None else nss_dropouts[dataset]
     DCLF = clf_dropout if clf_dropout is not None else clf_dropouts[dataset]
     params = {
-        "nie": nie,
-        "nrl": nrl if nrl is not None else nrls[dataset],
+        "IN": IN,
+        "RN": RN if RN is not None else RNs[dataset],
         "lr": LR,
         "h_feats": min(h_feats, feats[dataset]),
         "l2_coef": COEF,
@@ -161,28 +111,15 @@ def main(
         "n_hops": N_HOPS,
         "n_layers": N_LAYERS,
         "early_stop": ess[dataset],
-        "n_intervals": min(n_intervalss[dataset], N_HOPS + 1),
         "act": acts[dataset],
-        "layer_norm": layer_norms[dataset] if nrl != "attentive" else layer_norms_att[dataset],
+        "layer_norm": layer_norms[dataset] if RN != "attentive" else layer_norms_att[dataset],
         "loss": "ce" if dataset not in ["proteins"] else "bce",
-        "n_nodes":
-            (
-                graph.num_nodes() if dataset not in [
-                    "genius",
-                    "cora",
-                    "actor",
-                    "arxiv",
-                    "pokec",
-                    "Penn94",
-                    "snap-patents",
-                    "products",
-                ] and graph.num_nodes() >= 4e4 else None
-            ),
         "transform_first": False,
     }
     params_all = {
         "row_normalized": norms[dataset],
         "bs": BATCH_SIZE,
+        "eval_start": eval_start,
         **params,
     }
     tab_printer({**params_all})
@@ -213,7 +150,6 @@ def main(
     for i in range(repeat):
         graph.split = i
         # set_seed(seed_list[i])
-        # model.load_state_dict(torch.load(STATE, map_location=DEVICE))
         model = IGNN(
             in_feats=graph.ndata["feat"].shape[1],
             n_clusters=n_clusters if dataset not in ["proteins"] else label.shape[1],
@@ -240,10 +176,11 @@ def main(
             split_id=i,
             bs=BATCH_SIZE,
             device=DEVICE,
+            eval_start=eval_start,
         )
 
-        if BATCH_SIZE is not None:
-            with torch.no_grad():
+        with torch.no_grad():
+            if BATCH_SIZE is not None:
                 model.train(False)
                 pred_stack = []
                 idx = torch.LongTensor(list(range(graph.num_nodes())))
@@ -256,12 +193,6 @@ def main(
                         graph=graph,
                         device=DEVICE,
                     )
-                    # H,embeddings = model.forward(
-                    #     graph.ndata["feat"],
-                    #     batch_idx=batch_idx,
-                    #     graph=graph,
-                    #     device=DEVICE,
-                    # )
                     logits = model.classifier(embeddings)
                     pred_stack.append(logits)
 
@@ -275,43 +206,14 @@ def main(
                     val_mask=val_mask,
                     test_mask=test_mask,
                 )
-
-                # if graph.name not in (
-                #     "yelp-chi",
-                #     "deezer-europe",
-                #     "twitch-gamers",
-                #     "pokec",
-                #     "Penn94_linkx",
-                #     "fb100",
-                #     "proteins_ogb",
-                #     "pokec_linkx",
-                # ):
-                #     y_pred = torch.argmax(y_pred, dim=1)
-                #     res = ACC(label[test_mask].cpu(), y_pred[test_mask].cpu())
-                # else:
-                #     if graph.name in [
-                #         "proteins_ogb",
-                #         # "Penn94_linkx",
-                #         # "pokec_linkx",
-                #     ]:
-                #         res = eval_rocauc(
-                #             label[test_mask].cpu().numpy(), y_pred[test_mask].cpu().numpy()
-                #         )["rocauc"]
-        else:
-            with torch.no_grad():
+            else:
                 model.train(False)
                 embeddings = model(
                     graph.ndata["feat"],
                     graph=graph,
                     device=DEVICE,
                 )
-                # H,embeddings = model(
-                #     graph.ndata["feat"],
-                #     graph=graph,
-                #     device=DEVICE,
-                # )
                 y_pred = model.classifier(embeddings)
-                # y_pred = torch.argmax(logits_onehot, dim=1)
 
                 train_acc, val_acc, res = metric(
                     graph.name,
@@ -322,30 +224,6 @@ def main(
                     test_mask=test_mask,
                 )
 
-                # if graph.name not in (
-                #     "yelp-chi",
-                #     "deezer-europe",
-                #     "twitch-gamers",
-                #     "pokec",
-                #     "Penn94_linkx",
-                #     "fb100",
-                #     "proteins_ogb",
-                #     "pokec_linkx",
-                # ):
-                #     print(f'Evaluate {graph.name} with accuracy.')
-                #     y_pred = torch.argmax(y_pred, dim=1)
-                #     res = ACC(label[test_mask].cpu(), y_pred[test_mask].cpu())
-                # else:
-                #     if graph.name in [
-                #         "proteins_ogb",
-                #         "genius_linkx"
-                #         # "Penn94_linkx",
-                #         # "pokec_linkx",
-                #     ]:
-                #         print(f'Evaluate {graph.name} with rocauc.')
-                #         res = eval_rocauc(
-                #             label[test_mask].cpu().numpy(), y_pred[test_mask].cpu().numpy()
-                #         )["rocauc"]
         tms[f"{i}"] = tm
         ts.append(tm)
 
@@ -409,7 +287,7 @@ if __name__ == "__main__":
         "pyg":
             [
                 # "texas",
-                # "cornell",
+                # "coRNell",
                 # "wisconsin",
                 # "corafull",
                 # "cora",
@@ -445,7 +323,7 @@ if __name__ == "__main__":
                 "Amherst41",
                 # # (array([0, 1, 2]), array([1838, 8135, 8687]))
                 # # 18,660
-                "Cornell5",
+                "CoRNell5",
                 # # 41,554
                 "Penn94",
                 # # 168,114
@@ -473,52 +351,45 @@ if __name__ == "__main__":
 
     DATA = Data(**read_configs("data"))
 
-    DIM_BOUND = {
-        "pubmed": 500,
-        "photo": 256,
-        "roman-empire": 300,
-        "amazon-ratings": 300,
-        "wikics": 300,
-    }
-
     if args.dataset != "all":
         main(
             dataset=args.dataset,
             source=args.source,
-            h_feats=(
-                DIM_BOUND[args.dataset] if args.dataset in DIM_BOUND.keys() and
-                args.h_feats > DIM_BOUND[args.dataset] else args.h_feats
-            ),
+            h_feats=args.h_feats,
             MODEL=args.model,
             BATCH_SIZE=args.batch_size,
-            nie=args.nie,
-            nrl=args.nrl,
+            IN=args.IN,
+            RN=args.RN,
             n_hops=args.n_hops,
             n_layers=args.n_layers,
             lr=args.lr,
-            l2_coefs=args.l2_coefs,
+            l2_coef=args.l2_coef,
             nas_dropout=args.nas_dropout,
             nss_dropout=args.nss_dropout,
             clf_dropout=args.clf_dropout,
+            eval_start=args.eval_start,
         )
     else:
         for source, datasets in DATASETS.items():
-            # for source, datasets in [('pyg',['texas']),('cola',['blogcatalog']),('pyg',['cora'])]:
             for dataset in datasets:
                 source = source.lower()
                 try:
                     main(
                         dataset=dataset,
                         source=source,
-                        h_feats=(
-                            DIM_BOUND[dataset] if dataset in DIM_BOUND.keys() and
-                            args.h_feats > DIM_BOUND[dataset] else args.h_feats
-                        ),
+                        h_feats=args.h_feats,
                         MODEL=args.model,
                         BATCH_SIZE=args.batch_size,
-                        nie=args.nie,
-                        nrl=args.nrl,
+                        IN=args.IN,
+                        RN=args.RN,
                         n_hops=args.n_hops,
+                        n_layers=args.n_layers,
+                        lr=args.lr,
+                        l2_coef=args.l2_coef,
+                        nas_dropout=args.nas_dropout,
+                        nss_dropout=args.nss_dropout,
+                        clf_dropout=args.clf_dropout,
+                        eval_start=args.eval_start,
                     )
                 except Exception as e:
                     traceback.print_exc()

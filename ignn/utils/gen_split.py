@@ -168,9 +168,9 @@ def get_splits(
         )
         onetime_reminder(
             f"split num: {split.shape}\n"
-            f"public splits train:val:test = {train_mask.sum()*100:.0f}:"
-            f"{val_mask.sum()*100:.0f}:"
-            f"{test_mask.sum()*100:.0f}\n"
+            f"public splits train:val:test = {train_mask.sum()/ graph.num_nodes()*100:.0f}:"
+            f"{val_mask.sum()/ graph.num_nodes()*100:.0f}:"
+            f"{test_mask.sum()/ graph.num_nodes()*100:.0f}\n"
         )
     else:
         train_mask, val_mask, test_mask = get_random_split_masks(

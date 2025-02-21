@@ -1,32 +1,17 @@
 """FaltGNN Layer."""
 
 # pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals
-import copy
-import math
-import random
-import time
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Tuple
-
 import dgl
-import numpy as np
-import scipy.sparse as sp
 import torch
 import torch.nn.functional as F
 from dgl.nn.pytorch import GraphConv
-from sklearn.cluster import KMeans
-from sklearn.metrics import accuracy_score as ACC
-from sklearn.preprocessing import normalize
-from the_utils import get_str_time, make_parent_dirs, save_to_csv_files
 from torch import nn
-from torch.distributions.normal import Normal
-from torch.nn import LayerNorm, Linear, Module, ModuleList
+from torch.nn import LayerNorm, Linear, ModuleList
 from torch.utils.tensorboard import SummaryWriter
 from torch_geometric.nn import GATConv
-from torch_sparse import SparseTensor, fill_diag
-from tqdm import tqdm
+from torch_sparse import SparseTensor
 
-from ..utils import metric, preprocess_neighborhoods
+from ..utils import preprocess_neighborhoods
 from .LSTM import LSTM
 from .MLP import MLP
 from .orderedGating import ONGNNConv
@@ -43,7 +28,7 @@ acts = {
 class IGNNConv(nn.Module):
     def __init__(
         self,
-        nie,
+        IN,
         in_feats,
         h_feats,
         act,
@@ -51,10 +36,8 @@ class IGNNConv(nn.Module):
         layer_norm,
         N_NIE,
         transform_first,
-        n_nodes,
-        ndim_h_a,
         nss_dropout,
-        nrl,
+        RN,
         n_hops,
         ndim_fc,
         no_save,
@@ -62,8 +45,8 @@ class IGNNConv(nn.Module):
         self.no_save = no_save
         self.n_hops = n_hops
         self.h_feats = h_feats
-        self.nie = nie
-        self.nrl = nrl
+        self.IN = IN
+        self.RN = RN
         self.device = None
         self.transform_first = transform_first
         self.adj = None
@@ -74,7 +57,7 @@ class IGNNConv(nn.Module):
 
         N_NIE = self.n_hops + 1
         super().__init__()
-        if nie == "gat":
+        if IN == "gat":
             self.nei_ind_emb = nn.ModuleList(
                 GATConv(
                     in_channels=in_feats,
@@ -83,14 +66,14 @@ class IGNNConv(nn.Module):
                     dropout=nas_dropout,
                 ) for _ in range(N_NIE)
             )
-        elif nie == "gcn":
+        elif IN == "gcn":
             self.nei_ind_emb = nn.ModuleList(
                 (
                     GraphConv(
                         in_feats=h_feats,
                         out_feats=h_feats,
-                        weight=False if self.nrl == "attentive" else True,
-                        allow_zero_in_degree=True if self.nrl == "attentive" else False,
+                        weight=False if self.RN == "attentive" else True,
+                        allow_zero_in_degree=True if self.RN == "attentive" else False,
                         activation=acts[act](),
                     ) if i != 0 else MLP(
                         in_feats=in_feats,
@@ -102,7 +85,7 @@ class IGNNConv(nn.Module):
                 ) for i in range(N_NIE)
             )
 
-        elif nie == "gcn-nie-nst":
+        elif IN == "gcn-IN-SN":
             if transform_first:
                 self.nei_uni_emb = MLP(
                     in_feats=in_feats,
@@ -130,7 +113,7 @@ class IGNNConv(nn.Module):
                         layer_norm=layer_norm,
                     ) for _ in range(N_NIE)
                 )
-        elif nie == "gcn-nie-st":
+        elif IN == "gcn-IN-nSN":
             self.nei_ind_emb = nn.ModuleList(
                 [
                     MLP(
@@ -142,7 +125,7 @@ class IGNNConv(nn.Module):
                     )
                 ]
             )
-        elif nie == "gcn-nnie-nst":
+        elif IN == "gcn-nIN-SN":
             self.nei_ind_emb = nn.ModuleList(
                 (
                     GraphConv(
@@ -158,7 +141,7 @@ class IGNNConv(nn.Module):
                     )
                 ) for i in range(N_NIE)
             )
-        elif nie == "gcn-nnie-st":
+        elif IN == "gcn-nIN-nSN":
             self.nei_ind_emb = nn.ModuleList(
                 (
                     GraphConv(
@@ -177,8 +160,8 @@ class IGNNConv(nn.Module):
 
         self.nei_feats = None
 
-        if nrl == "concat":
-            self.nei_rel_learn = nn.ModuleList(
+        if RN == "concat":
+            self.nei_rel_leaRN = nn.ModuleList(
                 [
                     MLP(
                         in_feats=ndim_fc,
@@ -190,8 +173,8 @@ class IGNNConv(nn.Module):
                 ],
             )
 
-        elif nrl == "residual":
-            self.nei_rel_learn = nn.ModuleList(
+        elif RN == "residual":
+            self.nei_rel_leaRN = nn.ModuleList(
                 [
                     MLP(
                         in_feats=ndim_fc,
@@ -203,8 +186,8 @@ class IGNNConv(nn.Module):
                 ],
             )
 
-        elif nrl == "attentive":
-            self.nei_rel_learn = nn.ModuleList(
+        elif RN == "attentive":
+            self.nei_rel_leaRN = nn.ModuleList(
                 [
                     MLP(
                         in_feats=h_feats * 2,
@@ -215,8 +198,8 @@ class IGNNConv(nn.Module):
                     ) for i in range(N_NIE)
                 ],
             )
-        elif nrl in ["max", "sum", "mean"]:
-            self.nei_rel_learn = nn.ModuleList(
+        elif RN in ["max", "sum", "mean"]:
+            self.nei_rel_leaRN = nn.ModuleList(
                 [
                     MLP(
                         in_feats=h_feats,
@@ -227,8 +210,8 @@ class IGNNConv(nn.Module):
                     )
                 ],
             )
-        elif nrl == "lstm":
-            self.nei_rel_learn = nn.ModuleList(
+        elif RN == "lstm":
+            self.nei_rel_leaRN = nn.ModuleList(
                 [
                     nn.Sequential(
                         nn.Dropout(nss_dropout),
@@ -242,7 +225,7 @@ class IGNNConv(nn.Module):
                     )
                 ],
             )
-        elif nrl == "ordered-gating":
+        elif RN == "ordered-gating":
             self.linear_trans_in = ModuleList()
             self.linear_trans_out = Linear(h_feats, h_feats)
             self.norm_input = ModuleList()
@@ -289,32 +272,32 @@ class IGNNConv(nn.Module):
         features = graph.ndata["feat"] if feats is None else feats
         row, col = graph.add_self_loop().edges()
 
-        if self.nie == "gcn" and self.nrl == "residual":
+        if self.IN == "gcn" and self.RN == "residual":
             h = features.to(device)
             h = self.nei_ind_emb[0](h)
             for i in range(1, self.n_hops + 1):
                 h = self.nei_ind_emb[i](graph=graph.to(device), feat=h) + h
-        elif self.nie == "gcn" and self.nrl == "attentive":
+        elif self.IN == "gcn" and self.RN == "attentive":
             h = features.to(device)
             # h = self.nei_ind_emb[0](F.dropout(h,p=self.nas_dropout,training=self.training))
             h = self.nei_ind_emb[0](h)
             for i in range(1, self.n_hops + 1):
                 h_k = self.nei_ind_emb[i](graph=graph.to(device), feat=h)
-                a = self.nei_rel_learn[i](torch.cat([h_k, h], dim=-1))
+                a = self.nei_rel_leaRN[i](torch.cat([h_k, h], dim=-1))
                 h = a * h_k + (1 - a) * h
-        elif self.nie == "gcn-nnie-nst":
+        elif self.IN == "gcn-nIN-SN":
             h = features.to(device)
             self.ns.append(self.nei_ind_emb[0](h))
             for i in range(1, self.n_hops + 1):
                 h = self.nei_ind_emb[i](graph=graph.to(device), feat=h)
                 self.ns.append(h)
-        elif self.nie == "gcn-nnie-st":
+        elif self.IN == "gcn-nIN-nSN":
             h = self.nei_ind_emb[0](features.to(device))
             self.ns.append(h)
             for i in range(1, self.n_hops + 1):
                 h = self.nei_ind_emb[i](graph=graph.to(device), feat=h)
                 self.ns.append(h)
-        elif self.nie in ["gcn-nie-nst", "gcn-nie-st"]:
+        elif self.IN in ["gcn-IN-SN", "gcn-IN-nSN"]:
             if self.adj_und is None:
                 row, col = graph.to_simple().add_self_loop().edges()
                 self.adj_und = SparseTensor(
@@ -335,9 +318,9 @@ class IGNNConv(nn.Module):
                     remove_diag=False,
                     symm_norm={
                         "gcn": True,
-                        "gcn-nie-nst": True,
-                        "gcn-nie-st": True,
-                    }[self.nie],
+                        "gcn-IN-SN": True,
+                        "gcn-IN-nSN": True,
+                    }[self.IN],
                     device=torch.device("cpu"),
                     batch_idx=batch_idx if Batch_load else None,
                 )
@@ -358,16 +341,16 @@ class IGNNConv(nn.Module):
                     remove_diag=False,
                     symm_norm={
                         "gcn": True,
-                        "gcn-nie-nst": True,
-                        "gcn-nie-st": True,
-                    }[self.nie],
+                        "gcn-IN-SN": True,
+                        "gcn-IN-nSN": True,
+                    }[self.IN],
                     device=device,
                     no_save=True,
                     return_adj=True,
                     process_adj=False if self.adj is not None else True,
                     batch_idx=batch_idx,
                 )
-            if self.nie in ["gcn-nie-nst"]:
+            if self.IN in ["gcn-IN-SN"]:
                 for i in range(self.n_hops + 1):
                     if self.transform_first:
                         self.ns.append(
@@ -387,48 +370,41 @@ class IGNNConv(nn.Module):
                                 if batch_idx is not None else self.nei_feats[i].to(self.device)
                             )
                         )
-            elif self.nie in ["gcn-nie-st"]:
+            elif self.IN in ["gcn-IN-nSN"]:
                 for i in range(self.n_hops + 1):
                     self.ns.append(self.nei_ind_emb[0](self.nei_feats[i]))
 
-        if self.nrl in ["residual", "attentive"]:
+        if self.RN in ["residual", "attentive"]:
             return h, None, None
 
         hops_feats = torch.cat(self.ns, dim=1)
 
-        if self.nrl == "none":
+        if self.RN == "none":
             H = self.ns[-1]
 
-        if self.nrl == "only-concat":
-            H = hops_feats
-
-        if self.nrl == "concat":
-            # return torch.cat(
-            #                 [nei_rel_learn(hops_feats) for nei_rel_learn in self.nei_rel_learn],
-            #                 dim=-1,
-            #             )
+        if self.RN == "concat":
             H = torch.cat(
-                [nei_rel_learn(hops_feats) for nei_rel_learn in self.nei_rel_learn],
+                [nei_rel_leaRN(hops_feats) for nei_rel_leaRN in self.nei_rel_leaRN],
                 dim=-1,
             )
-        if self.nrl == "max":
-            H = self.nei_rel_learn[0](torch.max(
+        if self.RN == "max":
+            H = self.nei_rel_leaRN[0](torch.max(
                 torch.stack(self.ns, dim=1),
                 dim=1,
             )[0])
-        if self.nrl == "mean":
-            H = self.nei_rel_learn[0](torch.mean(
+        if self.RN == "mean":
+            H = self.nei_rel_leaRN[0](torch.mean(
                 torch.stack(self.ns, dim=1),
                 dim=1,
             ))
-        if self.nrl == "sum":
-            H = self.nei_rel_learn[0](torch.sum(
+        if self.RN == "sum":
+            H = self.nei_rel_leaRN[0](torch.sum(
                 torch.stack(self.ns, dim=1),
                 dim=1,
             ))
-        if self.nrl == "lstm":
-            H = self.nei_rel_learn[0](torch.stack(self.ns, dim=1), )
-        if self.nrl == "ordered-gating":
+        if self.RN == "lstm":
+            H = self.nei_rel_leaRN[0](torch.stack(self.ns, dim=1), )
+        if self.RN == "ordered-gating":
             check_signal = []
             h = self.ns[0]
             tm_signal = h.new_zeros(self.chunk_size)
@@ -455,26 +431,21 @@ class IGNN(nn.Module):
         n_hops,
         nas_dropout=0.0,
         nss_dropout=0.8,
-        n_intervals=3,
         out_ndim_trans=64,
         no_save=False,
-        nie="gcn-nie-nst",
-        nrl="concat",
+        IN="gcn-IN-SN",
+        RN="concat",
         act="relu",
         layer_norm=True,
-        n_nodes=None,
-        ndim_h_a=64,
         num_heads=1,
         transform_first=False,
-        trans_layer_num=3,
         ignn_layer_num=1,
     ):
         super().__init__()
         self.no_save = no_save
         self.n_hops = n_hops
         self.h_feats = h_feats
-        self.nie = nie
-        self.nrl = nrl
+        self.IN = IN
         self.device = None
         self.transform_first = transform_first
         self.num_heads = num_heads
@@ -484,14 +455,10 @@ class IGNN(nn.Module):
 
         ndim_fc = h_feats * N_NIE
 
-        # elif nrl == "self-attention":
-
-        nrl = nrl
-
         self.ignnconvs = nn.ModuleList(
             [
                 IGNNConv(
-                    nie,
+                    IN,
                     in_feats if i == 0 else h_feats,
                     h_feats,
                     act,
@@ -499,24 +466,20 @@ class IGNN(nn.Module):
                     layer_norm,
                     N_NIE,
                     transform_first,
-                    n_nodes,
-                    ndim_h_a,
                     nss_dropout,
-                    nrl=nrl,
+                    RN=RN,
                     n_hops=n_hops,
                     ndim_fc=ndim_fc,
                     no_save=i != 0,
                 ) for i in range(ignn_layer_num)
             ]
         )
-        trans_layer_num = trans_layer_num
 
         self.in_ndim_trans = {
             "concat": h_feats,
-            "only-concat": ndim_fc,
             "residual": h_feats,
             "attentive": h_feats,
-        }[nrl]
+        }[RN]
 
     def forward(
         self,
@@ -526,8 +489,8 @@ class IGNN(nn.Module):
         batch_idx=None,
     ):
         H = None
-        for i, ignnconvs in enumerate(self.ignnconvs):
-            H, hops_feats = ignnconvs(
+        for i, ignnconv in enumerate(self.ignnconvs):
+            H, hops_feats = ignnconv(
                 device=device,
                 graph=graph,
                 feats=feats if i == 0 else H,

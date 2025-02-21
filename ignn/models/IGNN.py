@@ -2,32 +2,16 @@
 
 # pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals
 import copy
-import math
 import time
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Tuple
 
-import dgl
-import numpy as np
-import scipy.sparse as sp
 import torch
-import torch.nn.functional as F
-from ogb.nodeproppred import Evaluator
-from sklearn.cluster import KMeans
-from sklearn.metrics import accuracy_score as ACC
-from sklearn.metrics import roc_auc_score
-from sklearn.preprocessing import normalize
-from the_utils import get_str_time, make_parent_dirs, save_to_csv_files
 from torch import nn
-from torch.distributions.normal import Normal
-from torch.nn import LayerNorm, Linear, Module, ModuleList
 from torch.utils.tensorboard import SummaryWriter
-from torch_sparse import SparseTensor, fill_diag
 from tqdm import tqdm
 
 from ..modules import IGNN as IGNN_layer
 from ..modules import MLP
-from ..utils import eval_rocauc, metric
+from ..utils import metric
 
 losses = {
     "ce": torch.nn.CrossEntropyLoss,
@@ -53,31 +37,25 @@ class IGNN(nn.Module):
         out_ndim_trans: int = 64,
         lda: float = 1,
         n_hops=6,
-        n_intervals=3,
-        nie="gcn",
-        nrl="concat",
+        IN="gcn",
+        RN="concat",
         n_layers=1,
         act="relu",
         layer_norm=True,
         loss="ce",
-        n_nodes=None,
-        ndim_h_a=64,
         num_heads=1,
         transform_first=False,
-        trans_layer_num=5,
     ) -> None:
         super().__init__()
 
         assert loss in losses.keys(), f"loss should be in {losses.keys()}"
 
-        self.n_intervals = n_intervals
         self.nss_dropout = nss_dropout
 
         # IGNN
         self.n_epochs = n_epochs
         self.h_feats = h_feats
         self.l2_coef = l2_coef
-        self.n_nodes = n_nodes
 
         # URL
         self.lr = lr
@@ -92,26 +70,20 @@ class IGNN(nn.Module):
             n_hops=n_hops,
             nas_dropout=nas_dropout,
             nss_dropout=nss_dropout,
-            n_intervals=n_intervals,
             out_ndim_trans=out_ndim_trans,
-            nie=nie,
-            nrl=nrl,
+            IN=IN,
+            RN=RN,
             act=act,
             layer_norm=layer_norm,
-            n_nodes=n_nodes,
-            ndim_h_a=ndim_h_a,
             num_heads=num_heads,
             transform_first=transform_first,
-            trans_layer_num=trans_layer_num,
             ignn_layer_num=n_layers,
         )
 
         hidden_dim = {
-            "multi-con": max(h_feats * (n_hops - n_intervals + 2), h_feats),
+            "multi-con": max(h_feats * (n_hops - 1), h_feats),
             "concat": h_feats,
             "ordered-gating": h_feats,
-            "self-attention": out_ndim_trans * num_heads if trans_layer_num else h_feats,
-            "only-concat": h_feats * (n_hops + 1),
             "max": h_feats,
             "mean": h_feats,
             "sum": h_feats,
@@ -119,7 +91,7 @@ class IGNN(nn.Module):
             "none": h_feats,
             "residual": h_feats,
             "attentive": h_feats,
-        }[nrl]
+        }[RN]
 
         self.classifier = MLP(
             in_feats=hidden_dim,
@@ -187,6 +159,7 @@ class IGNN(nn.Module):
         bs=None,
         split_id=None,
         device: torch.device = torch.device("cpu"),
+        eval_start=1000,
     ):
 
         self.device = device
@@ -250,7 +223,7 @@ class IGNN(nn.Module):
 
                     pred_stack.append(logits.detach().clone().cpu())
 
-                if epoch % 9 == 0:
+                if epoch % 9 == 0 and epoch > eval_start:
                     with torch.no_grad():
                         self.train(False)
                         pred_stack = []

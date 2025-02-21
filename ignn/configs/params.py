@@ -46,22 +46,6 @@ l2_coefs = {
     "pokec": 0.00005,
 }
 
-bss = {
-    "chameleon": 100000,
-    "squirrel": 100000,
-    "actor": 100000,
-    "pubmed": 100000,
-    "photo": 100000,
-    "roman-empire": 100000,
-    "amazon-ratings": 100000,
-    "flickr": 100000,
-    "blogcatalog": 100000,
-    "wikics": 100000,
-    "arxiv": 100000,
-    "products": 100000,
-    "pokec": 100000,
-}
-
 lrs = {
     "chameleon": 0.001,
     "squirrel": 0.001,
@@ -81,10 +65,11 @@ lrs = {
 ess = {
     "chameleon": 30,
     "squirrel": 50,
-    "actor": 200,
+    "actor": 50,
     "pubmed": 100,
     "photo": 100,
-    "roman-empire": 100,
+    "roman-empire": 200,
+    # "roman-empire": 100,
     "amazon-ratings": 100,
     "flickr": 100,
     "blogcatalog": 100,
@@ -158,13 +143,14 @@ n_hopss = {
     "pokec": 10,
 }
 
-n_layers = {
+n_layerss = {
     "chameleon": 1,
     "squirrel": 1,
     "actor": 1,
     "flickr": 1,
     "blogcatalog": 1,
-    "roman-empire": 3,
+    # "roman-empire": 3,
+    "roman-empire": 5,
     "amazon-ratings": 1,
     "photo": 1,
     "pubmed": 1,
@@ -174,7 +160,7 @@ n_layers = {
     "pokec": 1,
 }
 
-nrls = {
+RNs = {
     "chameleon": "concat",
     "squirrel": "concat",
     "actor": "concat",
@@ -236,22 +222,6 @@ layer_norms_att = {
     "arxiv": False,
     "products": False,
     "pokec": False,
-}
-
-n_intervalss = {
-    "chameleon": 3,
-    "squirrel": 3,
-    "actor": 3,
-    "flickr": 3,
-    "blogcatalog": 3,
-    "roman-empire": 3,
-    "amazon-ratings": 3,
-    "photo": 3,
-    "pubmed": 3,
-    "wikics": 3,
-    "arxiv": 3,
-    "products": 3,
-    "pokec": 3,
 }
 
 self_loop_attentive = {

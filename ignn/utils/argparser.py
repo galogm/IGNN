@@ -183,22 +183,29 @@ def parse_ignn_args() -> argparse.Namespace:
         "-m",
         "--model",
         type=str,
-        default="gcn-nie-nst",
+        default="ignn",
         help="model",
     )
     parser.add_argument(
-        "-nie",
-        "--nie",
-        type=str,
-        default="gcn-nie-nst",
-        help="nie",
+        "-eval",
+        "--eval_start",
+        type=int,
+        default=1,
+        help="eval_start epoch",
     )
     parser.add_argument(
-        "-nrl",
-        "--nrl",
+        "-IN",
+        "--IN",
+        type=str,
+        default="gcn-IN-SN",
+        help="IN",
+    )
+    parser.add_argument(
+        "-RN",
+        "--RN",
         type=lambda x: None if x == "None" else x,
         default=None,
-        help="nrl",
+        help="RN",
     )
     parser.add_argument(
         "-v",
@@ -236,11 +243,11 @@ def parse_ignn_args() -> argparse.Namespace:
         help="lr",
     )
     parser.add_argument(
-        "-l2_coefs",
-        "--l2_coefs",
+        "-l2_coef",
+        "--l2_coef",
         type=lambda x: None if x == "None" else float(x),
         default=None,
-        help="l2_coefs",
+        help="l2_coef",
     )
     parser.add_argument(
         "-nas_dropout",

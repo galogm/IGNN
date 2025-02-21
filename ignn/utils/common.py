@@ -5,6 +5,7 @@ common utils
 import os
 from pathlib import Path
 
+import networkx as nx
 import numpy as np
 import scipy.sparse as sp
 import torch
@@ -263,3 +264,29 @@ def preprocess_neighborhoods(
     #             pickle_protocol=4,
     #         )
     return nei_feats
+
+
+def graph_diameter(g):
+    """
+    Computes the diameter of a given graph.
+
+    Parameters:
+    g (DGLGraph): The input graph.
+
+    RetuRNs:
+    int: The diameter of the graph.
+    """
+    # Convert the DGL graph to a NetworkX graph
+    nx_graph = g.to_networkx()
+
+    # Use NetworkX to compute the all-pairs shortest path lengths
+    lengths = dict(nx.all_pairs_shortest_path_length(nx_graph))
+
+    # Find the maximum shortest path length
+    max_length = 0
+    for src in lengths:
+        for dst in lengths[src]:
+            if lengths[src][dst] > max_length:
+                max_length = lengths[src][dst]
+
+    return max_length
