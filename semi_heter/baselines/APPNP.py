@@ -1,16 +1,17 @@
 """APPANP. adapted from https://github.com/benedekrozemberczki/APPNP"""
 
-import math
-import torch
-from torch_sparse import spmm
-from scipy import sparse
-import numpy as np
-from tqdm import trange
-import random
-import torch.nn.functional as F
 import copy
-from sklearn.metrics import accuracy_score as ACC
+import math
+import random
+
+import numpy as np
+import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from scipy import sparse
+from sklearn.metrics import accuracy_score as ACC
+from torch_sparse import spmm
+from tqdm import trange
 
 
 def normalize_adjacency_matrix(A, I):
@@ -290,6 +291,7 @@ class APPNP(nn.Module):
         best_state_dict = None
 
         import time
+
         t_start = time.time()
         for epoch in range(self.epochs):
             self.train()
@@ -325,7 +327,7 @@ class APPNP(nn.Module):
         self.best_epoch = best_epoch
 
         t_finish = time.time()
-        t_m = (t_finish-t_start)/epoch * 10
+        t_m = (t_finish - t_start) / epoch * 10
         return t_m
 
     def forward(self, features, return_Z=False):

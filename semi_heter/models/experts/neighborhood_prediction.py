@@ -6,11 +6,7 @@ import math
 import random
 import time
 from pathlib import Path
-from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 import dgl
 import numpy as np
@@ -24,19 +20,19 @@ from the_utils import make_parent_dirs
 from torch import nn
 from torch.distributions.normal import Normal
 
+from semi_heter.utils.common import (
+    sparse_mx_to_torch_sparse_tensor,
+    sys_normalized_adjacency,
+)
+
 from ...baselines import H2GCN
-from ...modules import Data
-from ...modules import InnerProductDecoder
-from ...modules import LinTrans
-from ...modules import MLP
-from ...modules import SampleDecoder
+from ...modules import MLP, Data, InnerProductDecoder, LinTrans, SampleDecoder
 from ...utils import preprocess_graph
-from semi_heter.utils.common import sparse_mx_to_torch_sparse_tensor
-from semi_heter.utils.common import sys_normalized_adjacency
 
 
 class NeighborhoodPrediction(nn.Module):
     """Adaptive_learning"""
+
     def __init__(
         self,
         in_feats,
@@ -60,12 +56,14 @@ class NeighborhoodPrediction(nn.Module):
             class_num=n_clusters,
             device=device,
             is_layer=True,
-            args=Data(**{
-                "use_relu": True,
-                "hidden_dim": h_feats,
-                "k": k,
-                "dropout": dropout,
-            }),
+            args=Data(
+                **{
+                    "use_relu": True,
+                    "hidden_dim": h_feats,
+                    "k": k,
+                    "dropout": dropout,
+                }
+            ),
         )
 
         self.dc = LinTrans(1, [h_feats, in_feats])

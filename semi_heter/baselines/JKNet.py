@@ -1,13 +1,14 @@
 # code adapted from :https://github.com/mori97/JKNet-dgl
-import torch
-import torch.nn.functional as F
+import copy
+
 import dgl
 import dgl.function as fn
 import numpy as np
-from tqdm import tqdm
-import copy
-from sklearn.metrics import accuracy_score as ACC
+import torch
+import torch.nn.functional as F
 from dgl.nn.pytorch import GraphConv
+from sklearn.metrics import accuracy_score as ACC
+from tqdm import tqdm
 
 
 class GraphConvLayer(torch.nn.Module):
@@ -61,7 +62,8 @@ class JKNetConcat(torch.nn.Module):
                            Specify the way to aggregate the neighbourhoods.
     """
 
-    def __init__(self,
+    def __init__(
+        self,
         in_features: int,
         class_num: int,
         device,
@@ -121,6 +123,7 @@ class JKNetConcat(torch.nn.Module):
         best_state_dict = None
 
         import time
+
         t_start = time.time()
         for epoch in range(self.epochs):
             self.train()
@@ -156,7 +159,7 @@ class JKNetConcat(torch.nn.Module):
         self.best_epoch = best_epoch
 
         t_finish = time.time()
-        t_m = (t_finish-t_start)/epoch * 10
+        t_m = (t_finish - t_start) / epoch * 10
         return t_m
 
     def test(self, graph, X, labels, index_list):

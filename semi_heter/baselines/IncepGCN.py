@@ -1,16 +1,16 @@
 # adapted from :https://github.com/DropEdge/DropEdge/blob/master/src/layers.py
 
+import copy
 import math
 
 import torch
-
-from torch.nn.parameter import Parameter
-from torch.nn.modules.module import Module
-from torch import nn
 import torch.nn.functional as F
-from ..utils import sys_normalized_adjacency
 from sklearn.metrics import accuracy_score as ACC
-import copy
+from torch import nn
+from torch.nn.modules.module import Module
+from torch.nn.parameter import Parameter
+
+from ..utils import sys_normalized_adjacency
 
 
 class GraphConvolutionBS(Module):
@@ -226,6 +226,7 @@ class InecptionGCNBlock(Module):
         best_state_dict = None
 
         import time
+
         t_start = time.time()
         for epoch in range(self.epochs):
             self.train()
@@ -261,7 +262,7 @@ class InecptionGCNBlock(Module):
         self.best_epoch = best_epoch
 
         t_finish = time.time()
-        t_m = (t_finish-t_start)/epoch * 10
+        t_m = (t_finish - t_start) / epoch * 10
         return t_m
 
     def test(self, graph, X, labels, index_list):

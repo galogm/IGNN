@@ -5,11 +5,7 @@ import copy
 import math
 import time
 from pathlib import Path
-from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 import dgl
 import numpy as np
@@ -23,10 +19,7 @@ from the_utils import make_parent_dirs
 from torch import nn
 from torch.distributions.normal import Normal
 
-from ..modules import InnerProductDecoder
-from ..modules import LinTrans
-from ..modules import MLP
-from ..modules import SampleDecoder
+from ..modules import MLP, InnerProductDecoder, LinTrans, SampleDecoder
 from ..utils import preprocess_graph
 
 
@@ -63,6 +56,7 @@ def sk_clustering(
 
 class MoE(nn.Module):
     """MoE"""
+
     def __init__(
         self,
         in_feats,
@@ -262,8 +256,10 @@ class MoE(nn.Module):
 
         gates = self.noisy_top_k_gating(x, train=True)
         return (
-            gates[:, 0] * self.pair_decoder(zx1, zy1) + gates[:, 1] * self.pair_decoder(zx2, zy2) +
-            gates[:, 2] * self.pair_decoder(zx3, zy3) + gates[:, 3] * self.pair_decoder(zx4, zy4)
+            gates[:, 0] * self.pair_decoder(zx1, zy1)
+            + gates[:, 1] * self.pair_decoder(zx2, zy2)
+            + gates[:, 2] * self.pair_decoder(zx3, zy3)
+            + gates[:, 3] * self.pair_decoder(zx4, zy4)
         )
 
     def forward_kernel(self, x, coef=0.25):
@@ -276,8 +272,10 @@ class MoE(nn.Module):
         zx4 = self.ec_np_she(x)
 
         return (
-            coef * zx1.matmul(zx1.T) + coef * zx2.matmul(zx2.T) + coef * zx3.matmul(zx3.T) +
-            coef * zx4.matmul(zx4.T)
+            coef * zx1.matmul(zx1.T)
+            + coef * zx2.matmul(zx2.T)
+            + coef * zx3.matmul(zx3.T)
+            + coef * zx4.matmul(zx4.T)
         ).view(-1)
 
     def forward(self, x, coef=None, frozen_experts=False):
@@ -305,8 +303,10 @@ class MoE(nn.Module):
                 torch.concat((zx1, zx2, zx3, zx4), dim=1), train=True
             )
             return (
-                self.gates[:, 0].unsqueeze(dim=1) * zx1 + self.gates[:, 1].unsqueeze(dim=1) * zx2 +
-                self.gates[:, 2].unsqueeze(dim=1) * zx3 + self.gates[:, 3].unsqueeze(dim=1) * zx4
+                self.gates[:, 0].unsqueeze(dim=1) * zx1
+                + self.gates[:, 1].unsqueeze(dim=1) * zx2
+                + self.gates[:, 2].unsqueeze(dim=1) * zx3
+                + self.gates[:, 3].unsqueeze(dim=1) * zx4
             )
         return coef * zx1 + coef * zx2 + coef * zx3 + coef * zx4
 
@@ -411,8 +411,8 @@ class MoE(nn.Module):
 
         # calculate topk + 1 that will be needed for the noisy gates
         top_logits, top_indices = logits.topk(min(self.k + 1, self.n_experts), dim=1)
-        top_k_logits = top_logits[:, :self.k]
-        top_k_indices = top_indices[:, :self.k]
+        top_k_logits = top_logits[:, : self.k]
+        top_k_indices = top_indices[:, : self.k]
         top_k_gates = self.softmax(top_k_logits)
 
         zeros = torch.zeros_like(logits, requires_grad=True)
@@ -484,8 +484,9 @@ class MoE(nn.Module):
             t = time.time()
             while ed <= length:
                 print(f"batch_num:{batch_num}")
-                sampled_neg = torch.LongTensor(np.random.choice(neg_inds,
-                                                                size=ed - st)).to(self.device)
+                sampled_neg = torch.LongTensor(np.random.choice(neg_inds, size=ed - st)).to(
+                    self.device
+                )
                 sampled_inds = torch.cat((pos_inds_cuda[st:ed], sampled_neg), 0)
                 xind = sampled_inds // self.n_nodes
                 yind = sampled_inds % self.n_nodes
@@ -585,14 +586,15 @@ class MoE(nn.Module):
         self.pos_weight = torch.FloatTensor(
             [
                 (
-                    float(self.adj_nsl.shape[0] * self.adj_nsl.shape[0] - self.adj_nsl.sum()) /
-                    self.adj_nsl.sum()
+                    float(self.adj_nsl.shape[0] * self.adj_nsl.shape[0] - self.adj_nsl.sum())
+                    / self.adj_nsl.sum()
                 )
             ]
         ).to(self.device)
         self.norm_weights = (
-            self.adj_nsl.shape[0] * self.adj_nsl.shape[0] /
-            float((self.adj_nsl.shape[0] * self.adj_nsl.shape[0] - self.adj_nsl.sum()) * 2)
+            self.adj_nsl.shape[0]
+            * self.adj_nsl.shape[0]
+            / float((self.adj_nsl.shape[0] * self.adj_nsl.shape[0] - self.adj_nsl.sum()) * 2)
         )
         self.lbls = self.adj_nsl.view(-1).to(self.device)
 
@@ -645,12 +647,12 @@ class MoE(nn.Module):
         self.low_ratio = low_ratio or self.low_ratio
 
         dd = self.adj_nsl.sum(1)
-        self.idx_h = torch.argsort(
-            dd, descending=True
-        )[:int(self.features.shape[0] * self.high_ratio)]
-        self.idx_l = torch.argsort(
-            dd, descending=True
-        )[:int(self.features.shape[0] * self.low_ratio)]
+        self.idx_h = torch.argsort(dd, descending=True)[
+            : int(self.features.shape[0] * self.high_ratio)
+        ]
+        self.idx_l = torch.argsort(dd, descending=True)[
+            : int(self.features.shape[0] * self.low_ratio)
+        ]
 
         self.to(self.device)
         best_loss = 1e9
@@ -823,8 +825,9 @@ class MoE(nn.Module):
             loss.backward()
             self.optimizer.step()
 
-            [train_acc, valid_acc,
-             test_acc] = self.test(self.features, labels, [train_mask, val_mask, test_mask])
+            [train_acc, valid_acc, test_acc] = self.test(
+                self.features, labels, [train_mask, val_mask, test_mask]
+            )
             print(
                 f"epoch:{epoch},train acc: {train_acc:.3f}, valid acc: {valid_acc:.3f}, test acc: {test_acc:.3f}"
             )
@@ -911,9 +914,11 @@ def update_similarity(z, upper_threshold, lower_treshold, pos_num, neg_num):
     """
     f_adj = np.matmul(z, np.transpose(z))
     cosine = f_adj
-    cosine = cosine.reshape([
-        -1,
-    ])
+    cosine = cosine.reshape(
+        [
+            -1,
+        ]
+    )
     pos_num = round(upper_threshold * len(cosine))
     neg_num = round((1 - lower_treshold) * len(cosine))
 

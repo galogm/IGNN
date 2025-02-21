@@ -6,11 +6,7 @@ import math
 import random
 import time
 from pathlib import Path
-from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 import dgl
 import numpy as np
@@ -24,15 +20,13 @@ from the_utils import make_parent_dirs
 from torch import nn
 from torch.distributions.normal import Normal
 
-from ...modules import InnerProductDecoder
-from ...modules import LinTrans
-from ...modules import MLP
-from ...modules import SampleDecoder
+from ...modules import MLP, InnerProductDecoder, LinTrans, SampleDecoder
 from ...utils import preprocess_graph
 
 
 class SelfReconstruction(nn.Module):
     """Adaptive_learning"""
+
     def __init__(
         self,
         in_feats,

@@ -106,7 +106,7 @@ class SGC(nn.Module):
         self.load_state_dict(best_state_dict)
         self.best_epoch = best_epoch
         t_finish = time.time()
-        t_m = (t_finish-t_start)/epoch * 10
+        t_m = (t_finish - t_start) / epoch * 10
         return t_m
 
     def forward(self, graph, X, return_Z=False):
@@ -122,7 +122,7 @@ class SGC(nn.Module):
         self.eval()
         with torch.no_grad():
             Z = self.forward(graph, X)
-            y_pred = torch.argmax(F.softmax(Z,dim=-1), dim=1)
+            y_pred = torch.argmax(F.softmax(Z, dim=-1), dim=1)
         acc_list = []
         for index in index_list:
             acc_list.append(ACC(labels[index].cpu(), y_pred[index].cpu()))
@@ -135,6 +135,6 @@ class SGC(nn.Module):
         X = graph.ndata["feat"]
         with torch.no_grad():
             Z, C = self.forward(graph, X, return_Z=True)
-            y_pred = torch.argmax(F.softmax(C,dim=-1), dim=1)
+            y_pred = torch.argmax(F.softmax(C, dim=-1), dim=1)
 
         return y_pred.cpu(), C.cpu(), Z.cpu()

@@ -14,8 +14,7 @@ import torch.optim as optim
 from sklearn.metrics import accuracy_score as ACC
 from torch.nn.parameter import Parameter
 
-from ..utils import sparse_mx_to_torch_sparse_tensor
-from ..utils import sys_normalized_adjacency
+from ..utils import sparse_mx_to_torch_sparse_tensor, sys_normalized_adjacency
 
 
 class GCNII(nn.Module):
@@ -66,6 +65,7 @@ class GCNII(nn.Module):
         best_state_dict = None
 
         import time
+
         t_start = time.time()
         for epoch in range(self.epochs):
             self.train()
@@ -75,8 +75,9 @@ class GCNII(nn.Module):
             loss.backward()
             optimizer.step()
 
-            [train_acc, valid_acc, test_acc
-            ] = self.test(X, adj, labels, [self.train_mask, self.valid_mask, self.test_mask])
+            [train_acc, valid_acc, test_acc] = self.test(
+                X, adj, labels, [self.train_mask, self.valid_mask, self.test_mask]
+            )
             if valid_acc > best_acc:
                 cnt = 0
                 best_acc = valid_acc
@@ -95,7 +96,7 @@ class GCNII(nn.Module):
         self.best_epoch = best_epoch
 
         t_finish = time.time()
-        t_m = (t_finish-t_start)/epoch * 10
+        t_m = (t_finish - t_start) / epoch * 10
         return t_m
 
     def forward(self, x, adj, return_Z=False):

@@ -12,13 +12,12 @@ type_map = {"int": int, "str": str, "float": float, "bool": bool}
 
 #: Info of the models supported.
 models: Dict = {
-    "pca_kmeans":
-        {
-            "name": "PCA",
-            "description": "PCA with Kmeans.",
-            "paper url": "",
-            "source code": "",
-        },
+    "pca_kmeans": {
+        "name": "PCA",
+        "description": "PCA with Kmeans.",
+        "paper url": "",
+        "source code": "",
+    },
 }
 
 

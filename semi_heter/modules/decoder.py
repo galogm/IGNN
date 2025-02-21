@@ -10,6 +10,7 @@ from torch import nn
 
 class InnerProductDecoder(nn.Module):
     """Decoder for using inner product for prediction."""
+
     def __init__(self, dropout: float = 0.0, act=lambda x: x):
         super().__init__()
         self.dropout = dropout
@@ -27,6 +28,7 @@ class SampleDecoder(nn.Module):
     Args:
         activation (object, optional): activation of Decoder.
     """
+
     def __init__(self, act=torch.sigmoid):
         super().__init__()
         self.act = act

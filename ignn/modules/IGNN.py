@@ -1,17 +1,20 @@
 """FaltGNN Layer."""
 
 # pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals
+import os
+from pathlib import Path
+
 import dgl
 import torch
 import torch.nn.functional as F
 from dgl.nn.pytorch import GraphConv
+from the_utils import make_parent_dirs
 from torch import nn
 from torch.nn import LayerNorm, Linear, ModuleList
 from torch.utils.tensorboard import SummaryWriter
 from torch_geometric.nn import GATConv
 from torch_sparse import SparseTensor
 
-from ..utils import preprocess_neighborhoods
 from .LSTM import LSTM
 from .MLP import MLP
 from .OrderedGating import ONGNNConv
@@ -26,8 +29,8 @@ acts = {
 
 
 class IGNNConv(nn.Module):
-    """IGNN Conv.
-    """
+    """IGNN Conv."""
+
     def __init__(
         self,
         IN,
@@ -66,7 +69,8 @@ class IGNNConv(nn.Module):
                     out_channels=h_feats,
                     heads=1,
                     dropout=nas_dropout,
-                ) for _ in range(N_NIE)
+                )
+                for _ in range(N_NIE)
             )
         elif IN == "gcn":
             self.nei_ind_emb = nn.ModuleList(
@@ -77,14 +81,17 @@ class IGNNConv(nn.Module):
                         weight=False if self.RN == "attentive" else True,
                         allow_zero_in_degree=True if self.RN == "attentive" else False,
                         activation=acts[act](),
-                    ) if i != 0 else MLP(
+                    )
+                    if i != 0
+                    else MLP(
                         in_feats=in_feats,
                         h_feats=[h_feats],
                         acts=[acts[act]()],
                         dropout=nas_dropout,
                         layer_norm=True,
                     )
-                ) for i in range(N_NIE)
+                )
+                for i in range(N_NIE)
             )
 
         elif IN == "gcn-IN-SN":
@@ -103,7 +110,8 @@ class IGNNConv(nn.Module):
                         acts=[acts[act]()],
                         dropout=nas_dropout,
                         layer_norm=layer_norm,
-                    ) for _ in range(N_NIE)
+                    )
+                    for _ in range(N_NIE)
                 )
             else:
                 self.nei_ind_emb = nn.ModuleList(
@@ -113,7 +121,8 @@ class IGNNConv(nn.Module):
                         acts=[acts[act]()],
                         dropout=nas_dropout,
                         layer_norm=layer_norm,
-                    ) for _ in range(N_NIE)
+                    )
+                    for _ in range(N_NIE)
                 )
         elif IN == "gcn-IN-nSN":
             self.nei_ind_emb = nn.ModuleList(
@@ -134,14 +143,17 @@ class IGNNConv(nn.Module):
                         in_feats=in_feats if i == 1 else h_feats,
                         out_feats=h_feats,
                         activation=acts[act](),
-                    ) if i != 0 else MLP(
+                    )
+                    if i != 0
+                    else MLP(
                         in_feats=in_feats,
                         h_feats=[h_feats],
                         acts=[acts[act]()],
                         dropout=nas_dropout,
                         layer_norm=layer_norm,
                     )
-                ) for i in range(N_NIE)
+                )
+                for i in range(N_NIE)
             )
         elif IN == "gcn-nIN-nSN":
             self.nei_ind_emb = nn.ModuleList(
@@ -150,14 +162,17 @@ class IGNNConv(nn.Module):
                         in_feats=h_feats,
                         out_feats=h_feats,
                         activation=acts[act](),
-                    ) if i != 0 else MLP(
+                    )
+                    if i != 0
+                    else MLP(
                         in_feats=in_feats,
                         h_feats=[h_feats],
                         acts=[acts[act]()],
                         dropout=nas_dropout,
                         layer_norm=layer_norm,
                     )
-                ) for i in range(N_NIE)
+                )
+                for i in range(N_NIE)
             )
 
         self.nei_feats = None
@@ -197,7 +212,8 @@ class IGNNConv(nn.Module):
                         acts=[acts["tanh"]()],
                         dropout=nss_dropout,
                         layer_norm=layer_norm,
-                    ) for i in range(N_NIE)
+                    )
+                    for i in range(N_NIE)
                 ],
             )
         elif RN in ["max", "sum", "mean"]:
@@ -259,6 +275,96 @@ class IGNNConv(nn.Module):
                 )
             self.device = None
 
+    @staticmethod
+    def preprocess_neighborhoods(
+        adj: SparseTensor,
+        features: torch.FloatTensor,
+        name: str,
+        n_hops: int,
+        set_diag=True,
+        remove_diag=False,
+        symm_norm=False,
+        row_normalized=True,
+        device: torch.device = torch.device("cpu"),
+        no_save=False,
+        return_adj=False,
+        process_adj=True,
+        save_dir: str = "tmp/ignn/neighborhoods",
+        batch_idx=None,
+    ):
+        sym = "sym" if symm_norm else "nsy"
+        diag = "diag" if set_diag else "ndiag"
+        diag = "ndiag" if remove_diag else diag
+        norm = "norm" if row_normalized else "nnorm"
+        base = Path(f"{save_dir}/{name}/{norm}/{diag}/{sym}")
+
+        if process_adj:
+            if set_diag:
+                print("... setting diagonal entries")
+                adj = adj.set_diag()
+            elif remove_diag:
+                print("... removing diagonal entries")
+                adj = adj.remove_diag()
+            else:
+                print("... keeping diag elements as they are")
+            if symm_norm:
+                print("... performing symmetric normalization")
+                deg = adj.sum(dim=1).to(torch.float)
+                deg_inv_sqrt = deg.pow(-0.5)
+                deg_inv_sqrt[deg_inv_sqrt == float("inf")] = 0
+                adj = deg_inv_sqrt.view(-1, 1) * adj * deg_inv_sqrt.view(1, -1)
+            else:
+                print("... performing asymmetric normalization")
+                deg = adj.sum(dim=1).to(torch.float)
+                deg_inv = deg.pow(-1.0)
+                deg_inv[deg_inv == float("inf")] = 0
+                adj = deg_inv.view(-1, 1) * adj
+
+        nei_feats = [
+            (
+                features.to(device).index_select(0, batch_idx)
+                if batch_idx is not None
+                else features.to(device)
+            )
+        ]
+
+        # c-IGNN
+        if no_save:
+            adj = adj.to_torch_sparse_csr_tensor() if process_adj else adj
+            for i in range(1, n_hops + 1):
+                x = torch.mm(adj, features.cpu())
+                nei_feats.append(x.to(torch.float).to(device))
+            if return_adj:
+                return nei_feats, adj
+            return nei_feats
+
+        # Fast c-IGNN
+        adj = adj.to_scipy(layout="csr")
+        x = features.cpu().numpy()
+        print(f"Load aggregated feats from {base}")
+        hops = os.listdir(base) if base.exists() else []
+        if f"{n_hops}" not in hops:
+            for i in range(1, n_hops + 1):
+                file = base.joinpath(f"{i}")
+                if file.exists():
+                    x = torch.load(file, map_location=device)
+                    x = x.cpu().numpy()
+                else:
+                    make_parent_dirs(file)
+                    x = adj @ x
+                    torch.save(
+                        obj=torch.from_numpy(x).to(torch.float).to(device),
+                        f=file,
+                        pickle_protocol=4,
+                    )
+
+        for i in range(1, n_hops + 1):
+            file = base.joinpath(f"{i}")
+            x = torch.load(file, map_location=device)
+            nei_feats.append(x.index_select(0, batch_idx) if batch_idx is not None else x)
+
+        return nei_feats
+
     def forward(
         self,
         device,
@@ -300,17 +406,16 @@ class IGNNConv(nn.Module):
                 h = self.nei_ind_emb[i](graph=graph.to(device), feat=h)
                 self.ns.append(h)
         elif self.IN in ["gcn-IN-SN", "gcn-IN-nSN"]:
-            if self.adj_und is None:
-                row, col = graph.to_simple().add_self_loop().edges()
-                self.adj_und = SparseTensor(
-                    row=row.long(),
-                    col=col.long(),
-                    sparse_sizes=(graph.num_nodes(), graph.num_nodes()),
-                )
-            Batch_load = False
-            if (Batch_load or self.nei_feats is None) and self.no_save == False:
-                # if self.no_save == False:
-                self.nei_feats = preprocess_neighborhoods(
+            n_nodes = graph.num_nodes()
+            if (self.nei_feats is None) and not self.no_save:
+                if self.adj_und is None:
+                    row, col = graph.edges()
+                    self.adj_und = SparseTensor(
+                        row=row.long(),
+                        col=col.long(),
+                        sparse_sizes=(n_nodes, n_nodes),
+                    )
+                self.nei_feats = self.preprocess_neighborhoods(
                     adj=self.adj_und,
                     features=features,
                     row_normalized=graph.row_normalized,
@@ -324,16 +429,18 @@ class IGNNConv(nn.Module):
                         "gcn-IN-nSN": True,
                     }[self.IN],
                     device=torch.device("cpu"),
-                    batch_idx=batch_idx if Batch_load else None,
+                    batch_idx=None,
                 )
-            elif self.no_save == True:
-                self.nei_feats, self.adj = preprocess_neighborhoods(
+            elif self.no_save:
+                self.nei_feats, self.adj = self.preprocess_neighborhoods(
                     adj=(
                         SparseTensor(
                             row=row.long(),
                             col=col.long(),
-                            sparse_sizes=(graph.num_nodes(), graph.num_nodes()),
-                        ) if self.adj is None else self.adj
+                            sparse_sizes=(n_nodes, n_nodes),
+                        )
+                        if self.adj is None
+                        else self.adj
                     ),
                     features=features,
                     row_normalized=graph.row_normalized,
@@ -360,8 +467,9 @@ class IGNNConv(nn.Module):
                             self.nei_ind_emb[i](
                                 self.nei_uni_emb(
                                     self.nei_feats[i].index_select(0, batch_idx).to(self.device)
-                                ) if batch_idx is not None else self.
-                                nei_uni_emb(self.nei_feats[i].to(self.device))
+                                )
+                                if batch_idx is not None
+                                else self.nei_uni_emb(self.nei_feats[i].to(self.device))
                             )
                         )
                     else:
@@ -369,7 +477,8 @@ class IGNNConv(nn.Module):
                             # self.nei_ind_emb[i](self.nei_feats[i].index_select(0, batch_idx))
                             self.nei_ind_emb[i](
                                 self.nei_feats[i].index_select(0, batch_idx).to(self.device)
-                                if batch_idx is not None else self.nei_feats[i].to(self.device)
+                                if batch_idx is not None
+                                else self.nei_feats[i].to(self.device)
                             )
                         )
             elif self.IN in ["gcn-IN-nSN"]:
@@ -387,22 +496,30 @@ class IGNNConv(nn.Module):
                 dim=-1,
             )
         if self.RN == "max":
-            return self.nei_rel_leaRN[0](torch.max(
-                torch.stack(self.ns, dim=1),
-                dim=1,
-            )[0])
+            return self.nei_rel_leaRN[0](
+                torch.max(
+                    torch.stack(self.ns, dim=1),
+                    dim=1,
+                )[0]
+            )
         if self.RN == "mean":
-            return self.nei_rel_leaRN[0](torch.mean(
-                torch.stack(self.ns, dim=1),
-                dim=1,
-            ))
+            return self.nei_rel_leaRN[0](
+                torch.mean(
+                    torch.stack(self.ns, dim=1),
+                    dim=1,
+                )
+            )
         if self.RN == "sum":
-            return self.nei_rel_leaRN[0](torch.sum(
-                torch.stack(self.ns, dim=1),
-                dim=1,
-            ))
+            return self.nei_rel_leaRN[0](
+                torch.sum(
+                    torch.stack(self.ns, dim=1),
+                    dim=1,
+                )
+            )
         if self.RN == "lstm":
-            return self.nei_rel_leaRN[0](torch.stack(self.ns, dim=1), )
+            return self.nei_rel_leaRN[0](
+                torch.stack(self.ns, dim=1),
+            )
         if self.RN == "ordered-gating":
             check_signal = []
             h = self.ns[0]
@@ -421,6 +538,7 @@ class IGNNConv(nn.Module):
 
 class IGNN_layer(nn.Module):
     """IGNN_layer."""
+
     def __init__(
         self,
         in_feats,
@@ -468,7 +586,8 @@ class IGNN_layer(nn.Module):
                     n_hops=n_hops,
                     ndim_fc=ndim_fc,
                     no_save=i != 0,
-                ) for i in range(ignn_layer_num)
+                )
+                for i in range(ignn_layer_num)
             ]
         )
 

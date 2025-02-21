@@ -312,6 +312,7 @@ class SparseNGCNLayer(torch.nn.Module):
     :param iterations: Adjacency matrix power order.
     :param dropout_rate: Dropout value.
     """
+
     def __init__(self, in_channels, out_channels, iterations, dropout_rate):
         super(SparseNGCNLayer, self).__init__()
         self.in_channels = in_channels
@@ -378,6 +379,7 @@ class DenseNGCNLayer(torch.nn.Module):
     :param iterations: Adjacency matrix power order.
     :param dropout_rate: Dropout value.
     """
+
     def __init__(self, in_channels, out_channels, iterations, dropout_rate):
         super(DenseNGCNLayer, self).__init__()
         self.in_channels = in_channels
@@ -428,6 +430,7 @@ class ListModule(torch.nn.Module):
     """
     Abstract list layer class.
     """
+
     def __init__(self, *args):
         """
         Module initializing.

@@ -5,11 +5,7 @@ import copy
 import math
 import time
 from pathlib import Path
-from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 import dgl
 import numpy as np
@@ -23,15 +19,13 @@ from the_utils import make_parent_dirs
 from torch import nn
 from torch.distributions.normal import Normal
 
-from ...modules import InnerProductDecoder
-from ...modules import LinTrans
-from ...modules import MLP
-from ...modules import SampleDecoder
+from ...modules import MLP, InnerProductDecoder, LinTrans, SampleDecoder
 from ...utils import preprocess_graph
 
 
 class AdaptiveLearning(nn.Module):
     """Adaptive_learning"""
+
     def __init__(
         self,
         in_feats,
@@ -112,9 +106,7 @@ class AdaptiveLearning(nn.Module):
                 neg_inds,
                 upth,
                 lowth,
-            ) = torch.load(
-                file, map_location=device
-            )
+            ) = torch.load(file, map_location=device)
             self.generate_graph(
                 pos_inds=pos_inds,
                 n_nodes=graph.num_nodes(),
@@ -176,10 +168,11 @@ class AdaptiveLearning(nn.Module):
         pos_xind = torch.LongTensor(pos_inds) // n_nodes
         pos_yind = torch.LongTensor(pos_inds) % n_nodes
         adj_nsl = (
-            dgl.graph((pos_xind, pos_yind),
-                      num_nodes=n_nodes).to_simple().remove_self_loop().adj_external(
-                          scipy_fmt="csr"
-                      ).toarray()
+            dgl.graph((pos_xind, pos_yind), num_nodes=n_nodes)
+            .to_simple()
+            .remove_self_loop()
+            .adj_external(scipy_fmt="csr")
+            .toarray()
         )
         # adj_nsl = (
         #     dgl.knn_graph(x.cpu(),k=10).to_simple().remove_self_loop().adj_external(
@@ -243,10 +236,12 @@ class AdaptiveLearning(nn.Module):
         n_nodes,
         device=torch.device("cpu"),
     ):
-        sampled_neg = torch.LongTensor(np.random.choice(
-            neg_inds,
-            size=(ed - st),
-        )).to(device)
+        sampled_neg = torch.LongTensor(
+            np.random.choice(
+                neg_inds,
+                size=(ed - st),
+            )
+        ).to(device)
         pos_inds = torch.LongTensor(pos_inds).to(device)
         sampled_inds = torch.cat((pos_inds[st:ed], sampled_neg), 0)
         xind = sampled_inds // n_nodes
@@ -266,10 +261,12 @@ class AdaptiveLearning(nn.Module):
         zx = self.forward(torch.index_select(features, 0, x_batch)) if z is None else z[:batch_size]
         zy = self.forward(torch.index_select(features, 0, y_batch)) if z is None else z[batch_size:]
 
-        batch_label = torch.cat((
-            torch.ones(batch_size // 2),
-            torch.zeros(batch_size // 2),
-        )).to(device)
+        batch_label = torch.cat(
+            (
+                torch.ones(batch_size // 2),
+                torch.zeros(batch_size // 2),
+            )
+        ).to(device)
         batch_pred = self.pair_dc(
             zx,
             zy,
@@ -469,9 +466,11 @@ def update_similarity(z, upper_threshold, lower_treshold):
         numpy.ndarray: list of negative indexs
     """
     cosine = np.matmul(z, np.transpose(z))
-    cosine = cosine.reshape([
-        -1,
-    ])
+    cosine = cosine.reshape(
+        [
+            -1,
+        ]
+    )
     pos_num = round(upper_threshold * len(cosine))
     neg_num = round((1 - lower_treshold) * len(cosine))
 

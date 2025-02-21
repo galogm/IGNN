@@ -17,8 +17,7 @@ from sklearn.metrics import accuracy_score as ACC
 from torch import FloatTensor
 from torch.nn.parameter import Parameter
 
-from ..utils import sparse_mx_to_torch_sparse_tensor
-from ..utils import sys_normalized_adjacency
+from ..utils import sparse_mx_to_torch_sparse_tensor, sys_normalized_adjacency
 
 
 class H2GCN(nn.Module):
@@ -42,7 +41,7 @@ class H2GCN(nn.Module):
             self.l2_coef = args.l2_coef
         else:
             self.raw_h = args.hidden_dim
-            args.hidden_dim = args.hidden_dim // (2**(self.k + 1) - 1)
+            args.hidden_dim = args.hidden_dim // (2 ** (self.k + 1) - 1)
         self.use_relu = args.use_relu
         self.dropout = args.dropout
 
@@ -52,7 +51,7 @@ class H2GCN(nn.Module):
             torch.zeros(size=(in_features, args.hidden_dim)), requires_grad=True
         )
         self.w_classify = nn.Parameter(
-            torch.zeros(size=((2**(self.k + 1) - 1) * args.hidden_dim, class_num)),
+            torch.zeros(size=((2 ** (self.k + 1) - 1) * args.hidden_dim, class_num)),
             requires_grad=True,
         )
         self.params = [self.w_embed, self.w_classify]
@@ -85,6 +84,7 @@ class H2GCN(nn.Module):
         best_state_dict = None
 
         import time
+
         t_start = time.time()
         for epoch in range(self.epochs):
             self.train()
@@ -94,8 +94,9 @@ class H2GCN(nn.Module):
             loss.backward()
             optimizer.step()
 
-            [train_acc, valid_acc, test_acc
-            ] = self.test(X, adj, labels, [self.train_mask, self.valid_mask, self.test_mask])
+            [train_acc, valid_acc, test_acc] = self.test(
+                X, adj, labels, [self.train_mask, self.valid_mask, self.test_mask]
+            )
 
             if valid_acc > best_acc:
                 cnt = 0
@@ -116,7 +117,7 @@ class H2GCN(nn.Module):
         self.best_epoch = best_epoch
 
         t_finish = time.time()
-        t_m = (t_finish-t_start)/epoch * 10
+        t_m = (t_finish - t_start) / epoch * 10
         return t_m
 
     def forward(self, x: FloatTensor, adj: torch.sparse.Tensor, return_Z=False) -> FloatTensor:
@@ -133,8 +134,9 @@ class H2GCN(nn.Module):
         r_final = F.dropout(r_final, self.dropout, training=self.training)
 
         if self.is_layer:
-            padding_matrix = torch.zeros(r_final.shape[0],
-                                         self.raw_h - r_final.shape[1]).to(r_final.device)
+            padding_matrix = torch.zeros(r_final.shape[0], self.raw_h - r_final.shape[1]).to(
+                r_final.device
+            )
             r_final = torch.cat((r_final, padding_matrix), dim=1)
             return r_final
 

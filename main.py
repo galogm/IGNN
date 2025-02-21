@@ -1,4 +1,4 @@
-"""Full Batch"""
+"""IGNN"""
 
 # pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals
 import random
@@ -69,7 +69,9 @@ def main(
             "pokec": 5,
             "arxiv": 3,
             "products": 3,
-        }[dataset] if dataset in [
+        }[dataset]
+        if dataset
+        in [
             "pokec",
             "arxiv",
             "products",
@@ -80,7 +82,8 @@ def main(
             "arxiv-year",
             "genius",
             "Penn94",
-        ] else 10
+        ]
+        else 10
     )
 
     labeled_idx = None
@@ -90,8 +93,9 @@ def main(
 
     N_HOPS = n_hops if n_hops is not None else n_hopss[dataset]
     N_LAYERS = (
-        n_layers if n_layers is not None else
-        n_layerss[dataset] if RN not in ["residual", "attentive"] else 1
+        n_layers
+        if n_layers is not None
+        else n_layerss[dataset] if RN not in ["residual", "attentive"] else 1
     )
     LR = lr if lr is not None else lrs[dataset]
     COEF = l2_coef if l2_coef is not None else l2_coefs[dataset]
@@ -185,7 +189,7 @@ def main(
                 pred_stack = []
                 idx = torch.LongTensor(list(range(graph.num_nodes())))
                 for _, step in enumerate(range(0, graph.num_nodes(), BATCH_SIZE)):
-                    batch_idx = idx[step:step + BATCH_SIZE]
+                    batch_idx = idx[step : step + BATCH_SIZE]
 
                     embeddings = model(
                         batch_idx=batch_idx,
@@ -261,82 +265,78 @@ def main(
 if __name__ == "__main__":
 
     DATASETS = {
-        "critical":
-            [
-                # 890
-                "chameleon",
-                # 2,223
-                "squirrel",
-                # # 10,000
-                # "minesweeper",
-                # # 11,758
-                # "tolokers",
-                # # 22,662
-                # "roman-empire",
-                # # 24,492
-                # "amazon-ratings",
-                # 48,921
-                # "questions",
-            ],
+        "critical": [
+            # 890
+            "chameleon",
+            # 2,223
+            "squirrel",
+            # # 10,000
+            # "minesweeper",
+            # # 11,758
+            # "tolokers",
+            # # 22,662
+            # "roman-empire",
+            # # 24,492
+            # "amazon-ratings",
+            # 48,921
+            # "questions",
+        ],
         "cola": [
             "flickr",
             "blogcatalog",
         ],
-        "pyg":
-            [
-                # "texas",
-                # "coRNell",
-                # "wisconsin",
-                # "corafull",
-                # "cora",
-                # "citeseer",
-                "photo",
-                "actor",
-                "pubmed",
-                "wikics",
-            ],
-        "Critical":
-            [
-                # 22,662
-                "roman-empire",
-                # 24,492
-                "amazon-ratings",
-                # 48,921
-                # "questions",
-            ],
+        "pyg": [
+            # "texas",
+            # "coRNell",
+            # "wisconsin",
+            # "corafull",
+            # "cora",
+            # "citeseer",
+            "photo",
+            "actor",
+            "pubmed",
+            "wikics",
+        ],
+        "Critical": [
+            # 22,662
+            "roman-empire",
+            # 24,492
+            "amazon-ratings",
+            # 48,921
+            # "questions",
+        ],
         "ogb": [
             "arxiv",
             "proteins",
         ],
-        "linkx":
-            [
-                # (array([0, 1, 2]), array([ 97, 504, 361]))
-                # 962
-                "Reed98",
-                # # array([0, 1, 2]), array([ 418, 2153, 2609]
-                # # 5,180
-                "Johns Hopkins55",
-                # # (array([0, 1, 2]), array([ 203, 1015, 1017]))
-                # # 2,235
-                "Amherst41",
-                # # (array([0, 1, 2]), array([1838, 8135, 8687]))
-                # # 18,660
-                "CoRNell5",
-                # # 41,554
-                "Penn94",
-                # # 168,114
-                "twitch-gamers",
-                # 169,343
-                "arxiv-year",
-                # 421,961
-                "genius",
-                # # 1,632,803
-                "pokec",
-                # 2,923,922
-                "snap-patents",
-                # 1,925,342
-                "wiki",
-            ],
+        "linkx": [
+            # (array([0, 1, 2]), array([ 97, 504, 361]))
+            # 962
+            "Reed98",
+            # # array([0, 1, 2]), array([ 418, 2153, 2609]
+            # # 5,180
+            "Johns Hopkins55",
+            # # (array([0, 1, 2]), array([ 203, 1015, 1017]))
+            # # 2,235
+            "Amherst41",
+            # # (array([0, 1, 2]), array([1838, 8135, 8687]))
+            # # 18,660
+            "CoRNell5",
+            # # 41,554
+            "Penn94",
+            # # 168,114
+            "twitch-gamers",
+            # 169,343
+            "arxiv-year",
+            # 421,961
+            "genius",
+            # # 1,632,803
+            "pokec",
+            # 2,923,922
+            "snap-patents",
+            # 1,925,342
+            "wiki",
+        ],
     }
     TRAIN_RATIO = 48
     VALID_RATIO = 32

@@ -6,11 +6,7 @@ import math
 import random
 import time
 from pathlib import Path
-from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 import dgl
 import numpy as np
@@ -24,16 +20,13 @@ from the_utils import make_parent_dirs
 from torch import nn
 from torch.distributions.normal import Normal
 
-from ...modules import InnerProductDecoder
-from ...modules import LinTrans
-from ...modules import MLP
-from ...modules import SampleDecoder
-from ...utils import get_batch_edges
-from ...utils import preprocess_graph
+from ...modules import MLP, InnerProductDecoder, LinTrans, SampleDecoder
+from ...utils import get_batch_edges, preprocess_graph
 
 
 class EdgeReconstruction(nn.Module):
     """Homophilous GNN"""
+
     def __init__(
         self,
         in_feats,
@@ -105,8 +98,9 @@ class EdgeReconstruction(nn.Module):
 
         n_nodes = adj_nsl.shape[0]
         n_edges = adj_nsl.sum()
-        self.pos_weight = torch.FloatTensor([(float(n_nodes * n_nodes - n_edges) / n_edges)]
-                                           ).to(device)
+        self.pos_weight = torch.FloatTensor([(float(n_nodes * n_nodes - n_edges) / n_edges)]).to(
+            device
+        )
         self.norm_weights = n_nodes * n_nodes / float((n_nodes * n_nodes - n_edges) * 2)
         self.lbls = torch.FloatTensor(adj_nsl.toarray()).view(-1).to(device)
 
@@ -131,10 +125,12 @@ class EdgeReconstruction(nn.Module):
             sample_neg=True,
         )
 
-        adj_labels = torch.cat((
-            torch.ones(len(pos_u)),
-            torch.zeros(len(neg_u)),
-        )).to(device)
+        adj_labels = torch.cat(
+            (
+                torch.ones(len(pos_u)),
+                torch.zeros(len(neg_u)),
+            )
+        ).to(device)
         if z is None:
             return self.loss_pair(
                 adj_preds=self.pair_dc(

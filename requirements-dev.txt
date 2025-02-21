@@ -1,6 +1,6 @@
 pre-commit
 pylint
-yapf
+# yapf
 black
 mdformat
 mdformat_gfm

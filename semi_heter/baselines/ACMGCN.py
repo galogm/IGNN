@@ -16,8 +16,7 @@ from sklearn.metrics import accuracy_score as ACC
 from torch.nn import init
 from torch.nn.parameter import Parameter
 
-from ..utils import sparse_mx_to_torch_sparse_tensor
-from ..utils import sys_normalized_adjacency
+from ..utils import sparse_mx_to_torch_sparse_tensor, sys_normalized_adjacency
 
 
 class ACMGCN(nn.Module):
@@ -48,8 +47,11 @@ class ACMGCN(nn.Module):
         self.lr = args.lr
         self.l2_coef = args.l2_coef
         # ---------------- Layer -------------------
-        if (self.acm_model == "acmgcn" or self.acm_model == "acmgcnp" or
-                self.acm_model == "acmgcnpp"):
+        if (
+            self.acm_model == "acmgcn"
+            or self.acm_model == "acmgcnp"
+            or self.acm_model == "acmgcnpp"
+        ):
             self.gcns.append(
                 GraphConvolution(
                     in_features,
@@ -117,8 +119,9 @@ class ACMGCN(nn.Module):
         adj = graph.adj_external(scipy_fmt="csr")
         adj_low_unnormalized = sparse_mx_to_torch_sparse_tensor(adj)
 
-        if (self.acm_model == "acmgcnp" or self.acm_model == "acmgcnpp") and (self.structure_info
-                                                                              == 1):
+        if (self.acm_model == "acmgcnp" or self.acm_model == "acmgcnpp") and (
+            self.structure_info == 1
+        ):
             pass
         else:
             self.X = normalize_tensor(self.X)
@@ -141,6 +144,7 @@ class ACMGCN(nn.Module):
         best_state_dict = None
 
         import time
+
         t_start = time.time()
         for epoch in range(self.epochs):
             self.train()
@@ -152,8 +156,9 @@ class ACMGCN(nn.Module):
             loss.backward()
             optimizer.step()
 
-            [train_acc, valid_acc, test_acc
-            ] = self.test(self.X, labels, [self.train_mask, self.valid_mask, self.test_mask])
+            [train_acc, valid_acc, test_acc] = self.test(
+                self.X, labels, [self.train_mask, self.valid_mask, self.test_mask]
+            )
 
             if valid_acc > best_acc:
                 cnt = 0
@@ -175,13 +180,17 @@ class ACMGCN(nn.Module):
         self.best_epoch = best_epoch
 
         t_finish = time.time()
-        t_m = (t_finish-t_start)/epoch * 10
+        t_m = (t_finish - t_start) / epoch * 10
         return t_m
 
     def forward(self, x, return_Z=False):
-        if (self.acm_model == "acmgcn" or self.acm_model == "acmsgc" or
-                self.acm_model == "acmsnowball" or self.acm_model == "acmgcnp" or
-                self.acm_model == "acmgcnpp"):
+        if (
+            self.acm_model == "acmgcn"
+            or self.acm_model == "acmsgc"
+            or self.acm_model == "acmsnowball"
+            or self.acm_model == "acmgcnp"
+            or self.acm_model == "acmgcnpp"
+        ):
             x = F.dropout(x, self.dropout, training=self.training)
             if self.acm_model == "acmgcnpp":
                 xX = F.dropout(
@@ -218,8 +227,11 @@ class ACMGCN(nn.Module):
 
         fea1 = self.gcns[0](x, self.adj_low, self.adj_high, self.adj_low_unnormalized)
 
-        if (self.acm_model == "acmgcn" or self.acm_model == "acmgcnp" or
-                self.acm_model == "acmgcnpp"):
+        if (
+            self.acm_model == "acmgcn"
+            or self.acm_model == "acmgcnp"
+            or self.acm_model == "acmgcnpp"
+        ):
             fea1 = F.dropout((F.relu(fea1)), self.dropout, training=self.training)
 
             if self.acm_model == "acmgcnpp":
@@ -352,7 +364,8 @@ class GraphConvolution(nn.Module):
                     )
                 ),
                 self.att_vec,
-            ) / T
+            )
+            / T
         )
         att = torch.softmax(logits, 1)
         return att[:, 0][:, None], att[:, 1][:, None], att[:, 2][:, None]
@@ -427,8 +440,9 @@ class GraphConvolution(nn.Module):
                     (output_low), (output_high), (output_mlp)
                 )
                 return 3 * (
-                    self.att_low * output_low + self.att_high * output_high +
-                    self.att_mlp * output_mlp
+                    self.att_low * output_low
+                    + self.att_high * output_high
+                    + self.att_mlp * output_mlp
                 )
             else:
                 if self.structure_info:
@@ -438,31 +452,37 @@ class GraphConvolution(nn.Module):
                         self.att_high,
                         self.att_mlp,
                         self.att_struc_vec_low,
-                    ) = self.attention4(
-                        (output_low), (output_high), (output_mlp), output_struc_low
-                    )
+                    ) = self.attention4((output_low), (output_high), (output_mlp), output_struc_low)
                     return 1 * (
-                        self.att_low * output_low + self.att_high * output_high +
-                        self.att_mlp * output_mlp + self.att_struc_vec_low * output_struc_low
+                        self.att_low * output_low
+                        + self.att_high * output_high
+                        + self.att_mlp * output_mlp
+                        + self.att_struc_vec_low * output_struc_low
                     )
                 else:
                     self.att_low, self.att_high, self.att_mlp = self.attention3(
                         (output_low), (output_high), (output_mlp)
                     )
                     return 3 * (
-                        self.att_low * output_low + self.att_high * output_high +
-                        self.att_mlp * output_mlp
+                        self.att_low * output_low
+                        + self.att_high * output_high
+                        + self.att_mlp * output_mlp
                     )
 
     def __repr__(self):
         return (
-            self.__class__.__name__ + " (" + str(self.in_features) + " -> " +
-            str(self.out_features) + ")"
+            self.__class__.__name__
+            + " ("
+            + str(self.in_features)
+            + " -> "
+            + str(self.out_features)
+            + ")"
         )
 
 
 class MLP_acm(nn.Module):
     """adapted from https://github.com/CUAI/CorrectAndSmooth/blob/master/gen_models.py"""
+
     def __init__(self, in_channels, hidden_channels, out_channels, num_layers, dropout=0.5):
         super(MLP_acm, self).__init__()
         self.lins = nn.ModuleList()

@@ -12,17 +12,11 @@ import scipy.sparse as sp
 import torch
 from graph_datasets import load_data
 from sklearn.metrics import accuracy_score as ACC
-from the_utils import save_to_csv_files
-from the_utils import set_device
-from the_utils import set_seed
-from the_utils import tab_printer
+from the_utils import save_to_csv_files, set_device, set_seed, tab_printer
 
 import semi_heter.baselines as baselines
 from semi_heter.modules import Data
-from semi_heter.utils import get_splits_mask
-from semi_heter.utils import read_configs
-from semi_heter.utils import set_args_wrt_dataset
-
+from semi_heter.utils import get_splits_mask, read_configs, set_args_wrt_dataset
 
 DATASETS = {
     "critical": [
@@ -435,18 +429,15 @@ def main(dataset, source):
             val_mask,
             test_mask,
         )
-        tms[f'{run}'] = t_m
+        tms[f"{run}"] = t_m
         ts.append(t_m)
         res, C, Z = model.predict(graph)
         acc = ACC(label[test_mask], res[test_mask])
         res_list_acc.append(acc)
         print(f"Acc: {acc}")
 
-
     save_to_csv_files(
-        results={
-            **tms
-        },
+        results={**tms},
         append_info={
             "mean": f"{np.array(ts).mean():.2f}±{np.array(ts).std():.2f}",
         },

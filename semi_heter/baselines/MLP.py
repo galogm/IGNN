@@ -68,8 +68,9 @@ class MLP(nn.Module):
             loss.backward()
             optimizer.step()
 
-            [train_acc, valid_acc,
-             test_acc] = self.test(X, labels, [self.train_mask, self.valid_mask, self.test_mask])
+            [train_acc, valid_acc, test_acc] = self.test(
+                X, labels, [self.train_mask, self.valid_mask, self.test_mask]
+            )
 
             if valid_acc > best_acc:
                 cnt = 0

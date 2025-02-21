@@ -1,17 +1,19 @@
 """DAGNN. Adapted from https://github.com/dmlc/dgl/blob/master/examples/pytorch/dagnn/main.py.
 """
+
 import argparse
+import copy
+
+import dgl.function as fn
 import torch
+import torch.nn.functional as F
+from sklearn.metrics import accuracy_score as ACC
 from torch import nn
 from torch.nn import Linear
-import torch.nn.functional as F
-import dgl.function as fn
-from torch_geometric.nn.conv import MessagePassing, GCNConv
-from torch_scatter import scatter_add
+from torch_geometric.nn.conv import GCNConv, MessagePassing
 from torch_geometric.utils import add_remaining_self_loops
+from torch_scatter import scatter_add
 
-from sklearn.metrics import accuracy_score as ACC
-import copy
 
 class DAGNNConv(nn.Module):
     def __init__(self, in_dim, k):
@@ -74,6 +76,7 @@ class MLPLayer(nn.Module):
             feats = self.activation(feats)
 
         return feats
+
 
 class DAGNN(torch.nn.Module):
     def __init__(
@@ -141,12 +144,13 @@ class DAGNN(torch.nn.Module):
         best_state_dict = None
 
         import time
+
         t_start = time.time()
         for epoch in range(self.epochs):
             self.train()
             optimizer.zero_grad()
 
-            Z = self.forward(graph,X)
+            Z = self.forward(graph, X)
             loss = loss_fn(Z[self.train_mask], labels[self.train_mask])
 
             loss.backward()
@@ -179,13 +183,13 @@ class DAGNN(torch.nn.Module):
         self.best_epoch = best_epoch
 
         t_finish = time.time()
-        t_m = (t_finish-t_start)/epoch * 10
+        t_m = (t_finish - t_start) / epoch * 10
         return t_m
 
     def test(self, graph, X, labels, index_list):
         self.eval()
         with torch.no_grad():
-            Z = self.forward(graph,X)
+            Z = self.forward(graph, X)
             y_pred = torch.argmax(F.softmax(Z, dim=-1), dim=1)
         acc_list = []
         for index in index_list:
@@ -198,7 +202,7 @@ class DAGNN(torch.nn.Module):
         graph = graph.to(self.device)
         X = graph.ndata["feat"]
         with torch.no_grad():
-            Z, C = self.forward(graph,X, return_Z=True)
+            Z, C = self.forward(graph, X, return_Z=True)
             y_pred = torch.argmax(F.softmax(C, dim=-1), dim=1)
 
         return y_pred.cpu(), C.cpu(), Z.cpu()

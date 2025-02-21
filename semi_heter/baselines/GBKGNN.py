@@ -9,14 +9,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from sklearn.metrics import accuracy_score as ACC
-from torch.nn import LayerNorm
-from torch.nn import Linear
-from torch.nn import Module
-from torch.nn import ModuleList
-from torch_geometric.utils import add_self_loops
-from torch_geometric.utils import remove_self_loops
-from torch_sparse import fill_diag
-from torch_sparse import SparseTensor
+from torch.nn import LayerNorm, Linear, Module, ModuleList
+from torch_geometric.utils import add_self_loops, remove_self_loops
+from torch_sparse import SparseTensor, fill_diag
 
 
 class GBKGNN(nn.Module):
@@ -63,6 +58,7 @@ class GBKGNN(nn.Module):
         best_state_dict = None
 
         import time
+
         t_start = time.time()
         for epoch in range(self.epochs):
             self.train()
@@ -84,8 +80,9 @@ class GBKGNN(nn.Module):
                 )
                 regularizer_list.append(regularizer)
 
-            loss = F.nll_loss(output[train_mask],
-                              labels[train_mask]) + self.lamda * sum(regularizer_list)
+            loss = F.nll_loss(output[train_mask], labels[train_mask]) + self.lamda * sum(
+                regularizer_list
+            )
             loss.backward()
             optimizer.step()
 
@@ -113,7 +110,7 @@ class GBKGNN(nn.Module):
         self.best_epoch = best_epoch
 
         t_finish = time.time()
-        t_m = (t_finish-t_start)/epoch * 10
+        t_m = (t_finish - t_start) / epoch * 10
         return t_m
 
     def forward(self, x, edge_index, return_Z=False):
@@ -167,29 +164,33 @@ def glorot(tensor):
         tensor.data.uniform_(-stdv, stdv)
 
 
-import os
-import re
 import inspect
+import os
 import os.path as osp
-from uuid import uuid1
-from itertools import chain
+import re
 from inspect import Parameter
-from typing import List, Optional, Set
-from torch_geometric.typing import OptPairTensor, Adj, OptTensor, Size
-from torch import Tensor
+from itertools import chain
+from typing import List, Optional, Set, Tuple, Union
+from uuid import uuid1
+
 from jinja2 import Template
-from typing import Union, Tuple
-from torch_sparse import SparseTensor
-from torch_scatter import gather_csr, scatter, segment_csr
+from torch import Tensor
 from torch_geometric.nn.conv.utils.helpers import expand_left
+from torch_geometric.nn.conv.utils.inspector import (
+    Inspector,
+    func_body_repr,
+    func_header_repr,
+)
 from torch_geometric.nn.conv.utils.jit import class_from_module_repr
 from torch_geometric.nn.conv.utils.typing import (
-    sanitize,
-    split_types_repr,
     parse_types,
     resolve_types,
+    sanitize,
+    split_types_repr,
 )
-from torch_geometric.nn.conv.utils.inspector import Inspector, func_header_repr, func_body_repr
+from torch_geometric.typing import Adj, OptPairTensor, OptTensor, Size
+from torch_scatter import gather_csr, scatter, segment_csr
+from torch_sparse import SparseTensor
 
 
 class MessagePassingNew(torch.nn.Module):
@@ -251,10 +252,12 @@ class MessagePassingNew(torch.nn.Module):
         self.inspector.inspect(self.message_and_aggregate, pop_first=True)
         self.inspector.inspect(self.update, pop_first=True)
 
-        self.__user_args__ = self.inspector.keys(["message", "aggregate",
-                                                  "update"]).difference(self.special_args)
-        self.__fused_user_args__ = self.inspector.keys(["message_and_aggregate",
-                                                        "update"]).difference(self.special_args)
+        self.__user_args__ = self.inspector.keys(["message", "aggregate", "update"]).difference(
+            self.special_args
+        )
+        self.__fused_user_args__ = self.inspector.keys(
+            ["message_and_aggregate", "update"]
+        ).difference(self.special_args)
 
         # Support for "fused" message passing.
         self.fuse = self.inspector.implements("message_and_aggregate")

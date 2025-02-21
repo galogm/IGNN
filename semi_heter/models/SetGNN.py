@@ -1,20 +1,11 @@
 # pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals
 import copy
 import math
+import random
 import time
 from pathlib import Path
-from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Tuple
-import random
+from typing import Any, Callable, Dict, List, Tuple
 
-from torch.nn import LayerNorm
-from torch.nn import LayerNorm
-from torch.nn import Linear
-from torch.nn import Module
-from torch.nn import ModuleList
 import dgl
 import numpy as np
 import scipy.sparse as sp
@@ -23,30 +14,26 @@ import torch.nn.functional as F
 from sklearn.cluster import KMeans
 from sklearn.metrics import accuracy_score as ACC
 from sklearn.preprocessing import normalize
-from the_utils import get_str_time
-from the_utils import make_parent_dirs
-from the_utils import save_to_csv_files
+from the_utils import get_str_time, make_parent_dirs, save_to_csv_files
 from torch import nn
 from torch.distributions.normal import Normal
+from torch.nn import LayerNorm, Linear, Module, ModuleList
 from torch.utils.tensorboard import SummaryWriter
+from torch_sparse import SparseTensor, fill_diag
+from tqdm import tqdm
 
-from ..modules import InnerProductDecoder
-from ..modules import LinTrans
-from ..modules import MLP
-from ..modules import SampleDecoder
-from ..utils import preprocess_graph
-from .experts import AdaptiveLearning
-from .experts import EdgeReconstruction
-from .experts import NeighborhoodPrediction
-from .experts import SelfReconstruction
-from .experts import update_similarity
-from .experts import update_threshold
 from semi_heter.utils.common import sparse_mx_to_torch_sparse_tensor
 
-from torch_sparse import fill_diag
-from torch_sparse import SparseTensor
-
-from tqdm import tqdm
+from ..modules import MLP, InnerProductDecoder, LinTrans, SampleDecoder
+from ..utils import preprocess_graph
+from .experts import (
+    AdaptiveLearning,
+    EdgeReconstruction,
+    NeighborhoodPrediction,
+    SelfReconstruction,
+    update_similarity,
+    update_threshold,
+)
 
 
 class Deepsets(nn.Module):
@@ -133,14 +120,13 @@ def preprocess_neighborhoods(
 
     nei_feats = [features.to(device)]
     if no_save:
-        adj=adj.to_torch_sparse_csr_tensor() if process_adj else adj
+        adj = adj.to_torch_sparse_csr_tensor() if process_adj else adj
         for i in range(1, n_hops + 1):
             x = torch.mm(adj, features.cpu())
             nei_feats.append(x.to(torch.float).to(device))
         if return_adj:
-            return nei_feats,adj
+            return nei_feats, adj
         return nei_feats
-
 
     adj = adj.to_scipy(layout="csr")
     x = features.numpy()
@@ -210,7 +196,7 @@ class SetGNN(nn.Module):
                 ],
             ]
         )
-        self.adj=None
+        self.adj = None
 
     def forward(
         self,
@@ -222,7 +208,7 @@ class SetGNN(nn.Module):
         self.ns = []
         adj = graph.adj()
         features = graph.ndata["feat"] if feats is None else feats
-        if self.nei_feats is None and self.no_save==False:
+        if self.nei_feats is None and self.no_save == False:
             self.nei_feats = preprocess_neighborhoods(
                 adj=SparseTensor(
                     row=adj.row.long(),
@@ -237,13 +223,17 @@ class SetGNN(nn.Module):
                 symm_norm=True,
                 device=device,
             )
-        elif self.no_save==True:
+        elif self.no_save == True:
             self.nei_feats, self.adj = preprocess_neighborhoods(
-                adj=SparseTensor(
-                    row=adj.row.long(),
-                    col=adj.col.long(),
-                    sparse_sizes=adj.shape,
-                ) if self.adj is None else self.adj,
+                adj=(
+                    SparseTensor(
+                        row=adj.row.long(),
+                        col=adj.col.long(),
+                        sparse_sizes=adj.shape,
+                    )
+                    if self.adj is None
+                    else self.adj
+                ),
                 features=features,
                 name=graph.name,
                 n_hops=self.n_hops,
@@ -264,13 +254,12 @@ class SetGNN(nn.Module):
         return [
             torch.cat(
                 [
-                    self.relation_nets[i](hops_feats[:, self.h_feats * i : self.h_feats * (i + self.interval)])
+                    self.relation_nets[i](
+                        hops_feats[:, self.h_feats * i : self.h_feats * (i + self.interval)]
+                    )
                     for i in range(self.n_relations + 1)
                 ],
                 dim=1,
             )
         ]
         # return [self.mlp(F.dropout(torch.cat(self.ns, dim=1), self.dropout, self.training))]
-
-
-

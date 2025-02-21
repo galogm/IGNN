@@ -13,8 +13,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from sklearn.metrics import accuracy_score as ACC
 from torch.nn.parameter import Parameter
-from torch_geometric.nn import APPNP
-from torch_geometric.nn import MessagePassing
+from torch_geometric.nn import APPNP, MessagePassing
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
 
 
@@ -68,6 +67,7 @@ class GPRGNN(nn.Module):
         best_state_dict = None
 
         import time
+
         t_start = time.time()
         for epoch in range(self.epochs):
             self.train()
@@ -100,7 +100,7 @@ class GPRGNN(nn.Module):
         self.best_epoch = best_epoch
 
         t_finish = time.time()
-        t_m = (t_finish-t_start)/epoch * 10
+        t_m = (t_finish - t_start) / epoch * 10
         return t_m
 
     def forward(self, x, edge_index, return_Z=False):
@@ -146,6 +146,7 @@ class GPR_prop(MessagePassing):
     """
     propagation class for GPR_GNN
     """
+
     def __init__(self, K, alpha, Init, Gamma=None, bias=True, **kwargs):
         super(GPR_prop, self).__init__(aggr="add", **kwargs)
         self.K = K
@@ -159,11 +160,11 @@ class GPR_prop(MessagePassing):
             TEMP[alpha] = 1.0
         elif Init == "PPR":
             # PPR-like
-            TEMP = alpha * (1 - alpha)**np.arange(K + 1)
-            TEMP[-1] = (1 - alpha)**K
+            TEMP = alpha * (1 - alpha) ** np.arange(K + 1)
+            TEMP[-1] = (1 - alpha) ** K
         elif Init == "NPPR":
             # Negative PPR
-            TEMP = (alpha)**np.arange(K + 1)
+            TEMP = (alpha) ** np.arange(K + 1)
             TEMP = TEMP / np.sum(np.abs(TEMP))
         elif Init == "Random":
             # Random
@@ -179,8 +180,8 @@ class GPR_prop(MessagePassing):
     def reset_parameters(self):
         torch.nn.init.zeros_(self.temp)
         for k in range(self.K + 1):
-            self.temp.data[k] = self.alpha * (1 - self.alpha)**k
-        self.temp.data[-1] = (1 - self.alpha)**self.K
+            self.temp.data[k] = self.alpha * (1 - self.alpha) ** k
+        self.temp.data[-1] = (1 - self.alpha) ** self.K
 
     def forward(self, x, edge_index, edge_weight=None):
 

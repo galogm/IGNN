@@ -1,13 +1,8 @@
 """MLP"""
 
 # pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals
-from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Tuple
+from typing import Callable, List
 
-import torch.nn.functional as F
 from torch import nn
 
 

@@ -20,6 +20,7 @@ losses = {
 
 class IGNN(nn.Module):
     """IGNN"""
+
     def __init__(
         self,
         in_feats,
@@ -186,7 +187,7 @@ class IGNN(nn.Module):
             if bs is not None:
                 pred_stack = []
                 for step in tqdm(range(0, n, bs), "training step"):
-                    batch_idx = shf[step:step + bs]
+                    batch_idx = shf[step : step + bs]
 
                     batch_labels = labels[batch_idx]
                     batch_train_mask = train_mask[batch_idx]
@@ -223,7 +224,7 @@ class IGNN(nn.Module):
                         pred_stack = []
                         idx = torch.LongTensor(list(range(n)))
                         for step in tqdm(range(0, n, bs), "validate step"):
-                            batch_idx = idx[step:step + bs]
+                            batch_idx = idx[step : step + bs]
 
                             embeddings = self.forward(
                                 batch_idx=batch_idx,

@@ -2,9 +2,6 @@
 common utils
 """
 
-import os
-from pathlib import Path
-
 import networkx as nx
 import numpy as np
 import scipy.sparse as sp
@@ -12,7 +9,7 @@ import torch
 from ogb.nodeproppred import Evaluator
 from sklearn.metrics import accuracy_score as ACC
 from sklearn.metrics import roc_auc_score
-from the_utils import make_parent_dirs, onetime_reminder
+from the_utils import onetime_reminder
 from torch_sparse import SparseTensor
 
 evaluators = {
@@ -157,113 +154,6 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx: sp.spmatrix) -> torch.Tensor:
     values = torch.from_numpy(sparse_mx.data)
     shape = torch.Size(sparse_mx.shape)
     return torch.sparse_coo_tensor(indices, values, shape, dtype=torch.float32)
-
-
-def preprocess_neighborhoods(
-    adj: SparseTensor,
-    features: torch.FloatTensor,
-    name: str,
-    n_hops: int,
-    set_diag=True,
-    remove_diag=False,
-    symm_norm=False,
-    row_normalized=True,
-    device: torch.device = torch.device("cpu"),
-    no_save=False,
-    return_adj=False,
-    process_adj=True,
-    save_dir: str = "tmp/ignn/neighborhoods",
-    batch_idx=None,
-    verbose=True,
-):
-    sym = "sym" if symm_norm else "nsy"
-    diag = "diag" if set_diag else "ndiag"
-    diag = "ndiag" if remove_diag else diag
-    norm = "norm" if row_normalized else "nnorm"
-    base = Path(f"{save_dir}/{name}/{norm}/{diag}/{sym}")
-
-    if process_adj:
-        if set_diag:
-            print("... setting diagonal entries") if verbose else None
-            adj = adj.set_diag()
-        elif remove_diag:
-            print("... removing diagonal entries") if verbose else None
-            adj = adj.remove_diag()
-        else:
-            print("... keeping diag elements as they are") if verbose else None
-        if symm_norm:
-            print("... performing symmetric normalization") if verbose else None
-            deg = adj.sum(dim=1).to(torch.float)
-            deg_inv_sqrt = deg.pow(-0.5)
-            deg_inv_sqrt[deg_inv_sqrt == float("inf")] = 0
-            adj = deg_inv_sqrt.view(-1, 1) * adj * deg_inv_sqrt.view(1, -1)
-        else:
-            print("... performing asymmetric normalization") if verbose else None
-            deg = adj.sum(dim=1).to(torch.float)
-            deg_inv = deg.pow(-1.0)
-            deg_inv[deg_inv == float("inf")] = 0
-            adj = deg_inv.view(-1, 1) * adj
-
-    # features = F.normalize(features, dim=1) if row_normalized else features
-    nei_feats = [
-        (
-            features.to(device).index_select(0, batch_idx)
-            if batch_idx is not None
-            else features.to(device)
-        )
-    ]
-    if no_save:
-        adj = adj.to_torch_sparse_csr_tensor() if process_adj else adj
-        for i in range(1, n_hops + 1):
-            x = torch.mm(adj, features.cpu())
-            nei_feats.append(x.to(torch.float).to(device))
-        if return_adj:
-            return nei_feats, adj
-        return nei_feats
-
-    adj = adj.to_scipy(layout="csr")
-    x = features.cpu().numpy()
-    print(f"Load aggregated feats from {base}") if verbose else None
-    hops = os.listdir(base) if base.exists() else []
-    if f"{n_hops}" not in hops:
-        for i in range(1, n_hops + 1):
-            file = base.joinpath(f"{i}")
-            if file.exists():
-                x = torch.load(file, map_location=device)
-                x = x.cpu().numpy()
-                continue
-            make_parent_dirs(file)
-            x = adj @ x
-            # if name != "arxiv-year_linkx":
-            torch.save(
-                obj=torch.from_numpy(x).to(torch.float).to(device),
-                f=file,
-                pickle_protocol=4,
-            )
-
-    for i in range(1, n_hops + 1):
-        file = base.joinpath(f"{i}")
-        x = torch.load(file, map_location=device)
-        nei_feats.append(x.index_select(0, batch_idx) if batch_idx is not None else x)
-
-    # for i in range(1, n_hops + 1):
-    #     file = base.joinpath(f"{i}")
-    #     if file.exists():
-    #         x = torch.load(file, map_location=device)
-    #         nei_feats.append(x.index_select(0,batch_idx) if batch_idx is not None else x)
-    #         continue
-    #     x = x.cpu().numpy()
-    #     make_parent_dirs(file)
-    #     x = adj @ x
-    #     x_ = torch.from_numpy(x).to(torch.float).to(device)
-    #     nei_feats.append(x_.index_select(0,batch_idx) if batch_idx is not None else x_)
-    #     if name!='arxiv-year_linkx':
-    #         torch.save(
-    #             obj=x_,
-    #             f=file,
-    #             pickle_protocol=4,
-    #         )
-    return nei_feats
 
 
 def graph_diameter(g):

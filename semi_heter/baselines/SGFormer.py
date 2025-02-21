@@ -1,6 +1,7 @@
 """SGFormer. Adapted from https://github.com/qitianwu/SGFormer/blob/main/medium/ours.py.
 """
 
+import copy
 import math
 import os
 from multiprocessing.sharedctypes import Value
@@ -9,11 +10,17 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from sklearn.metrics import accuracy_score as ACC
+from torch_geometric.nn import (
+    APPNP,
+    GATConv,
+    GCNConv,
+    JumpingKnowledge,
+    MessagePassing,
+    SGConv,
+)
 from torch_geometric.utils import degree
 from torch_sparse import SparseTensor, matmul
-from sklearn.metrics import accuracy_score as ACC
-import copy
-from torch_geometric.nn import GCNConv, SGConv, GATConv, JumpingKnowledge, APPNP, MessagePassing
 
 
 class GCN(nn.Module):
@@ -366,6 +373,7 @@ class SGFormer(nn.Module):
         )
 
         import time
+
         t_start = time.time()
         for epoch in range(self.epochs):
             self.train()
@@ -400,7 +408,7 @@ class SGFormer(nn.Module):
         self.load_state_dict(best_state_dict)
         self.best_epoch = best_epoch
         t_finish = time.time()
-        t_m = (t_finish-t_start)/epoch * 10
+        t_m = (t_finish - t_start) / epoch * 10
         return t_m
 
     def test(self, graph, X, labels, index_list):

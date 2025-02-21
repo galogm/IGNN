@@ -7,8 +7,7 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 import torch.nn.functional as F
-from the_utils import make_parent_dirs
-from the_utils import split_train_test_nodes
+from the_utils import make_parent_dirs, split_train_test_nodes
 
 
 def get_splits_mask(
@@ -30,16 +29,19 @@ def get_splits_mask(
         split_save_dir=SPLIT_DIR,
     )
     train_mask = (
-        torch.zeros(graph.num_nodes()).scatter_(0, torch.tensor(train_idx, dtype=torch.int64),
-                                                1).bool()
+        torch.zeros(graph.num_nodes())
+        .scatter_(0, torch.tensor(train_idx, dtype=torch.int64), 1)
+        .bool()
     )
     val_mask = (
-        torch.zeros(graph.num_nodes()).scatter_(0, torch.tensor(val_idx, dtype=torch.int64),
-                                                1).bool()
+        torch.zeros(graph.num_nodes())
+        .scatter_(0, torch.tensor(val_idx, dtype=torch.int64), 1)
+        .bool()
     )
     test_mask = (
-        torch.zeros(graph.num_nodes()).scatter_(0, torch.tensor(test_idx, dtype=torch.int64),
-                                                1).bool()
+        torch.zeros(graph.num_nodes())
+        .scatter_(0, torch.tensor(test_idx, dtype=torch.int64), 1)
+        .bool()
     )
 
     return train_mask, val_mask, test_mask

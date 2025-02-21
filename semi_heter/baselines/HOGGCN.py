@@ -16,8 +16,7 @@ import torch.optim as optim
 from sklearn.metrics import accuracy_score as ACC
 from torch.nn.parameter import Parameter
 
-from ..utils import sparse_mx_to_torch_sparse_tensor
-from ..utils import sys_normalized_adjacency
+from ..utils import sparse_mx_to_torch_sparse_tensor, sys_normalized_adjacency
 
 
 class HOGGCN(nn.Module):
@@ -91,8 +90,9 @@ class HOGGCN(nn.Module):
         self.si_adj = adj
         self.bi_adj = adj.mm(adj)
         self.labels_for_lp = (
-            one_hot_embedding(labels, labels.max().item() + 1, output,
-                              device=self.device).type(torch.FloatTensor).to(self.device)
+            one_hot_embedding(labels, labels.max().item() + 1, output, device=self.device)
+            .type(torch.FloatTensor)
+            .to(self.device)
         )
 
         optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.l2_coef)
@@ -102,6 +102,7 @@ class HOGGCN(nn.Module):
         best_state_dict = None
 
         import time
+
         t_start = time.time()
         for epoch in range(self.epochs):
             self.train()
@@ -115,16 +116,18 @@ class HOGGCN(nn.Module):
             loss_mlp = F.nll_loss(output_mlp[self.train_mask], labels[self.train_mask])
             loss_lp = F.nll_loss(y_hat[self.train_mask], labels[self.train_mask])
             loss = (
-                loss_mlp + F.nll_loss(output[self.train_mask], labels[self.train_mask]) +
-                1 * loss_lp
+                loss_mlp
+                + F.nll_loss(output[self.train_mask], labels[self.train_mask])
+                + 1 * loss_lp
             )
 
             loss.backward()
             optimizer.step()
             optimizer_mlp.step()
 
-            [train_acc, valid_acc, test_acc
-            ] = self.test(X, adj, labels, [self.train_mask, self.valid_mask, self.test_mask])
+            [train_acc, valid_acc, test_acc] = self.test(
+                X, adj, labels, [self.train_mask, self.valid_mask, self.test_mask]
+            )
 
             if valid_acc > best_acc:
                 cnt = 0
@@ -145,7 +148,7 @@ class HOGGCN(nn.Module):
         self.best_epoch = best_epoch
 
         t_finish = time.time()
-        t_m = (t_finish-t_start)/epoch * 10
+        t_m = (t_finish - t_start) / epoch * 10
         return t_m
 
     def forward(self, x, output):
@@ -255,6 +258,7 @@ class GraphConvolution_homo(nn.Module):
     """
     Simple GCN layer, similar to https://arxiv.org/abs/1609.02907
     """
+
     def __init__(self, in_features, adj, out_features, device, bias=True):
         super(GraphConvolution_homo, self).__init__()
         self.in_features = in_features
@@ -312,6 +316,10 @@ class GraphConvolution_homo(nn.Module):
 
     def __repr__(self):
         return (
-            self.__class__.__name__ + " (" + str(self.in_features) + " -> " +
-            str(self.out_features) + ")"
+            self.__class__.__name__
+            + " ("
+            + str(self.in_features)
+            + " -> "
+            + str(self.out_features)
+            + ")"
         )

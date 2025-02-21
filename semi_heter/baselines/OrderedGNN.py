@@ -8,14 +8,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from sklearn.metrics import accuracy_score as ACC
-from torch.nn import LayerNorm
-from torch.nn import Linear
-from torch.nn import Module
-from torch.nn import ModuleList
-from torch_geometric.utils import add_self_loops
-from torch_geometric.utils import remove_self_loops
-from torch_sparse import fill_diag
-from torch_sparse import SparseTensor
+from torch.nn import LayerNorm, Linear, Module, ModuleList
+from torch_geometric.utils import add_self_loops, remove_self_loops
+from torch_sparse import SparseTensor, fill_diag
 
 
 class OrderedGNN(nn.Module):
@@ -73,8 +68,9 @@ class OrderedGNN(nn.Module):
             )
 
         self.params_conv = list(set(list(self.convs.parameters()) + list(self.tm_net.parameters())))
-        self.params_others = list(self.linear_trans_in.parameters()
-                                 ) + list(self.linear_trans_out.parameters())
+        self.params_others = list(self.linear_trans_in.parameters()) + list(
+            self.linear_trans_out.parameters()
+        )
 
     def fit(self, graph, labels, train_mask, val_mask, test_mask):
         # model init
@@ -124,7 +120,7 @@ class OrderedGNN(nn.Module):
                     print(f"Early Stopping! Best Epoch: {best_epoch}, best val acc: {best_acc}")
                     break
         t_finish = time.time()
-        t_m = (t_finish-t_start)/epoch * 10
+        t_m = (t_finish - t_start) / epoch * 10
         print(f"10 epoch cost: {t_m:.4f}s")
         self.load_state_dict(best_state_dict)
         self.best_epoch = best_epoch
@@ -191,14 +187,16 @@ from inspect import Parameter
 from itertools import chain
 from typing import Callable, List, Optional, Set, get_type_hints
 from uuid import uuid1
+
 from jinja2 import Template
 from torch import Tensor
 from torch.utils.hooks import RemovableHandle
-from torch_scatter import gather_csr, scatter, segment_csr
-from torch_sparse import SparseTensor
-from torch_geometric.typing import Adj, Size
 from torch_geometric.nn.conv.utils.helpers import expand_left
-from torch_geometric.nn.conv.utils.inspector import Inspector, func_body_repr, func_header_repr
+from torch_geometric.nn.conv.utils.inspector import (
+    Inspector,
+    func_body_repr,
+    func_header_repr,
+)
 from torch_geometric.nn.conv.utils.jit import class_from_module_repr
 from torch_geometric.nn.conv.utils.typing import (
     parse_types,
@@ -206,6 +204,9 @@ from torch_geometric.nn.conv.utils.typing import (
     sanitize,
     split_types_repr,
 )
+from torch_geometric.typing import Adj, Size
+from torch_scatter import gather_csr, scatter, segment_csr
+from torch_sparse import SparseTensor
 
 
 class MessagePassing(torch.nn.Module):
@@ -296,10 +297,12 @@ class MessagePassing(torch.nn.Module):
         self.inspector.inspect(self.update, pop_first=True)
         self.inspector.inspect(self.edge_update)
 
-        self.__user_args__ = self.inspector.keys(["message", "aggregate",
-                                                  "update"]).difference(self.special_args)
-        self.__fused_user_args__ = self.inspector.keys(["message_and_aggregate",
-                                                        "update"]).difference(self.special_args)
+        self.__user_args__ = self.inspector.keys(["message", "aggregate", "update"]).difference(
+            self.special_args
+        )
+        self.__fused_user_args__ = self.inspector.keys(
+            ["message_and_aggregate", "update"]
+        ).difference(self.special_args)
         self.__edge_user_args__ = self.inspector.keys(["edge_update"]).difference(self.special_args)
 
         # Support for "fused" message passing.
@@ -509,12 +512,12 @@ class MessagePassing(torch.nn.Module):
 
                 msg_kwargs = self.inspector.distribute("message", coll_dict)
                 for hook in self._message_forward_pre_hooks.values():
-                    res = hook(self, (msg_kwargs, ))
+                    res = hook(self, (msg_kwargs,))
                     if res is not None:
                         msg_kwargs = res[0] if isinstance(res, tuple) else res
                 out = self.message(**msg_kwargs)
                 for hook in self._message_forward_hooks.values():
-                    res = hook(self, (msg_kwargs, ), out)
+                    res = hook(self, (msg_kwargs,), out)
                     if res is not None:
                         out = res
 
@@ -536,12 +539,12 @@ class MessagePassing(torch.nn.Module):
 
                 aggr_kwargs = self.inspector.distribute("aggregate", coll_dict)
                 for hook in self._aggregate_forward_pre_hooks.values():
-                    res = hook(self, (aggr_kwargs, ))
+                    res = hook(self, (aggr_kwargs,))
                     if res is not None:
                         aggr_kwargs = res[0] if isinstance(res, tuple) else res
                 out = self.aggregate(out, **aggr_kwargs)
                 for hook in self._aggregate_forward_hooks.values():
-                    res = hook(self, (aggr_kwargs, ), out)
+                    res = hook(self, (aggr_kwargs,), out)
                     if res is not None:
                         out = res
 

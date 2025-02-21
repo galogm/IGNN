@@ -15,8 +15,7 @@ import torch.nn.functional as F
 from sklearn.metrics import accuracy_score as ACC
 from torch.nn import init
 
-from ..utils import sparse_mx_to_torch_sparse_tensor
-from ..utils import sys_normalized_adjacency
+from ..utils import sparse_mx_to_torch_sparse_tensor, sys_normalized_adjacency
 
 
 class GGCN(nn.Module):
@@ -120,6 +119,7 @@ class GGCN(nn.Module):
         best_state_dict = None
 
         import time
+
         t_start = time.time()
         for epoch in range(self.epochs):
             self.train()
@@ -129,8 +129,9 @@ class GGCN(nn.Module):
             loss.backward()
             optimizer.step()
 
-            [train_acc, valid_acc, test_acc
-            ] = self.test(X, adj, labels, [self.train_mask, self.valid_mask, self.test_mask])
+            [train_acc, valid_acc, test_acc] = self.test(
+                X, adj, labels, [self.train_mask, self.valid_mask, self.test_mask]
+            )
 
             if valid_acc > best_acc:
                 cnt = 0
@@ -151,7 +152,7 @@ class GGCN(nn.Module):
         self.best_epoch = best_epoch
 
         t_finish = time.time()
-        t_m = (t_finish-t_start)/epoch * 10
+        t_m = (t_finish - t_start) / epoch * 10
         return t_m
 
     def forward(self, x, adj, return_Z=False):
@@ -176,7 +177,7 @@ class GGCN(nn.Module):
                 layer_previous = layer_inner + layer_previous
             else:
                 if self.use_decay:
-                    coeff = math.log(self.decay / (i + 2)**self.exponent + 1)
+                    coeff = math.log(self.decay / (i + 2) ** self.exponent + 1)
                 else:
                     coeff = 1
                 layer_previous = coeff * layer_inner + layer_previous

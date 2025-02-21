@@ -16,7 +16,7 @@ search_space_GPRGNN = {
     'dataset': {'_type': 'choice', '_value': dataset_list},
     'lr': {'_type': 'choice', '_value': [0.002, 0.05, 0.01]},
     'l2_coef': {'_type': 'choice', '_value': [0, 0.0005]},
-    'alpha':  {'_type': 'choice', '_value': [0.1, 0.2, 0.5, 0.9]},   
+    'alpha':  {'_type': 'choice', '_value': [0.1, 0.2, 0.5, 0.9]},
     'nlayers': {'_type': 'choice', '_value': [1, 2, 3, 4, 8,10, 16, 32]},
     'dprate': {'_type': 'choice', '_value': [0, 0.5, 0.7]},
     'patience':  {'_type': 'choice', '_value': ￼},
@@ -51,7 +51,7 @@ search_space_APPNP = {
     'dataset': {'_type': 'choice', '_value': dataset_list},
     'lr': {'_type': 'choice', '_value': [0.001, 0.005, 0.01, 0.05]},
     'l2_coef': {'_type': 'choice', '_value': [0, 0.0005]},
-    'alpha':  {'_type': 'choice', '_value': [0.1, 0.2, 0.5]},   
+    'alpha':  {'_type': 'choice', '_value': [0.1, 0.2, 0.5]},
     'iterations': {'_type': 'choice', '_value': [1, 2, 3, 4, 8, 10]},
     'patience':  {'_type': 'choice', '_value': [100, 200]},
 }

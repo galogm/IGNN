@@ -2,7 +2,5 @@
 """
 
 from .data import Data
-from .decoder import InnerProductDecoder
-from .decoder import SampleDecoder
-from .mlp import LinTrans
-from .mlp import MLP
+from .decoder import InnerProductDecoder, SampleDecoder
+from .mlp import MLP, LinTrans

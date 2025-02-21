@@ -1,5 +1,6 @@
 # Semi-supervised Classification with Graph Convolutional Networks.
 # code adapted from :https://github.com/dmlc/dgl/blob/master/examples/pytorch/sign/sign.py
+import argparse
 import copy
 import math
 import os
@@ -7,6 +8,7 @@ import random
 import time
 
 import dgl
+import dgl.function as fn
 import numpy as np
 import scipy.sparse as sp
 import torch
@@ -15,16 +17,6 @@ import torch.nn.functional as F
 from dgl.nn.pytorch import SAGEConv
 from sklearn.metrics import accuracy_score as ACC
 from torch.nn import init
-import argparse
-import os
-import time
-
-import dgl
-import dgl.function as fn
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 
 class FeedForwardNet(nn.Module):
@@ -78,7 +70,7 @@ class SIGN(nn.Module):
         self.epochs = args.epochs
         self.patience = args.patience
 
-        self.device=device
+        self.device = device
         self.dropout = nn.Dropout(dropout)
         self.prelu = nn.PReLU()
         self.inception_ffs = nn.ModuleList()
@@ -118,6 +110,7 @@ class SIGN(nn.Module):
         self.feats = preprocess(graph, graph.ndata["feat"], self.hops)
 
         import time
+
         t_start = time.time()
         for epoch in range(self.epochs):
             self.train()
@@ -153,7 +146,7 @@ class SIGN(nn.Module):
         self.best_epoch = best_epoch
 
         t_finish = time.time()
-        t_m = (t_finish-t_start)/epoch * 10
+        t_m = (t_finish - t_start) / epoch * 10
         return t_m
 
     def test(self, graph, X, labels, index_list):
