@@ -9,7 +9,7 @@ from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from ..modules import MLP, IGNN_layer
+from ..modules import MLP, IGNNConv, INConf
 from ..utils import metric
 
 losses = {
@@ -60,20 +60,23 @@ class IGNN(nn.Module):
         self.device = device
         self.best_model = None
 
-        self.ignn = IGNN_layer(
-            in_feats=in_feats,
-            h_feats=h_feats,
-            n_hops=n_hops,
-            nas_dropout=nas_dropout,
-            nss_dropout=nss_dropout,
-            out_ndim_trans=out_ndim_trans,
-            IN=IN,
-            RN=RN,
-            act=act,
-            layer_norm=layer_norm,
-            num_heads=num_heads,
-            transform_first=transform_first,
-            ignn_layer_num=n_layers,
+        self.ignnconvs = nn.ModuleList(
+            [
+                IGNNConv(
+                    IN=IN,
+                    in_feats=in_feats if i == 0 else h_feats,
+                    h_feats=h_feats,
+                    act=act,
+                    nas_dropout=nas_dropout,
+                    nss_dropout=nss_dropout,
+                    layer_norm=layer_norm,
+                    transform_first=transform_first,
+                    RN=RN,
+                    n_hops=n_hops,
+                    ndim_fc=h_feats * (n_hops + 1),
+                )
+                for i in range(n_layers)
+            ]
         )
 
         hidden_dim = {
@@ -99,26 +102,7 @@ class IGNN(nn.Module):
 
         self.criterion = losses[loss]()
 
-        self.optimizer = torch.optim.Adam(
-            self.parameters(),
-            lr=self.lr,
-            weight_decay=self.l2_coef,
-        )
-
-    def forward(
-        self,
-        graph=None,
-        batch_idx=None,
-        device=None,
-    ):
-        z_ignn = self.ignn(
-            graph=graph,
-            features=graph.ndata["feat"],
-            batch_idx=batch_idx,
-            device=device,
-        )
-
-        return z_ignn
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.l2_coef)
 
     def validate(
         self,
@@ -126,60 +110,72 @@ class IGNN(nn.Module):
         train_mask,
         val_mask,
         test_mask,
-        graph,
+        edge_index,
+        features,
+        IN_config: INConf,
         batch_idx=None,
     ):
         self.train(False)
         with torch.no_grad():
             embeddings = self.forward(
-                graph=graph,
+                edge_index=edge_index,
+                features=features,
+                IN_config=IN_config,
                 device=self.device,
                 batch_idx=batch_idx,
             )
             logits = self.classifier(embeddings)
 
-            return metric(
-                graph.name,
-                logits,
-                labels,
-                train_mask,
-                val_mask,
-                test_mask,
+            return metric(IN_config.name, logits, labels, train_mask, val_mask, test_mask)
+
+    def forward(
+        self,
+        edge_index,
+        features,
+        IN_config: INConf,
+        batch_idx=None,
+        device=None,
+    ):
+        H = None
+        for i, ignnconv in enumerate(self.ignnconvs):
+            H = ignnconv(
+                edge_index,
+                features=features if i == 0 else H,
+                IN_config=INConf(**{**IN_config.__dict__, "fast": i == 0}),
+                batch_idx=batch_idx,
+                device=device,
             )
+
+        return H
 
     def fit(
         self,
-        graph,
+        edge_index,
+        features,
         labels,
         train_mask,
         val_mask,
         test_mask,
+        IN_config: INConf,
         bs=None,
-        split_id=None,
         device: torch.device = torch.device("cpu"),
         eval_start=1000,
     ):
-
         self.device = device
         self.to(self.device)
-
-        if graph.name in ["proteins_ogb"]:
-            labels = labels.to(torch.float).to(device)
-        else:
-            labels = labels.to(device)
+        labels = labels.to(self.device)
 
         best_epoch = 0
         best_acc = 0.0
         cnt = 0
         best_state_dict = None
         # writer = SummaryWriter(
-        #     log_dir=f"logs/runs/{get_str_time()[:10]}/joint_{graph.name}_{split_id}_{self.h_feats}_{get_str_time()[11:]}"
+        #     log_dir=f"logs/runs/{get_str_time()[:10]}/joint_{name}_{split_id}_{self.h_feats}_{get_str_time()[11:]}"
         # )
 
         t_start = time.time()
         for epoch in range(self.n_epochs):
-
-            n = graph.num_nodes()
+            n = features.shape[0]
             shf = torch.randperm(n)
 
             loss_value = 0
@@ -200,8 +196,10 @@ class IGNN(nn.Module):
                     self.optimizer.zero_grad()
 
                     embeddings = self.forward(
+                        edge_index=edge_index,
+                        features=features,
+                        IN_config=IN_config,
                         batch_idx=batch_idx,
-                        graph=graph,
                         device=device,
                     )
                     logits = self.classifier(embeddings)
@@ -229,8 +227,10 @@ class IGNN(nn.Module):
                             batch_idx = idx[step : step + bs]
 
                             embeddings = self.forward(
+                                edge_index=edge_index,
+                                features=features,
+                                IN_config=IN_config,
                                 batch_idx=batch_idx,
-                                graph=graph,
                                 device=device,
                             )
                             logits = self.classifier(embeddings)
@@ -239,7 +239,7 @@ class IGNN(nn.Module):
                         pred_stack = torch.cat(pred_stack, dim=0)
 
                         train_acc, valid_acc, test_acc = metric(
-                            graph.name,
+                            IN_config.name,
                             logits=pred_stack,
                             labels=labels,
                             train_mask=train_mask,
@@ -249,8 +249,9 @@ class IGNN(nn.Module):
                 else:
                     pred_stack = torch.cat(pred_stack, dim=0)
 
+                    self.train(False)
                     train_acc, valid_acc, test_acc = metric(
-                        graph.name,
+                        IN_config.name,
                         logits=pred_stack,
                         labels=labels[shf],
                         train_mask=train_mask[shf],
@@ -263,8 +264,10 @@ class IGNN(nn.Module):
                 self.optimizer.zero_grad()
 
                 embeddings = self.forward(
+                    edge_index=edge_index,
+                    features=features,
+                    IN_config=IN_config,
                     batch_idx=None,
-                    graph=graph,
                     device=device,
                 )
 
@@ -283,7 +286,9 @@ class IGNN(nn.Module):
                     train_mask,
                     val_mask,
                     test_mask,
-                    graph=graph,
+                    edge_index,
+                    features,
+                    IN_config=IN_config,
                     batch_idx=None,
                 )
 
@@ -300,7 +305,7 @@ class IGNN(nn.Module):
                 cnt += 1
                 if cnt == self.estop_steps:
                     print(
-                        f"{graph.name} Early Stopping! Best Epoch: {best_epoch}, best val acc: {best_acc:.4f}, test acc: {best_acc_t:.4f}"
+                        f"{IN_config.name} Early Stopping! Best Epoch: {best_epoch}, best val acc: {best_acc:.4f}, test acc: {best_acc_t:.4f}"
                     )
                     break
 

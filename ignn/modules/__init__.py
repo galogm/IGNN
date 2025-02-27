@@ -1,7 +1,7 @@
 """Modules
 """
 
-from .Data import Data
-from .IGNN import IGNN_layer
+from .Conf import DataConf, INConf
+from .IGNN import IGNNConv
 from .MLP import MLP
 from .OrderedGating import ONGNNConv

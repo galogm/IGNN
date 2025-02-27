@@ -1,241 +1,385 @@
-norms = {
-    "chameleon": False,
-    "squirrel": True,
-    "actor": False,
-    "flickr": True,
-    "blogcatalog": True,
-    "roman-empire": False,
-    "amazon-ratings": True,
-    "photo": True,
-    "pubmed": True,
-    "wikics": False,
-    "arxiv": False,
-    "products": False,
-    "pokec": False,
-}
+"""Default Params.
+"""
 
-feats = {
-    "chameleon": 512,
-    "squirrel": 512,
-    "actor": 512,
-    "photo": 256,
-    "pubmed": 500,
-    "roman-empire": 300,
-    "amazon-ratings": 300,
-    "flickr": 512,
-    "blogcatalog": 512,
-    "wikics": 300,
-    "arxiv": 512,
-    "products": 512,
-    "pokec": 512,
-}
+from collections import defaultdict
 
-l2_coefs = {
-    "chameleon": 0.00005,
-    "squirrel": 0.00005,
-    "actor": 0.0000,
-    "pubmed": 0.00005,
-    "photo": 0.00005,
-    "roman-empire": 0.00005,
-    "amazon-ratings": 0.00005,
-    "flickr": 0.00005,
-    "blogcatalog": 0.00005,
-    "wikics": 0.00005,
-    "arxiv": 0.00005,
-    "products": 0.00005,
-    "pokec": 0.00005,
-}
+norms = defaultdict(
+    lambda: True,
+    {
+        "chameleon": False,
+        "squirrel": True,
+        "actor": False,
+        "flickr": True,
+        "blogcatalog": True,
+        "roman-empire": False,
+        "amazon-ratings": True,
+        "photo": True,
+        "pubmed": True,
+        "wikics": False,
+        "arxiv": False,
+        "products": False,
+        "pokec": False,
+    },
+)
 
-lrs = {
-    "chameleon": 0.001,
-    "squirrel": 0.001,
-    "actor": 0.001,
-    "pubmed": 0.001,
-    "photo": 0.001,
-    "roman-empire": 0.001,
-    "amazon-ratings": 0.001,
-    "flickr": 0.001,
-    "blogcatalog": 0.001,
-    "wikics": 0.001,
-    "arxiv": 0.001,
-    "products": 0.001,
-    "pokec": 0.001,
-}
+feats = defaultdict(
+    lambda: 512,
+    {
+        "chameleon": 512,
+        "squirrel": 512,
+        "actor": 512,
+        "photo": 256,
+        "pubmed": 500,
+        "roman-empire": 300,
+        "amazon-ratings": 300,
+        "flickr": 512,
+        "blogcatalog": 512,
+        "wikics": 300,
+        "arxiv": 512,
+        "products": 512,
+        "pokec": 512,
+    },
+)
 
-ess = {
-    "chameleon": 30,
-    "squirrel": 50,
-    "actor": 50,
-    "pubmed": 100,
-    "photo": 100,
-    "roman-empire": 300,
-    # "roman-empire": 100,
-    "amazon-ratings": 100,
-    "flickr": 100,
-    "blogcatalog": 100,
-    "wikics": 200,
-    "arxiv": 200,
-    "products": 200,
-    "pokec": 200,
-}
+l2_coefs = defaultdict(
+    lambda: 5e-5,
+    {
+        "chameleon": 5e-5,
+        "squirrel": 5e-5,
+        "actor": 0.0000,
+        "pubmed": 5e-5,
+        "photo": 5e-5,
+        "roman-empire": 5e-5,
+        "amazon-ratings": 5e-5,
+        "flickr": 5e-5,
+        "blogcatalog": 5e-5,
+        "wikics": 5e-5,
+        "arxiv": 5e-5,
+        "products": 5e-5,
+        "pokec": 5e-5,
+    },
+)
 
-nas_dropouts = {
-    "flickr": 0.8,
-    "blogcatalog": 0.8,
-    "chameleon": 0.8,
-    "squirrel": 0.8,
-    "actor": 0.0,
-    "pubmed": 0.2,
-    "photo": 0.4,
-    "roman-empire": 0.2,
-    "amazon-ratings": 0.0,
-    "wikics": 0.2,
-    "arxiv": 0.0,
-    "products": 0.0,
-    "pokec": 0.0,
-}
+lrs = defaultdict(
+    lambda: 0.001,
+    {
+        "chameleon": 0.001,
+        "squirrel": 0.001,
+        "actor": 0.001,
+        "pubmed": 0.001,
+        "photo": 0.001,
+        "roman-empire": 0.001,
+        "amazon-ratings": 0.001,
+        "flickr": 0.001,
+        "blogcatalog": 0.001,
+        "wikics": 0.001,
+        "arxiv": 0.001,
+        "products": 0.001,
+        "pokec": 0.001,
+    },
+)
 
-nss_dropouts = {
-    "flickr": 0.8,
-    "blogcatalog": 0.8,
-    "chameleon": 0.8,
-    "squirrel": 0.8,
-    "actor": 0.8,
-    "pubmed": 0.8,
-    "photo": 0.5,
-    "roman-empire": 0.2,
-    "amazon-ratings": 0.5,
-    "wikics": 0.5,
-    "arxiv": 0.8,
-    "products": 0.8,
-    "pokec": 0.8,
-}
+ess = defaultdict(
+    lambda: 100,
+    {
+        "chameleon": 30,
+        "squirrel": 50,
+        "actor": 50,
+        "pubmed": 100,
+        "photo": 100,
+        "roman-empire": 300,
+        # "roman-empire": 100,
+        "amazon-ratings": 100,
+        "flickr": 100,
+        "blogcatalog": 100,
+        "wikics": 200,
+        "arxiv": 200,
+        "products": 200,
+        "pokec": 200,
+    },
+)
 
-clf_dropouts = {
-    "flickr": 0.9,
-    "blogcatalog": 0.9,
-    "chameleon": 0.9,
-    "squirrel": 0.9,
-    "actor": 0.9,
-    "photo": 0.5,
-    "pubmed": 0.9,
-    "roman-empire": 0.2,
-    "amazon-ratings": 0.9,
-    "wikics": 0.9,
-    "arxiv": 0.5,
-    "products": 0.5,
-    "pokec": 0.5,
-}
+nas_dropouts = defaultdict(
+    lambda: 0.5,
+    {
+        "flickr": 0.8,
+        "blogcatalog": 0.8,
+        "chameleon": 0.8,
+        "squirrel": 0.8,
+        "actor": 0.0,
+        "pubmed": 0.2,
+        "photo": 0.4,
+        "roman-empire": 0.2,
+        "amazon-ratings": 0.0,
+        "wikics": 0.2,
+        "arxiv": 0.0,
+        "products": 0.0,
+        "pokec": 0.0,
+    },
+)
 
-n_hopss = {
-    "chameleon": 64,
-    "squirrel": 64,
-    "actor": 1,
-    "flickr": 10,
-    "blogcatalog": 10,
-    "roman-empire": 1,
-    "amazon-ratings": 10,
-    "photo": 10,
-    "pubmed": 4,
-    "wikics": 8,
-    "arxiv": 10,
-    "products": 10,
-    "pokec": 10,
-}
+nss_dropouts = defaultdict(
+    lambda: 0.8,
+    {
+        "flickr": 0.8,
+        "blogcatalog": 0.8,
+        "chameleon": 0.8,
+        "squirrel": 0.8,
+        "actor": 0.8,
+        "pubmed": 0.8,
+        "photo": 0.5,
+        "roman-empire": 0.2,
+        "amazon-ratings": 0.5,
+        "wikics": 0.5,
+        "arxiv": 0.8,
+        "products": 0.8,
+        "pokec": 0.8,
+    },
+)
 
-n_layerss = {
-    "chameleon": 1,
-    "squirrel": 1,
-    "actor": 1,
-    "flickr": 1,
-    "blogcatalog": 1,
-    # "roman-empire": 3,
-    "roman-empire": 5,
-    "amazon-ratings": 1,
-    "photo": 1,
-    "pubmed": 1,
-    "wikics": 1,
-    "arxiv": 1,
-    "products": 1,
-    "pokec": 1,
-}
+clf_dropouts = defaultdict(
+    lambda: 0.5,
+    {
+        "flickr": 0.9,
+        "blogcatalog": 0.9,
+        "chameleon": 0.9,
+        "squirrel": 0.9,
+        "actor": 0.9,
+        "photo": 0.5,
+        "pubmed": 0.9,
+        "roman-empire": 0.2,
+        "amazon-ratings": 0.9,
+        "wikics": 0.9,
+        "arxiv": 0.5,
+        "products": 0.5,
+        "pokec": 0.5,
+    },
+)
 
-RNs = {
-    "chameleon": "concat",
-    "squirrel": "concat",
-    "actor": "concat",
-    "flickr": "concat",
-    "blogcatalog": "concat",
-    "roman-empire": "concat",
-    "amazon-ratings": "concat",
-    "pubmed": "concat",
-    "photo": "concat",
-    "wikics": "concat",
-    "arxiv": "concat",
-    "products": "concat",
-    "pokec": "concat",
-}
+n_hopss = defaultdict(
+    lambda: 10,
+    {
+        "chameleon": 64,
+        "squirrel": 64,
+        "actor": 1,
+        "flickr": 10,
+        "blogcatalog": 10,
+        "roman-empire": 1,
+        "amazon-ratings": 10,
+        "photo": 10,
+        "pubmed": 4,
+        "wikics": 8,
+        "arxiv": 10,
+        "products": 10,
+        "pokec": 10,
+    },
+)
 
-acts = {
-    "chameleon": "relu",
-    "squirrel": "relu",
-    "actor": "relu",
-    "flickr": "relu",
-    "blogcatalog": "relu",
-    "roman-empire": "relu",
-    "amazon-ratings": "prelu",
-    "photo": "relu",
-    "pubmed": "relu",
-    "wikics": "relu",
-    "arxiv": "relu",
-    "products": "relu",
-    "pokec": "relu",
-}
+n_layerss = defaultdict(
+    lambda: 1,
+    {
+        "chameleon": 1,
+        "squirrel": 1,
+        "actor": 1,
+        "flickr": 1,
+        "blogcatalog": 1,
+        # "roman-empire": 3,
+        "roman-empire": 5,
+        "amazon-ratings": 1,
+        "photo": 1,
+        "pubmed": 1,
+        "wikics": 1,
+        "arxiv": 1,
+        "products": 1,
+        "pokec": 1,
+    },
+)
 
-layer_norms = {
-    "chameleon": True,
-    "squirrel": True,
-    "actor": True,
-    "flickr": True,
-    "blogcatalog": True,
-    "roman-empire": True,
-    "amazon-ratings": True,
-    "photo": True,
-    "pubmed": True,
-    "wikics": True,
-    "arxiv": True,
-    "products": True,
-    "pokec": True,
-}
+RNs = defaultdict(
+    lambda: "concat",
+    {
+        "chameleon": "concat",
+        "squirrel": "concat",
+        "actor": "concat",
+        "flickr": "concat",
+        "blogcatalog": "concat",
+        "roman-empire": "concat",
+        "amazon-ratings": "concat",
+        "pubmed": "concat",
+        "photo": "concat",
+        "wikics": "concat",
+        "arxiv": "concat",
+        "products": "concat",
+        "pokec": "concat",
+    },
+)
 
-layer_norms_att = {
-    "chameleon": False,
-    "squirrel": False,
-    "actor": True,
-    "flickr": False,
-    "blogcatalog": True,
-    "roman-empire": False,
-    "amazon-ratings": True,
-    "photo": True,
-    "pubmed": True,
-    "wikics": False,
-    "arxiv": False,
-    "products": False,
-    "pokec": False,
-}
+acts = defaultdict(
+    lambda: "relu",
+    {
+        "chameleon": "relu",
+        "squirrel": "relu",
+        "actor": "relu",
+        "flickr": "relu",
+        "blogcatalog": "relu",
+        "roman-empire": "relu",
+        "amazon-ratings": "prelu",
+        "photo": "relu",
+        "pubmed": "relu",
+        "wikics": "relu",
+        "arxiv": "relu",
+        "products": "relu",
+        "pokec": "relu",
+    },
+)
 
-self_loop_attentive = {
-    "chameleon": False,
-    "squirrel": False,
-    "actor": False,
-    "flickr": False,
-    "blogcatalog": False,
-    "roman-empire": False,
-    "amazon-ratings": False,
-    "photo": False,
-    "pubmed": False,
-    "wikics": False,
-    "arxiv": False,
-    "products": False,
-    "pokec": False,
+layer_norms = defaultdict(
+    lambda: True,
+    {
+        "chameleon": True,
+        "squirrel": True,
+        "actor": True,
+        "flickr": True,
+        "blogcatalog": True,
+        "roman-empire": True,
+        "amazon-ratings": True,
+        "photo": True,
+        "pubmed": True,
+        "wikics": True,
+        "arxiv": True,
+        "products": True,
+        "pokec": True,
+    },
+)
+
+layer_norms_att = defaultdict(
+    lambda: False,
+    {
+        "chameleon": False,
+        "squirrel": False,
+        "actor": True,
+        "flickr": False,
+        "blogcatalog": True,
+        "roman-empire": False,
+        "amazon-ratings": True,
+        "photo": True,
+        "pubmed": True,
+        "wikics": False,
+        "arxiv": False,
+        "products": False,
+        "pokec": False,
+    },
+)
+
+self_loop_attentive = defaultdict(
+    lambda: False,
+    {
+        "chameleon": False,
+        "squirrel": False,
+        "actor": False,
+        "flickr": False,
+        "blogcatalog": False,
+        "roman-empire": False,
+        "amazon-ratings": False,
+        "photo": False,
+        "pubmed": False,
+        "wikics": False,
+        "arxiv": False,
+        "products": False,
+        "pokec": False,
+    },
+)
+
+repeats = defaultdict(
+    lambda: 5,
+    {
+        "pokec": 5,
+        "arxiv": 5,
+        "products": 3,
+        "actor": 10,
+        "blogcatalog": 10,
+        "flickr": 10,
+        "squirrel": 10,
+        "chameleon": 10,
+        "roman-empire": 10,
+        "amazon-ratings": 10,
+        "photo": 10,
+        "pubmed": 10,
+        "wikics": 10,
+    },
+)
+
+DATASETS = {
+    "critical": [
+        # 890
+        "chameleon",
+        # 2,223
+        "squirrel",
+        # # 10,000
+        # "minesweeper",
+        # # 11,758
+        # "tolokers",
+        # # 22,662
+        # "roman-empire",
+        # # 24,492
+        # "amazon-ratings",
+        # 48,921
+        # "questions",
+    ],
+    "cola": [
+        "flickr",
+        "blogcatalog",
+    ],
+    "pyg": [
+        # "texas",
+        # "coRNell",
+        # "wisconsin",
+        # "corafull",
+        # "cora",
+        # "citeseer",
+        "photo",
+        "actor",
+        "pubmed",
+        "wikics",
+    ],
+    "Critical": [
+        # 22,662
+        "roman-empire",
+        # 24,492
+        "amazon-ratings",
+        # 48,921
+        # "questions",
+    ],
+    "ogb": [
+        "arxiv",
+        "proteins",
+    ],
+    "linkx": [
+        # (array([0, 1, 2]), array([ 97, 504, 361]))
+        # 962
+        "Reed98",
+        # # array([0, 1, 2]), array([ 418, 2153, 2609]
+        # # 5,180
+        "Johns Hopkins55",
+        # # (array([0, 1, 2]), array([ 203, 1015, 1017]))
+        # # 2,235
+        "Amherst41",
+        # # (array([0, 1, 2]), array([1838, 8135, 8687]))
+        # # 18,660
+        "CoRNell5",
+        # # 41,554
+        "Penn94",
+        # # 168,114
+        "twitch-gamers",
+        # 169,343
+        "arxiv-year",
+        # 421,961
+        "genius",
+        # # 1,632,803
+        "pokec",
+        # 2,923,922
+        "snap-patents",
+        # 1,925,342
+        "wiki",
+    ],
 }

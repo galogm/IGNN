@@ -3,7 +3,6 @@
 # pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals,invalid-name,too-many-statements
 import random
 import time
-import traceback
 
 import numpy as np
 import torch
@@ -25,10 +24,11 @@ from ignn.configs.params import (
     nas_dropouts,
     norms,
     nss_dropouts,
+    repeats,
     self_loop_attentive,
 )
 from ignn.models import IGNN
-from ignn.modules import Data
+from ignn.modules import DataConf, INConf
 from ignn.utils import get_splits, metric, parse_ignn_args, read_configs
 
 torch.set_printoptions(threshold=10_000)
@@ -53,6 +53,48 @@ def main(
     eval_start=1,
     return_type="dgl",
 ):
+    if return_type == "dgl":
+        graph, label, n_clusters = load_data(
+            dataset_name=dataset,
+            directory=DATA_INFO.DATA_DIR,
+            source=source,
+            row_normalize=norms[dataset],
+            rm_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
+            add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
+            # products and arxiv-year are already simple graphs
+            to_simple=dataset not in ["products", "arxiv-year"],
+            verbosity=1,
+            return_type=return_type,
+        )
+        n_nodes = graph.num_nodes()
+        edge_index = graph.edges()
+        features = graph.ndata["feat"]
+        name = graph.name
+    else:
+        data = load_data(
+            dataset_name=dataset,
+            directory=DATA_INFO.DATA_DIR,
+            source=source,
+            row_normalize=norms[dataset],
+            rm_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
+            add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
+            # products and arxiv-year are already simple graphs
+            to_simple=dataset not in ["products", "arxiv-year"],
+            verbosity=1,
+            return_type=return_type,
+        )
+        label = data.y
+        n_clusters = data.num_classes
+        n_nodes = data.num_nodes
+        edge_index = data.edge_index
+        features = data.x
+        name = data.name
+
+    labeled_idx = torch.where(label != -1)[0] if dataset in ["wiki", "Penn94", "pokec"] else None
+    n_clusters = 2 if dataset == "pokec" else n_clusters
+    n_clusters = n_clusters if dataset not in ["proteins"] else label.shape[1]
+
+    repeat = repeats[dataset.lower()]
 
     N_HOPS = n_hops if n_hops is not None else n_hopss[dataset]
     N_LAYERS = (
@@ -65,6 +107,15 @@ def main(
     DNAS = nas_dropout if nas_dropout is not None else nas_dropouts[dataset]
     DNSS = nss_dropout if nss_dropout is not None else nss_dropouts[dataset]
     DCLF = clf_dropout if clf_dropout is not None else clf_dropouts[dataset]
+    IN_config = INConf(
+        n_hops=N_HOPS,
+        add_self_loop=True,
+        remove_self_loop=False,
+        symm_norm=True,
+        row_normalized=norms[dataset],
+        fast=False,
+        name=name,
+    )
     params = {
         "IN": IN,
         "RN": RN if RN is not None else RNs[dataset],
@@ -84,75 +135,12 @@ def main(
         "transform_first": False,
     }
     params_all = {
-        "row_normalized": norms[dataset],
         "bs": BATCH_SIZE,
         "eval_start": eval_start,
+        "IN_config": IN_config,
         **params,
     }
     tab_printer({**params_all})
-
-    if return_type == "dgl":
-        graph, label, n_clusters = load_data(
-            dataset_name=dataset,
-            directory=DATA.DATA_DIR,
-            source=source,
-            row_normalize=norms[dataset],
-            rm_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
-            add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
-            # products and arxiv-year are already simple graphs
-            to_simple=dataset not in ["products", "arxiv-year"],
-            verbosity=1,
-            return_type=return_type,
-        )
-    else:
-        data = load_data(
-            dataset_name=dataset,
-            directory=DATA.DATA_DIR,
-            source=source,
-            row_normalize=norms[dataset],
-            rm_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
-            add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
-            # products and arxiv-year are already simple graphs
-            to_simple=dataset not in ["products", "arxiv-year"],
-            verbosity=1,
-            return_type=return_type,
-        )
-        label = data.y
-        n_clusters = data.num_classes
-
-    labeled_idx = (
-        torch.where(label != -1)[0]
-        if dataset
-        in [
-            "wiki",
-            "Penn94",
-            "pokec",
-        ]
-        else None
-    )
-    n_clusters = 2 if dataset == "pokec" else n_clusters
-
-    repeat = (
-        {
-            "pokec": 5,
-            "arxiv": 3,
-            "products": 3,
-        }[dataset]
-        if dataset
-        in [
-            "pokec",
-            "arxiv",
-            "products",
-            "proteins",
-            "wiki",
-            "twitch-gamers",
-            "snap-patents",
-            "arxiv-year",
-            "genius",
-            "Penn94",
-        ]
-        else 10
-    )
 
     t_start = time.time()
 
@@ -160,102 +148,77 @@ def main(
 
     res_list_acc_joint = []
 
-    tms = {
-        "model": "IGNN",
-        "dataset": dataset,
-        "hops": N_HOPS,
-        "0": 0,
-        "1": 0,
-        "2": 0,
-        "3": 0,
-        "4": 0,
-        "5": 0,
-        "6": 0,
-        "7": 0,
-        "8": 0,
-        "9": 0,
-        "mean": 0,
-    }
+    tms = {"model": "IGNN", "dataset": dataset, "hops": N_HOPS}
     ts = []
 
     for i in range(repeat):
-        graph.split = i
         # set_seed(seed_list[i])
-        model = IGNN(
-            in_feats=graph.ndata["feat"].shape[1],
-            n_clusters=n_clusters if dataset not in ["proteins"] else label.shape[1],
-            device=DEVICE,
-            **params,
-        )
+        model = IGNN(in_feats=features.shape[1], n_clusters=n_clusters, device=DEVICE, **params)
 
         train_mask, val_mask, test_mask = get_splits(
-            graph,
-            label,
+            graph.ndata if return_type == "dgl" else data,
+            name,
+            n_nodes,
             i,
             TRAIN_RATIO=TRAIN_RATIO,
             VALID_RATIO=VALID_RATIO,
-            DATA=DATA,
+            DATA=DATA_INFO,
             labeled_idx=labeled_idx,
         )
 
         tm = model.fit(
-            graph=graph,
+            edge_index=edge_index,
+            features=features,
             labels=label,
             train_mask=train_mask,
             val_mask=val_mask,
             test_mask=test_mask,
-            split_id=i,
             bs=BATCH_SIZE,
+            IN_config=IN_config,
             device=DEVICE,
             eval_start=eval_start,
         )
 
         with torch.no_grad():
+            model.train(False)
             if BATCH_SIZE is not None:
                 pred_stack = []
-                idx = torch.LongTensor(list(range(graph.num_nodes())))
-                for _, step in enumerate(range(0, graph.num_nodes(), BATCH_SIZE)):
+                idx = torch.LongTensor(list(range(n_nodes)))
+                for _, step in enumerate(range(0, n_nodes, BATCH_SIZE)):
                     batch_idx = idx[step : step + BATCH_SIZE]
 
                     embeddings = model(
+                        edge_index=edge_index,
+                        features=features,
+                        IN_config=IN_config,
                         batch_idx=batch_idx,
-                        graph=graph,
                         device=DEVICE,
                     )
                     logits = model.classifier(embeddings)
                     pred_stack.append(logits)
 
                 y_pred = torch.cat(pred_stack, dim=0)
-
                 train_acc, val_acc, res = metric(
-                    graph.name,
-                    logits=y_pred,
-                    labels=label,
-                    train_mask=train_mask,
-                    val_mask=val_mask,
-                    test_mask=test_mask,
+                    name, y_pred, label, train_mask, val_mask, test_mask
                 )
             else:
                 embeddings = model(
-                    graph=graph,
+                    edge_index=edge_index,
+                    features=features,
+                    IN_config=IN_config,
                     device=DEVICE,
                 )
                 y_pred = model.classifier(embeddings)
 
                 train_acc, val_acc, res = metric(
-                    graph.name,
-                    logits=y_pred,
-                    labels=label,
-                    train_mask=train_mask,
-                    val_mask=val_mask,
-                    test_mask=test_mask,
+                    name, y_pred, label, train_mask, val_mask, test_mask
                 )
 
         tms[f"{i}"] = tm
         ts.append(tm)
 
         res_list_acc_joint.append(res)
-        print(f"{graph.name} {i} res: {res}\n\n")
+        print(f"{name} {i} res: {res}\n\n")
 
     save_to_csv_files(
         results={**tms},
@@ -269,13 +232,8 @@ def main(
 
     print(f"\nResults: \tAcc:{acc_jl} \tTrain cost: {elapsed_time}s")
     save_to_csv_files(
-        results={
-            "acc_hl": acc_jl,
-            "hop": N_HOPS,
-        },
-        insert_info={
-            "dataset": dataset,
-        },
+        results={"acc_hl": acc_jl, "hop": N_HOPS},
+        insert_info={"dataset": dataset},
         append_info={
             "args": params_all,
             "time": elapsed_time,
@@ -289,133 +247,30 @@ def main(
 
 if __name__ == "__main__":
 
-    DATASETS = {
-        "critical": [
-            # 890
-            "chameleon",
-            # 2,223
-            "squirrel",
-            # # 10,000
-            # "minesweeper",
-            # # 11,758
-            # "tolokers",
-            # # 22,662
-            # "roman-empire",
-            # # 24,492
-            # "amazon-ratings",
-            # 48,921
-            # "questions",
-        ],
-        "cola": [
-            "flickr",
-            "blogcatalog",
-        ],
-        "pyg": [
-            # "texas",
-            # "coRNell",
-            # "wisconsin",
-            # "corafull",
-            # "cora",
-            # "citeseer",
-            "photo",
-            "actor",
-            "pubmed",
-            "wikics",
-        ],
-        "Critical": [
-            # 22,662
-            "roman-empire",
-            # 24,492
-            "amazon-ratings",
-            # 48,921
-            # "questions",
-        ],
-        "ogb": [
-            "arxiv",
-            "proteins",
-        ],
-        "linkx": [
-            # (array([0, 1, 2]), array([ 97, 504, 361]))
-            # 962
-            "Reed98",
-            # # array([0, 1, 2]), array([ 418, 2153, 2609]
-            # # 5,180
-            "Johns Hopkins55",
-            # # (array([0, 1, 2]), array([ 203, 1015, 1017]))
-            # # 2,235
-            "Amherst41",
-            # # (array([0, 1, 2]), array([1838, 8135, 8687]))
-            # # 18,660
-            "CoRNell5",
-            # # 41,554
-            "Penn94",
-            # # 168,114
-            "twitch-gamers",
-            # 169,343
-            "arxiv-year",
-            # 421,961
-            "genius",
-            # # 1,632,803
-            "pokec",
-            # 2,923,922
-            "snap-patents",
-            # 1,925,342
-            "wiki",
-        ],
-    }
-    TRAIN_RATIO = 48
-    VALID_RATIO = 32
-
     args = parse_ignn_args()
 
+    TRAIN_RATIO = 48
+    VALID_RATIO = 32
     VERSION = args.version
     DEVICE = set_device(str(args.gpu_id))
     set_seed(args.seed)
+    DATA_INFO = DataConf(**read_configs("data"))
 
-    DATA = Data(**read_configs("data"))
-
-    if args.dataset != "all":
-        main(
-            dataset=args.dataset,
-            source=args.source,
-            h_feats=args.h_feats,
-            MODEL=args.model,
-            BATCH_SIZE=args.batch_size,
-            IN=args.IN,
-            RN=args.RN,
-            n_hops=args.n_hops,
-            n_layers=args.n_layers,
-            lr=args.lr,
-            l2_coef=args.l2_coef,
-            nas_dropout=args.nas_dropout,
-            nss_dropout=args.nss_dropout,
-            clf_dropout=args.clf_dropout,
-            eval_start=args.eval_start,
-            return_type=args.return_type,
-        )
-    else:
-        for _source, datasets in DATASETS.items():
-            for _dataset in datasets:
-                _source = _source.lower()
-                try:
-                    main(
-                        dataset=_dataset,
-                        source=_source,
-                        h_feats=args.h_feats,
-                        MODEL=args.model,
-                        BATCH_SIZE=args.batch_size,
-                        IN=args.IN,
-                        RN=args.RN,
-                        n_hops=args.n_hops,
-                        n_layers=args.n_layers,
-                        lr=args.lr,
-                        l2_coef=args.l2_coef,
-                        nas_dropout=args.nas_dropout,
-                        nss_dropout=args.nss_dropout,
-                        clf_dropout=args.clf_dropout,
-                        eval_start=args.eval_start,
-                        return_type=args.return_type,
-                    )
-                except Exception as e:
-                    traceback.print_exc()
-                    continue
+    main(
+        dataset=args.dataset,
+        source=args.source,
+        h_feats=args.h_feats,
+        MODEL=args.model,
+        BATCH_SIZE=args.batch_size,
+        IN=args.IN,
+        RN=args.RN,
+        n_hops=args.n_hops,
+        n_layers=args.n_layers,
+        lr=args.lr,
+        l2_coef=args.l2_coef,
+        nas_dropout=args.nas_dropout,
+        nss_dropout=args.nss_dropout,
+        clf_dropout=args.clf_dropout,
+        eval_start=args.eval_start,
+        return_type=args.return_type,
+    )

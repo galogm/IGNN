@@ -168,14 +168,14 @@ def parse_ignn_args() -> argparse.Namespace:
         "-d",
         "--dataset",
         type=str,
-        default=None,
+        default="actor",
         help="dataset",
     )
     parser.add_argument(
         "-s",
         "--source",
         type=str,
-        default=None,
+        default="dgl",
         help="source",
     )
     parser.add_argument(
