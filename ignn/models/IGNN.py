@@ -1,6 +1,6 @@
 """IGNN"""
 
-# pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals
+# pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals,invalid-name,too-many-branches,too-many-statements
 import copy
 import time
 
@@ -47,16 +47,13 @@ class IGNN(nn.Module):
     ) -> None:
         super().__init__()
 
+        # pylint: disable=consider-iterating-dictionary
         assert loss in losses.keys(), f"loss should be in {losses.keys()}"
 
         self.nss_dropout = nss_dropout
-
-        # IGNN
         self.n_epochs = n_epochs
         self.h_feats = h_feats
         self.l2_coef = l2_coef
-
-        # URL
         self.lr = lr
         self.estop_steps = early_stop
         self.n_clusters = n_clusters
@@ -114,7 +111,12 @@ class IGNN(nn.Module):
         batch_idx=None,
         device=None,
     ):
-        z_ignn = self.ignn(graph=graph, device=device, batch_idx=batch_idx)
+        z_ignn = self.ignn(
+            graph=graph,
+            features=graph.ndata["feat"],
+            batch_idx=batch_idx,
+            device=device,
+        )
 
         return z_ignn
 

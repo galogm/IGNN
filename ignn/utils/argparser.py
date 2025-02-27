@@ -41,13 +41,13 @@ def set_args_wrt_dataset(args, args_dict):
     #     cfg_file = f.read()
     cfg_dict = read_configs(args_dict["model"])[args_dict["dataset"]]
     for k, v in cfg_dict.items():
-        args.__setattr__(k, v)
+        setattr(args, k, v)
     return args
 
 
-def read_configs(type: str = None) -> Dict:
+def read_configs(_type: str = None) -> Dict:
     pkg_dir = get_pkg_dir()
-    config_path: PurePath = Path(f"{pkg_dir}/configs/{type}.yaml")
+    config_path: PurePath = Path(f"{pkg_dir}/configs/{_type}.yaml")
     if not config_path.exists():
         return {}
     with open(config_path, encoding="utf-8") as f:
@@ -177,6 +177,13 @@ def parse_ignn_args() -> argparse.Namespace:
         type=str,
         default=None,
         help="source",
+    )
+    parser.add_argument(
+        "-r",
+        "--return_type",
+        type=str,
+        default="dgl",
+        help="return_type",
     )
     parser.add_argument(
         "-m",

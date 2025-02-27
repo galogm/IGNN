@@ -1,6 +1,6 @@
 """IGNN"""
 
-# pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals
+# pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals,invalid-name,too-many-statements
 import random
 import time
 import traceback
@@ -51,45 +51,8 @@ def main(
     nss_dropout=None,
     clf_dropout=None,
     eval_start=1,
+    return_type="dgl",
 ):
-    graph, label, n_clusters = load_data(
-        dataset_name=dataset,
-        directory=DATA.DATA_DIR,
-        source=source,
-        row_normalize=norms[dataset],
-        rm_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
-        add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
-        # products and arxiv-year are already simple graphs
-        to_simple=True if dataset not in ["products", "arxiv-year"] else False,
-        verbosity=3,
-    )
-
-    repeat = (
-        {
-            "pokec": 5,
-            "arxiv": 3,
-            "products": 3,
-        }[dataset]
-        if dataset
-        in [
-            "pokec",
-            "arxiv",
-            "products",
-            "proteins",
-            "wiki",
-            "twitch-gamers",
-            "snap-patents",
-            "arxiv-year",
-            "genius",
-            "Penn94",
-        ]
-        else 10
-    )
-
-    labeled_idx = None
-    if dataset in ["wiki", "Penn94", "pokec"]:
-        labeled_idx = torch.where(label != -1)[0]
-        n_clusters = 2 if dataset == "pokec" else n_clusters
 
     N_HOPS = n_hops if n_hops is not None else n_hopss[dataset]
     N_LAYERS = (
@@ -128,15 +91,78 @@ def main(
     }
     tab_printer({**params_all})
 
+    if return_type == "dgl":
+        graph, label, n_clusters = load_data(
+            dataset_name=dataset,
+            directory=DATA.DATA_DIR,
+            source=source,
+            row_normalize=norms[dataset],
+            rm_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
+            add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
+            # products and arxiv-year are already simple graphs
+            to_simple=dataset not in ["products", "arxiv-year"],
+            verbosity=1,
+            return_type=return_type,
+        )
+    else:
+        data = load_data(
+            dataset_name=dataset,
+            directory=DATA.DATA_DIR,
+            source=source,
+            row_normalize=norms[dataset],
+            rm_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
+            add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
+            # products and arxiv-year are already simple graphs
+            to_simple=dataset not in ["products", "arxiv-year"],
+            verbosity=1,
+            return_type=return_type,
+        )
+        label = data.y
+        n_clusters = data.num_classes
+
+    labeled_idx = (
+        torch.where(label != -1)[0]
+        if dataset
+        in [
+            "wiki",
+            "Penn94",
+            "pokec",
+        ]
+        else None
+    )
+    n_clusters = 2 if dataset == "pokec" else n_clusters
+
+    repeat = (
+        {
+            "pokec": 5,
+            "arxiv": 3,
+            "products": 3,
+        }[dataset]
+        if dataset
+        in [
+            "pokec",
+            "arxiv",
+            "products",
+            "proteins",
+            "wiki",
+            "twitch-gamers",
+            "snap-patents",
+            "arxiv-year",
+            "genius",
+            "Penn94",
+        ]
+        else 10
+    )
+
     t_start = time.time()
 
     seed_list = [random.randint(0, 99999) for i in range(repeat)]
 
     res_list_acc_joint = []
-    print("train_mask exists:", "train_mask" in graph.ndata)
 
     tms = {
         "model": "IGNN",
+        "dataset": dataset,
         "hops": N_HOPS,
         "0": 0,
         "1": 0,
@@ -151,6 +177,7 @@ def main(
         "mean": 0,
     }
     ts = []
+
     for i in range(repeat):
         graph.split = i
         # set_seed(seed_list[i])
@@ -185,7 +212,6 @@ def main(
 
         with torch.no_grad():
             if BATCH_SIZE is not None:
-                model.train(False)
                 pred_stack = []
                 idx = torch.LongTensor(list(range(graph.num_nodes())))
                 for _, step in enumerate(range(0, graph.num_nodes(), BATCH_SIZE)):
@@ -210,7 +236,6 @@ def main(
                     test_mask=test_mask,
                 )
             else:
-                model.train(False)
                 embeddings = model(
                     graph=graph,
                     device=DEVICE,
@@ -366,15 +391,16 @@ if __name__ == "__main__":
             nss_dropout=args.nss_dropout,
             clf_dropout=args.clf_dropout,
             eval_start=args.eval_start,
+            return_type=args.return_type,
         )
     else:
-        for source, datasets in DATASETS.items():
-            for dataset in datasets:
-                source = source.lower()
+        for _source, datasets in DATASETS.items():
+            for _dataset in datasets:
+                _source = _source.lower()
                 try:
                     main(
-                        dataset=dataset,
-                        source=source,
+                        dataset=_dataset,
+                        source=_source,
                         h_feats=args.h_feats,
                         MODEL=args.model,
                         BATCH_SIZE=args.batch_size,
@@ -388,6 +414,7 @@ if __name__ == "__main__":
                         nss_dropout=args.nss_dropout,
                         clf_dropout=args.clf_dropout,
                         eval_start=args.eval_start,
+                        return_type=args.return_type,
                     )
                 except Exception as e:
                     traceback.print_exc()
