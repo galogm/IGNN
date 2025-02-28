@@ -10,7 +10,6 @@ from ogb.nodeproppred import Evaluator
 from sklearn.metrics import accuracy_score as ACC
 from sklearn.metrics import roc_auc_score
 from the_utils import onetime_reminder
-from torch_sparse import SparseTensor
 
 evaluators = {
     "products_ogb": Evaluator(name="ogbn-products"),
@@ -22,9 +21,9 @@ def metric(
     name,
     logits,
     labels,
-    train_mask,
-    val_mask,
-    test_mask,
+    train_mask=None,
+    val_mask=None,
+    test_mask=None,
 ):
     if name in [
         "Penn94_linxk",
@@ -49,54 +48,66 @@ def metric(
         "proteins_ogb",
         "genius_linkx",
     ):
-        y_pred = torch.argmax(logits, dim=1)
+        y_pred = torch.argmax(logits, dim=1, keepdim=True)
 
-        if name in evaluators.keys():
+        if name in evaluators:
             onetime_reminder(f"Evaluate {name} with OGB Evaluator.\n")
+            if train_mask is None:
+                return evaluators[name].eval(
+                    {
+                        "y_true": labels.unsqueeze(1),
+                        "y_pred": y_pred,
+                    }
+                )["acc"]
+
             train_acc = evaluators[name].eval(
                 {
                     "y_true": labels[train_mask].cpu().unsqueeze(1),
-                    "y_pred": y_pred[train_mask].cpu().unsqueeze(1),
+                    "y_pred": y_pred[train_mask].cpu(),
                 }
             )["acc"]
 
             valid_acc = evaluators[name].eval(
                 {
                     "y_true": labels[val_mask].cpu().unsqueeze(1),
-                    "y_pred": y_pred[val_mask].cpu().unsqueeze(1),
+                    "y_pred": y_pred[val_mask].cpu(),
                 }
             )["acc"]
 
             test_acc = evaluators[name].eval(
                 {
                     "y_true": labels[test_mask].cpu().unsqueeze(1),
-                    "y_pred": y_pred[test_mask].cpu().unsqueeze(1),
+                    "y_pred": y_pred[test_mask].cpu(),
                 }
             )["acc"]
             return train_acc, valid_acc, test_acc
 
         onetime_reminder(f"Evaluate {name} with ACC.\n")
+        if train_mask is None:
+            return ACC(labels, y_pred)
         return (
             ACC(labels[train_mask].cpu(), y_pred[train_mask].cpu()),
             ACC(labels[val_mask].cpu(), y_pred[val_mask].cpu()),
             ACC(labels[test_mask].cpu(), y_pred[test_mask].cpu()),
         )
-    else:
-        onetime_reminder(f"Evaluate {name} with ROCAUC.\n")
-        return (
-            eval_rocauc(
-                labels[train_mask].cpu().numpy(),
-                logits[train_mask].cpu().numpy(),
-            )["rocauc"],
-            eval_rocauc(
-                labels[val_mask].cpu().numpy(),
-                logits[val_mask].cpu().numpy(),
-            )["rocauc"],
-            eval_rocauc(
-                labels[test_mask].cpu().numpy(),
-                logits[test_mask].cpu().numpy(),
-            )["rocauc"],
-        )
+
+    onetime_reminder(f"Evaluate {name} with ROCAUC.\n")
+    if train_mask is None:
+        return eval_rocauc(labels, logits)["rocauc"]
+    return (
+        eval_rocauc(
+            labels[train_mask].cpu().numpy(),
+            logits[train_mask].cpu().numpy(),
+        )["rocauc"],
+        eval_rocauc(
+            labels[val_mask].cpu().numpy(),
+            logits[val_mask].cpu().numpy(),
+        )["rocauc"],
+        eval_rocauc(
+            labels[test_mask].cpu().numpy(),
+            logits[test_mask].cpu().numpy(),
+        )["rocauc"],
+    )
 
 
 def eval_rocauc(y_true, y_pred):

@@ -6,8 +6,11 @@ import time
 
 import numpy as np
 import torch
+import torch_geometric.transforms as T
 from graph_datasets import load_data
 from the_utils import save_to_csv_files, set_device, set_seed, tab_printer
+from torch_geometric.loader import RandomNodeLoader
+from tqdm import tqdm
 
 from ignn.configs.params import (
     RNs,
@@ -40,55 +43,35 @@ def main(
     source,
     h_feats,
     MODEL,
-    BATCH_SIZE=None,
-    IN=None,
-    RN=None,
-    n_hops=None,
-    n_layers=None,
-    lr=None,
-    l2_coef=None,
-    nas_dropout=None,
-    nss_dropout=None,
-    clf_dropout=None,
+    IN,
+    RN,
+    n_hops,
+    n_layers=1,
+    lr=0.001,
+    l2_coef=5e-5,
+    nas_dropout=0.0,
+    nss_dropout=0.0,
+    clf_dropout=0.0,
     eval_start=1,
-    return_type="dgl",
 ):
-    if return_type == "dgl":
-        graph, label, n_clusters = load_data(
-            dataset_name=dataset,
-            directory=DATA_INFO.DATA_DIR,
-            source=source,
-            row_normalize=norms[dataset],
-            rm_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
-            add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
-            # products and arxiv-year are already simple graphs
-            to_simple=dataset not in ["products", "arxiv-year"],
-            verbosity=1,
-            return_type=return_type,
-        )
-        n_nodes = graph.num_nodes()
-        edge_index = graph.edges()
-        features = graph.ndata["feat"]
-        name = graph.name
-    else:
-        data = load_data(
-            dataset_name=dataset,
-            directory=DATA_INFO.DATA_DIR,
-            source=source,
-            row_normalize=norms[dataset],
-            rm_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
-            add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
-            # products and arxiv-year are already simple graphs
-            to_simple=dataset not in ["products", "arxiv-year"],
-            verbosity=1,
-            return_type=return_type,
-        )
-        label = data.y
-        n_clusters = data.num_classes
-        n_nodes = data.num_nodes
-        edge_index = data.edge_index
-        features = data.x
-        name = data.name
+    data = load_data(
+        dataset_name=dataset,
+        source=source,
+        directory=DATA_INFO.DATA_DIR,
+        row_normalize=norms[dataset],
+        rm_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
+        add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
+        # products and arxiv-year are already simple graphs
+        to_simple=dataset not in ["products", "arxiv-year"],
+        verbosity=1,
+        return_type="pyg",
+    )
+    label = data.y
+    n_clusters = data.num_classes
+    n_nodes = data.num_nodes
+    edge_index = data.edge_index
+    features = data.x
+    name = data.name
 
     labeled_idx = torch.where(label != -1)[0] if dataset in ["wiki", "Penn94", "pokec"] else None
     n_clusters = 2 if dataset == "pokec" else n_clusters
@@ -135,7 +118,6 @@ def main(
         "transform_first": False,
     }
     params_all = {
-        "bs": BATCH_SIZE,
         "eval_start": eval_start,
         "IN_config": IN_config,
         **params,
@@ -155,51 +137,92 @@ def main(
         # set_seed(seed_list[i])
         model = IGNN(in_feats=features.shape[1], n_clusters=n_clusters, device=DEVICE, **params)
 
-        train_mask, val_mask, test_mask = get_splits(
-            graph.ndata if return_type == "dgl" else data,
-            name,
-            n_nodes,
-            i,
-            TRAIN_RATIO=TRAIN_RATIO,
-            VALID_RATIO=VALID_RATIO,
-            DATA=DATA_INFO,
-            labeled_idx=labeled_idx,
-        )
+        train_mask = val_mask = test_mask = train_loader = test_loader = None
+        batch_list = ["products_ogb", "pokec_linkx"]
+        transform = T.Compose([T.ToDevice(DEVICE), T.ToSparseTensor()])
+        if name in batch_list:
+            if name == "pokec_linkx":
+                data["train_mask"], data["val_mask"], data["test_mask"] = get_splits(
+                    data,
+                    name,
+                    n_nodes,
+                    i,
+                    TRAIN_RATIO=TRAIN_RATIO,
+                    VALID_RATIO=VALID_RATIO,
+                    DATA=DATA_INFO,
+                    labeled_idx=labeled_idx,
+                )
+            train_loader = RandomNodeLoader(
+                data,
+                num_parts={"products_ogb": 5, "pokec_linkx": 7}[name],
+                shuffle=True,
+                num_workers=5,
+            )
+            # Increase the num_parts of the test loader if you cannot fit
+            # the full batch graph into your GPU:
+            test_loader = RandomNodeLoader(
+                data, num_parts={"products_ogb": 1, "pokec_linkx": 1}[name], num_workers=5
+            )
+        else:
+            train_mask, val_mask, test_mask = get_splits(
+                data,
+                name,
+                n_nodes,
+                i,
+                TRAIN_RATIO=TRAIN_RATIO,
+                VALID_RATIO=VALID_RATIO,
+                DATA=DATA_INFO,
+                labeled_idx=labeled_idx,
+            )
 
         tm = model.fit(
             edge_index=edge_index,
             features=features,
             labels=label,
+            IN_config=IN_config,
+            train_loader=train_loader,
+            test_loader=test_loader,
             train_mask=train_mask,
             val_mask=val_mask,
             test_mask=test_mask,
-            bs=BATCH_SIZE,
-            IN_config=IN_config,
             device=DEVICE,
             eval_start=eval_start,
         )
 
         with torch.no_grad():
             model.train(False)
-            if BATCH_SIZE is not None:
-                pred_stack = []
-                idx = torch.LongTensor(list(range(n_nodes)))
-                for _, step in enumerate(range(0, n_nodes, BATCH_SIZE)):
-                    batch_idx = idx[step : step + BATCH_SIZE]
-
+            if test_loader is not None:
+                y_true = {"train": [], "val": [], "test": []}
+                y_pred = {"train": [], "val": [], "test": []}
+                for data in tqdm(test_loader, "test step"):
+                    data = transform(data)
                     embeddings = model(
-                        edge_index=edge_index,
-                        features=features,
+                        edge_index=data.adj_t,
+                        features=data.x,
                         IN_config=IN_config,
-                        batch_idx=batch_idx,
                         device=DEVICE,
+                        fast=False,
                     )
                     logits = model.classifier(embeddings)
-                    pred_stack.append(logits)
+                    for split in ["train", "val", "test"]:
+                        mask = data[f"{split}_mask"]
+                        y_true[split].append(data.y[mask].cpu())
+                        y_pred[split].append(logits[mask].cpu())
 
-                y_pred = torch.cat(pred_stack, dim=0)
-                train_acc, val_acc, res = metric(
-                    name, y_pred, label, train_mask, val_mask, test_mask
+                train_acc = metric(
+                    name,
+                    logits=torch.cat(y_pred["train"], dim=0),
+                    labels=torch.cat(y_true["train"], dim=0),
+                )
+                valid_acc = metric(
+                    name,
+                    logits=torch.cat(y_pred["val"], dim=0),
+                    labels=torch.cat(y_true["val"], dim=0),
+                )
+                test_acc = metric(
+                    name,
+                    logits=torch.cat(y_pred["test"], dim=0),
+                    labels=torch.cat(y_true["test"], dim=0),
                 )
             else:
                 embeddings = model(
@@ -210,15 +233,15 @@ def main(
                 )
                 y_pred = model.classifier(embeddings)
 
-                train_acc, val_acc, res = metric(
+                train_acc, val_acc, test_acc = metric(
                     name, y_pred, label, train_mask, val_mask, test_mask
                 )
 
         tms[f"{i}"] = tm
         ts.append(tm)
 
-        res_list_acc_joint.append(res)
-        print(f"{name} {i} res: {res}\n\n")
+        res_list_acc_joint.append(test_acc)
+        print(f"{name} {i} res: {test_acc}\n\n")
 
     save_to_csv_files(
         results={**tms},
@@ -239,7 +262,6 @@ def main(
             "time": elapsed_time,
             "source": source,
             "model": MODEL,
-            "bs": BATCH_SIZE,
         },
         csv_name=f"results_v{VERSION}.csv",
     )
@@ -261,7 +283,6 @@ if __name__ == "__main__":
         source=args.source,
         h_feats=args.h_feats,
         MODEL=args.model,
-        BATCH_SIZE=args.batch_size,
         IN=args.IN,
         RN=args.RN,
         n_hops=args.n_hops,
@@ -272,5 +293,4 @@ if __name__ == "__main__":
         nss_dropout=args.nss_dropout,
         clf_dropout=args.clf_dropout,
         eval_start=args.eval_start,
-        return_type=args.return_type,
     )

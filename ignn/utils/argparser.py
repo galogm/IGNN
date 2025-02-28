@@ -221,13 +221,6 @@ def parse_ignn_args() -> argparse.Namespace:
         help="version",
     )
     parser.add_argument(
-        "-b",
-        "--batch_size",
-        type=lambda x: None if x == "None" else int(x),
-        default=None,
-        help="batch size",
-    )
-    parser.add_argument(
         "-hops",
         "--n_hops",
         type=lambda x: None if x == "None" else int(x),

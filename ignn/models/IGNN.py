@@ -5,6 +5,7 @@ import copy
 import time
 
 import torch
+import torch_geometric.transforms as T
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -113,36 +114,25 @@ class IGNN(nn.Module):
         edge_index,
         features,
         IN_config: INConf,
-        batch_idx=None,
     ):
-        self.train(False)
         with torch.no_grad():
+            self.train(False)
             embeddings = self.forward(
-                edge_index=edge_index,
-                features=features,
-                IN_config=IN_config,
-                device=self.device,
-                batch_idx=batch_idx,
+                edge_index=edge_index, features=features, IN_config=IN_config, device=self.device
             )
             logits = self.classifier(embeddings)
 
             return metric(IN_config.name, logits, labels, train_mask, val_mask, test_mask)
 
-    def forward(
-        self,
-        edge_index,
-        features,
-        IN_config: INConf,
-        batch_idx=None,
-        device=None,
-    ):
+    def forward(self, edge_index, features, IN_config: INConf, device=None, fast=None):
         H = None
         for i, ignnconv in enumerate(self.ignnconvs):
             H = ignnconv(
                 edge_index,
                 features=features if i == 0 else H,
-                IN_config=INConf(**{**IN_config.__dict__, "fast": i == 0}),
-                batch_idx=batch_idx,
+                IN_config=INConf(
+                    **{**IN_config.__dict__, "fast": i == 0 if fast is None else fast}
+                ),
                 device=device,
             )
 
@@ -153,17 +143,20 @@ class IGNN(nn.Module):
         edge_index,
         features,
         labels,
-        train_mask,
-        val_mask,
-        test_mask,
         IN_config: INConf,
-        bs=None,
+        train_loader=None,
+        test_loader=None,
+        train_mask=None,
+        val_mask=None,
+        test_mask=None,
         device: torch.device = torch.device("cpu"),
         eval_start=1000,
     ):
+        transform = T.Compose([T.ToDevice(device), T.ToSparseTensor()])
         self.device = device
         self.to(self.device)
         labels = labels.to(self.device)
+        name = IN_config.name
 
         best_epoch = 0
         best_acc = 0.0
@@ -175,100 +168,102 @@ class IGNN(nn.Module):
 
         t_start = time.time()
         for epoch in range(self.n_epochs):
-            n = features.shape[0]
-            shf = torch.randperm(n)
-
             loss_value = 0
             loss_val_value = 0
             loss_test_value = 0
 
-            if bs is not None:
-                pred_stack = []
-                for step in tqdm(range(0, n, bs), "training step"):
-                    batch_idx = shf[step : step + bs]
-
-                    batch_labels = labels[batch_idx]
-                    batch_train_mask = train_mask[batch_idx]
-                    batch_val_mask = val_mask[batch_idx]
-                    batch_test_mask = test_mask[batch_idx]
-
-                    self.train()
+            if train_loader is not None:
+                self.train()
+                y_true = {"train": [], "val": [], "test": []}
+                y_pred = {"train": [], "val": [], "test": []}
+                for data in tqdm(train_loader, "train step"):
+                    data = transform(data)
                     self.optimizer.zero_grad()
 
                     embeddings = self.forward(
-                        edge_index=edge_index,
-                        features=features,
+                        edge_index=data.adj_t,
+                        features=data.x,
                         IN_config=IN_config,
-                        batch_idx=batch_idx,
                         device=device,
+                        fast=False,
                     )
                     logits = self.classifier(embeddings)
-                    loss = self.criterion(logits[batch_train_mask], batch_labels[batch_train_mask])
-                    loss_val = self.criterion(logits[batch_val_mask], batch_labels[batch_val_mask])
-                    loss_test = self.criterion(
-                        logits[batch_test_mask], batch_labels[batch_test_mask]
-                    )
 
-                    loss.backward()
-                    self.optimizer.step()
-
+                    loss = self.criterion(logits[data.train_mask], data.y[data.train_mask])
+                    loss_val = self.criterion(logits[data.val_mask], data.y[data.val_mask])
+                    loss_test = self.criterion(logits[data.test_mask], data.y[data.test_mask])
                     loss_value += loss.item()
                     loss_val_value += loss_val.item()
                     loss_test_value += loss_test.item()
 
-                    pred_stack.append(logits.detach().clone().cpu())
+                    loss.backward()
+                    self.optimizer.step()
 
-                if epoch % 9 == 0 and epoch > eval_start:
-                    with torch.no_grad():
-                        self.train(False)
-                        pred_stack = []
-                        idx = torch.LongTensor(list(range(n)))
-                        for step in tqdm(range(0, n, bs), "validate step"):
-                            batch_idx = idx[step : step + bs]
+                    for split in ["train", "val", "test"]:
+                        mask = data[f"{split}_mask"]
+                        y_true[split].append(data.y[mask].detach().cpu())
+                        y_pred[split].append(logits[mask].detach().cpu())
 
+                with torch.no_grad():
+                    self.train(False)
+                    if epoch % 9 == 0 and epoch > eval_start:
+                        del y_true
+                        del y_pred
+                        y_true = {"train": [], "val": [], "test": []}
+                        y_pred = {"train": [], "val": [], "test": []}
+                        # for data in tqdm(test_loader, 'val step'):
+                        for data in tqdm(train_loader, "val step"):
+                            data = transform(data)
                             embeddings = self.forward(
-                                edge_index=edge_index,
-                                features=features,
+                                edge_index=data.adj_t,
+                                features=data.x,
                                 IN_config=IN_config,
-                                batch_idx=batch_idx,
                                 device=device,
+                                fast=False,
                             )
                             logits = self.classifier(embeddings)
-                            pred_stack.append(logits)
+                            for split in ["train", "val", "test"]:
+                                mask = data[f"{split}_mask"]
+                                y_true[split].append(data.y[mask].detach().cpu())
+                                y_pred[split].append(logits[mask].detach().cpu())
 
-                        pred_stack = torch.cat(pred_stack, dim=0)
-
-                        train_acc, valid_acc, test_acc = metric(
-                            IN_config.name,
-                            logits=pred_stack,
-                            labels=labels,
-                            train_mask=train_mask,
-                            val_mask=val_mask,
-                            test_mask=test_mask,
+                        train_acc = metric(
+                            name,
+                            logits=torch.cat(y_pred["train"], dim=0),
+                            labels=torch.cat(y_true["train"], dim=0),
                         )
-                else:
-                    pred_stack = torch.cat(pred_stack, dim=0)
-
-                    self.train(False)
-                    train_acc, valid_acc, test_acc = metric(
-                        IN_config.name,
-                        logits=pred_stack,
-                        labels=labels[shf],
-                        train_mask=train_mask[shf],
-                        val_mask=val_mask[shf],
-                        test_mask=test_mask[shf],
-                    )
-
+                        valid_acc = metric(
+                            name,
+                            logits=torch.cat(y_pred["val"], dim=0),
+                            labels=torch.cat(y_true["val"], dim=0),
+                        )
+                        test_acc = metric(
+                            name,
+                            logits=torch.cat(y_pred["test"], dim=0),
+                            labels=torch.cat(y_true["test"], dim=0),
+                        )
+                    else:
+                        train_acc = metric(
+                            name,
+                            logits=torch.cat(y_pred["train"], dim=0),
+                            labels=torch.cat(y_true["train"], dim=0),
+                        )
+                        valid_acc = metric(
+                            name,
+                            logits=torch.cat(y_pred["val"], dim=0),
+                            labels=torch.cat(y_true["val"], dim=0),
+                        )
+                        test_acc = metric(
+                            name,
+                            logits=torch.cat(y_pred["test"], dim=0),
+                            labels=torch.cat(y_true["test"], dim=0),
+                        )
             else:
                 self.train()
                 self.optimizer.zero_grad()
 
                 embeddings = self.forward(
-                    edge_index=edge_index,
-                    features=features,
-                    IN_config=IN_config,
-                    batch_idx=None,
-                    device=device,
+                    edge_index=edge_index, features=features, IN_config=IN_config, device=device
                 )
 
                 logits = self.classifier(embeddings)
@@ -289,7 +284,6 @@ class IGNN(nn.Module):
                     edge_index,
                     features,
                     IN_config=IN_config,
-                    batch_idx=None,
                 )
 
             print(

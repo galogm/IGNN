@@ -30,21 +30,15 @@ acts = {
 
 def preprocess_adj(adj, add_self_loop, remove_self_loop, symm_norm):
     if add_self_loop:
-        print("... setting diagonal entries")
         adj = set_diag(adj)
     if remove_self_loop:
-        print("... removing diagonal entries")
         adj = remove_diag(adj)
-    if not add_self_loop and not remove_self_loop:
-        print("... keeping diag elements as they are")
     if symm_norm:
-        print("... performing symmetric normalization")
         deg = adj.sum(dim=1).to(torch.float)
         deg_inv_sqrt = deg.pow(-0.5)
         deg_inv_sqrt[deg_inv_sqrt == float("inf")] = 0
         adj = deg_inv_sqrt.view(-1, 1) * adj * deg_inv_sqrt.view(1, -1)
     else:
-        print("... performing asymmetric normalization")
         deg = adj.sum(dim=1).to(torch.float)
         deg_inv = deg.pow(-1.0)
         deg_inv[deg_inv == float("inf")] = 0
@@ -382,47 +376,39 @@ class IGNNConv(nn.Module):
 
         return torch.cat(ns, dim=1)
 
-    def forward(
-        self,
-        edge_index,
-        features,
-        IN_config: INConf,
-        batch_idx=None,
-        device=torch.device("cpu"),
-    ):
+    def forward(self, edge_index, features, IN_config: INConf, device=torch.device("cpu")):
         self.to(device=device)
         self.device = device
 
-        n_nodes = features.shape[0]
-        row, col = edge_index[0].long(), edge_index[1].long()
-        adj_sparse_tensor = SparseTensor(row=row, col=col, sparse_sizes=(n_nodes, n_nodes))
+        if not isinstance(edge_index, SparseTensor):
+            n_nodes = features.shape[0]
+            row, col = edge_index[0].long(), edge_index[1].long()
+            edge_index = SparseTensor(row=row, col=col, sparse_sizes=(n_nodes, n_nodes))
 
         if self.IN == "gcn" and self.RN == "residual":
             h = features.to(device)
             h = self.nei_ind_emb[0](h)
             for i in range(1, self.n_nie):
-                h = self.nei_ind_emb[i](x=h, edge_index=adj_sparse_tensor) + h
+                h = self.nei_ind_emb[i](x=h, edge_index=edge_index) + h
             return h
 
         if self.IN == "gcn" and self.RN == "attentive":
             h = features.to(device)
             h = self.nei_ind_emb[0](h)
             for i in range(1, self.n_nie):
-                h_k = self.nei_ind_emb[i](x=h, edge_index=adj_sparse_tensor)
+                h_k = self.nei_ind_emb[i](x=h, edge_index=edge_index)
                 a = self.nei_rel_learn[i](torch.cat([h_k, h], dim=-1))
                 h = a * h_k + (1 - a) * h
             return h
 
         if not IN_config.fast or self.nei_feats is None:
-            self.nei_feats, self.adj = self.inceptive_aggregation(
-                adj=(adj_sparse_tensor if self.adj is None else self.adj),
+            self.nei_feats, _ = self.inceptive_aggregation(
+                adj=edge_index,
                 features=features,
                 IN_config=IN_config,
-                preprocess=self.adj is None,
+                preprocess=True,
                 device=device,
             )
-        if batch_idx is not None:
-            self.nei_feats = [nei_feat.index_select(0, batch_idx) for nei_feat in self.nei_feats]
 
         if self.IN == "gcn-IN-SN":
             init_trans = self.nei_uni_emb if self.transform_first else nn.Identity()
@@ -430,7 +416,7 @@ class IGNNConv(nn.Module):
         elif self.IN == "gcn-IN-nSN":
             ns = [self.nei_ind_emb(self.nei_feats[i]) for i in range(self.n_nie)]
         else:
-            ns = self.custom_INs(features=features, edge_index=adj_sparse_tensor, device=device)
+            ns = self.custom_INs(features=features, edge_index=edge_index, device=device)
 
         if self.RN == "concat":
             return self.nei_rel_learn(torch.cat(ns, dim=1))
