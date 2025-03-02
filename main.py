@@ -53,7 +53,13 @@ def main(
     nss_dropout=0.0,
     clf_dropout=0.0,
     eval_start=1,
+    transform_first=False,
+    TRAIN_RATIO=48,
+    VALID_RATIO=32,
+    VERSION="1.0",
+    device=torch.device("cpu"),
 ):
+    DATA_INFO = DataConf(**read_configs("data"))
     data = load_data(
         dataset_name=dataset,
         source=source,
@@ -92,8 +98,8 @@ def main(
     DCLF = clf_dropout if clf_dropout is not None else clf_dropouts[dataset]
     IN_config = INConf(
         n_hops=N_HOPS,
-        add_self_loop=True,
-        remove_self_loop=False,
+        add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
+        remove_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
         symm_norm=True,
         row_normalized=norms[dataset],
         fast=False,
@@ -115,7 +121,7 @@ def main(
         "act": acts[dataset],
         "layer_norm": layer_norms[dataset] if RN != "attentive" else layer_norms_att[dataset],
         "loss": "ce" if dataset not in ["proteins"] else "bce",
-        "transform_first": False,
+        "transform_first": transform_first,
     }
     params_all = {
         "eval_start": eval_start,
@@ -126,7 +132,7 @@ def main(
 
     t_start = time.time()
 
-    seed_list = [random.randint(0, 99999) for i in range(repeat)]
+    # seed_list = [random.randint(0, 99999) for i in range(repeat)]
 
     res_list_acc_joint = []
 
@@ -135,11 +141,10 @@ def main(
 
     for i in range(repeat):
         # set_seed(seed_list[i])
-        model = IGNN(in_feats=features.shape[1], n_clusters=n_clusters, device=DEVICE, **params)
+        model = IGNN(in_feats=features.shape[1], n_clusters=n_clusters, device=device, **params)
 
         train_mask = val_mask = test_mask = train_loader = test_loader = None
         batch_list = ["products_ogb", "pokec_linkx"]
-        transform = T.Compose([T.ToDevice(DEVICE), T.ToSparseTensor()])
         if name in batch_list:
             if name == "pokec_linkx":
                 data["train_mask"], data["val_mask"], data["test_mask"] = get_splits(
@@ -154,14 +159,14 @@ def main(
                 )
             train_loader = RandomNodeLoader(
                 data,
-                num_parts={"products_ogb": 5, "pokec_linkx": 7}[name],
+                num_parts={"products_ogb": 10, "pokec_linkx": 7}[name],
                 shuffle=True,
                 num_workers=5,
             )
             # Increase the num_parts of the test loader if you cannot fit
             # the full batch graph into your GPU:
             test_loader = RandomNodeLoader(
-                data, num_parts={"products_ogb": 1, "pokec_linkx": 1}[name], num_workers=5
+                data, num_parts={"products_ogb": 2, "pokec_linkx": 3}[name], num_workers=5
             )
         else:
             train_mask, val_mask, test_mask = get_splits(
@@ -185,7 +190,7 @@ def main(
             train_mask=train_mask,
             val_mask=val_mask,
             test_mask=test_mask,
-            device=DEVICE,
+            device=device,
             eval_start=eval_start,
         )
 
@@ -194,31 +199,21 @@ def main(
             if test_loader is not None:
                 y_true = {"train": [], "val": [], "test": []}
                 y_pred = {"train": [], "val": [], "test": []}
-                for data in tqdm(test_loader, "test step"):
-                    data = transform(data)
+                for data_t in tqdm(test_loader, "test step"):
+                    data_t = model.transform(data_t)
                     embeddings = model(
-                        edge_index=data.adj_t,
-                        features=data.x,
+                        edge_index=data_t.adj_t,
+                        features=data_t.x,
                         IN_config=IN_config,
-                        device=DEVICE,
+                        device=device,
                         fast=False,
                     )
                     logits = model.classifier(embeddings)
                     for split in ["train", "val", "test"]:
-                        mask = data[f"{split}_mask"]
-                        y_true[split].append(data.y[mask].cpu())
+                        mask = data_t[f"{split}_mask"]
+                        y_true[split].append(data_t.y[mask].cpu())
                         y_pred[split].append(logits[mask].cpu())
 
-                train_acc = metric(
-                    name,
-                    logits=torch.cat(y_pred["train"], dim=0),
-                    labels=torch.cat(y_true["train"], dim=0),
-                )
-                valid_acc = metric(
-                    name,
-                    logits=torch.cat(y_pred["val"], dim=0),
-                    labels=torch.cat(y_true["val"], dim=0),
-                )
                 test_acc = metric(
                     name,
                     logits=torch.cat(y_pred["test"], dim=0),
@@ -229,13 +224,11 @@ def main(
                     edge_index=edge_index,
                     features=features,
                     IN_config=IN_config,
-                    device=DEVICE,
+                    device=device,
                 )
                 y_pred = model.classifier(embeddings)
 
-                train_acc, val_acc, test_acc = metric(
-                    name, y_pred, label, train_mask, val_mask, test_mask
-                )
+                _, _, test_acc = metric(name, y_pred, label, train_mask, val_mask, test_mask)
 
         tms[f"{i}"] = tm
         ts.append(tm)
@@ -271,12 +264,8 @@ if __name__ == "__main__":
 
     args = parse_ignn_args()
 
-    TRAIN_RATIO = 48
-    VALID_RATIO = 32
-    VERSION = args.version
     DEVICE = set_device(str(args.gpu_id))
     set_seed(args.seed)
-    DATA_INFO = DataConf(**read_configs("data"))
 
     main(
         dataset=args.dataset,
@@ -293,4 +282,9 @@ if __name__ == "__main__":
         nss_dropout=args.nss_dropout,
         clf_dropout=args.clf_dropout,
         eval_start=args.eval_start,
+        transform_first=args.transform_first,
+        TRAIN_RATIO=48,
+        VALID_RATIO=32,
+        VERSION=args.version,
+        device=DEVICE,
     )

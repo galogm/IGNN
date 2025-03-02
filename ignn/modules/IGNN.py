@@ -16,8 +16,11 @@ from torch_sparse.tensor import SparseTensor
 from .Conf import INConf
 from .GCNConv import GCNConv
 from .LSTM import LSTM
-from .MLP import MLP
 from .OrderedGating import ONGNNConv
+
+# from dgl.nn.pytorch import GraphConv
+# from torch_geometric.data import Data
+# from torch_geometric.utils import to_dgl
 
 acts = {
     "relu": nn.ReLU,
@@ -69,9 +72,8 @@ class IGNNConv(nn.Module):
         self.IN = IN
         self.RN = RN
         self.transform_first = transform_first
-        self.nas_dropout = nas_dropout
         self.n_nie = self.n_hops + 1
-        act_func = acts[act]
+        act_func = acts[act]()
         self.nei_feats = None
         self.adj = None
         self.device = None
@@ -84,40 +86,45 @@ class IGNNConv(nn.Module):
                         out_channels=h_feats,
                         improved=False,
                         cached=False,
-                        add_self_loops=True,
+                        add_self_loops=False,
                         normalize=True,
                         weight=not self.RN == "attentive",
-                        bias=not self.RN == "attentive",
-                        act=act_func(),
+                        # weight=True,
+                        bias=True,
+                        act=act_func,
                     )
+                    # GraphConv(
+                    #     in_feats=h_feats,
+                    #     out_feats=h_feats,
+                    #     norm='both',
+                    #     weight=False if RN == "attentive" else True,
+                    #     activation=act_func,
+                    #     allow_zero_in_degree=RN=="attentive",
+                    # )
                     if i != 0
-                    else MLP(
-                        in_feats=in_feats,
-                        h_feats=[h_feats],
-                        acts=[act_func()],
-                        dropout=nas_dropout,
-                        layer_norm=True,
+                    else nn.Sequential(
+                        nn.Dropout(p=nas_dropout),
+                        nn.Linear(in_feats, h_feats),
+                        nn.LayerNorm(h_feats),
+                        act_func,
                     )
                 )
                 for i in range(self.n_nie)
             )
-
         elif IN == "gcn-IN-SN":
             if transform_first:
-                self.nei_uni_emb = MLP(
-                    in_feats=in_feats,
-                    h_feats=[h_feats],
-                    acts=[act_func()],
-                    dropout=nas_dropout,
-                    layer_norm=layer_norm,
+                self.nei_uni_emb = nn.Sequential(
+                    nn.Dropout(p=nas_dropout),
+                    nn.Linear(in_feats, h_feats),
+                    nn.LayerNorm(h_feats),
+                    act_func,
                 )
             self.nei_ind_emb = nn.ModuleList(
-                MLP(
-                    in_feats=h_feats if transform_first else in_feats,
-                    h_feats=[h_feats],
-                    acts=[act_func()],
-                    dropout=nas_dropout,
-                    layer_norm=layer_norm,
+                nn.Sequential(
+                    nn.Dropout(p=nas_dropout),
+                    nn.Linear(h_feats if transform_first else in_feats, h_feats),
+                    nn.LayerNorm(h_feats) if layer_norm else nn.Identity(),
+                    act_func,
                 )
                 for _ in range(self.n_nie)
             )
@@ -125,36 +132,25 @@ class IGNNConv(nn.Module):
             self.init_custom_INs(IN, in_feats, h_feats, act_func, nas_dropout, layer_norm)
 
         if RN == "concat":
-            self.nei_rel_learn = MLP(
-                in_feats=ndim_fc,
-                h_feats=[h_feats],
-                acts=[act_func()],
-                dropout=nss_dropout,
-                layer_norm=layer_norm,
+            self.nei_rel_learn = nn.Sequential(
+                nn.Dropout(p=nss_dropout),
+                nn.Linear(ndim_fc, h_feats),
+                nn.LayerNorm(h_feats) if layer_norm else nn.Identity(),
+                act_func,
             )
         elif RN == "residual":
-            self.nei_rel_learn = nn.ModuleList(
-                [
-                    MLP(
-                        in_feats=ndim_fc,
-                        h_feats=[h_feats],
-                        acts=[act_func()],
-                        dropout=nss_dropout,
-                        layer_norm=layer_norm,
-                    )
-                ]
-            )
+            # no nei_rel_learn needed for residual variant
+            pass
         elif RN == "attentive":
             self.nei_rel_learn = nn.ModuleList(
                 [
-                    MLP(
-                        in_feats=h_feats * 2,
-                        h_feats=[1],
-                        acts=[acts["tanh"]()],
-                        dropout=nss_dropout,
-                        layer_norm=layer_norm,
+                    nn.Sequential(
+                        nn.Dropout(p=nss_dropout),
+                        nn.Linear(h_feats * 2, 1),
+                        nn.LayerNorm(1) if layer_norm else nn.Identity(),
+                        acts["tanh"](),
                     )
-                    for i in range(self.n_nie)
+                    for _ in range(self.n_nie)
                 ]
             )
         else:
@@ -162,35 +158,32 @@ class IGNNConv(nn.Module):
 
     def init_custom_INs(self, IN, in_feats, h_feats, act_func, nas_dropout, layer_norm):
         if IN == "gcn-IN-nSN":
-            self.nei_ind_emb = MLP(
-                in_feats=in_feats,
-                h_feats=[h_feats],
-                acts=[act_func()],
-                dropout=nas_dropout,
-                layer_norm=layer_norm,
+            self.nei_ind_emb = nn.Sequential(
+                nn.Dropout(p=nas_dropout),
+                nn.Linear(in_feats, h_feats),
+                nn.LayerNorm(h_feats) if layer_norm else nn.Identity(),
+                act_func,
             )
         elif IN == "gcn-nIN-SN":
             self.nei_ind_emb = nn.ModuleList(
                 (
-                    nn.Sequential(
-                        GCNConv(
-                            in_channels=in_feats if i == 1 else h_feats,
-                            out_channels=h_feats,
-                            improved=False,
-                            cached=False,
-                            add_self_loops=True,
-                            normalize=True,
-                            bias=True,
-                        ),
-                        act_func(),
+                    GCNConv(
+                        in_channels=in_feats if i == 1 else h_feats,
+                        out_channels=h_feats,
+                        improved=False,
+                        cached=False,
+                        add_self_loops=True,
+                        normalize=True,
+                        weight=True,
+                        bias=True,
+                        act=act_func,
                     )
                     if i != 0
-                    else MLP(
-                        in_feats=in_feats,
-                        h_feats=[h_feats],
-                        acts=[act_func()],
-                        dropout=nas_dropout,
-                        layer_norm=layer_norm,
+                    else nn.Sequential(
+                        nn.Dropout(p=nas_dropout),
+                        nn.Linear(in_feats, h_feats),
+                        nn.LayerNorm(h_feats) if layer_norm else nn.Identity(),
+                        act_func,
                     )
                 )
                 for i in range(self.n_nie)
@@ -198,25 +191,23 @@ class IGNNConv(nn.Module):
         elif IN == "gcn-nIN-nSN":
             self.nei_ind_emb = nn.ModuleList(
                 (
-                    nn.Sequential(
-                        GCNConv(
-                            in_channels=h_feats,
-                            out_channels=h_feats,
-                            improved=False,
-                            cached=False,
-                            add_self_loops=True,
-                            normalize=True,
-                            bias=True,
-                        ),
-                        act_func(),
+                    GCNConv(
+                        in_channels=in_feats if i == 1 else h_feats,
+                        out_channels=h_feats,
+                        improved=False,
+                        cached=False,
+                        add_self_loops=True,
+                        normalize=True,
+                        weight=True,
+                        bias=True,
+                        act=act_func,
                     )
                     if i != 0
-                    else MLP(
-                        in_feats=in_feats,
-                        h_feats=[h_feats],
-                        acts=[act_func()],
-                        dropout=nas_dropout,
-                        layer_norm=layer_norm,
+                    else nn.Sequential(
+                        nn.Dropout(p=nas_dropout),
+                        nn.Linear(in_feats, h_feats),
+                        nn.LayerNorm(h_feats) if layer_norm else nn.Identity(),
+                        act_func,
                     )
                 )
                 for i in range(self.n_nie)
@@ -228,12 +219,11 @@ class IGNNConv(nn.Module):
         if RN in ["max", "sum", "mean"]:
             self.nei_rel_learn = nn.ModuleList(
                 [
-                    MLP(
-                        in_feats=h_feats,
-                        h_feats=[h_feats],
-                        acts=[act_func()],
-                        dropout=nss_dropout,
-                        layer_norm=layer_norm,
+                    nn.Sequential(
+                        nn.Dropout(p=nss_dropout),
+                        nn.Linear(h_feats, h_feats),
+                        nn.LayerNorm(h_feats) if layer_norm else nn.Identity(),
+                        act_func,
                     )
                 ],
             )
@@ -341,13 +331,13 @@ class IGNNConv(nn.Module):
 
     def custom_INs(self, features, edge_index, device):
         if self.IN == "gcn-nIN-SN":
-            h = features.to(device)
+            h = features
             ns = [self.nei_ind_emb[0](h)]
             for i in range(1, self.n_nie):
                 h = self.nei_ind_emb[i](x=h, edge_index=edge_index)
                 ns.append(h)
         elif self.IN == "gcn-nIN-nSN":
-            h = self.nei_ind_emb[0](features.to(device))
+            h = self.nei_ind_emb[0](features)
             ns = [h]
             for i in range(1, self.n_nie):
                 h = self.nei_ind_emb[i](x=h, edge_index=edge_index)
@@ -379,6 +369,8 @@ class IGNNConv(nn.Module):
     def forward(self, edge_index, features, IN_config: INConf, device=torch.device("cpu")):
         self.to(device=device)
         self.device = device
+        edge_index = edge_index.to(device)
+        features = features.to(device)
 
         if not isinstance(edge_index, SparseTensor):
             n_nodes = features.shape[0]
@@ -386,17 +378,16 @@ class IGNNConv(nn.Module):
             edge_index = SparseTensor(row=row, col=col, sparse_sizes=(n_nodes, n_nodes))
 
         if self.IN == "gcn" and self.RN == "residual":
-            h = features.to(device)
-            h = self.nei_ind_emb[0](h)
+            h = self.nei_ind_emb[0](features)
             for i in range(1, self.n_nie):
                 h = self.nei_ind_emb[i](x=h, edge_index=edge_index) + h
             return h
 
         if self.IN == "gcn" and self.RN == "attentive":
-            h = features.to(device)
-            h = self.nei_ind_emb[0](h)
+            h = self.nei_ind_emb[0](features)
             for i in range(1, self.n_nie):
                 h_k = self.nei_ind_emb[i](x=h, edge_index=edge_index)
+                # h_k = self.nei_ind_emb[i](graph=to_dgl(Data(edge_index=edge_index, num_nodes=features.shape[0])), feat=h)
                 a = self.nei_rel_learn[i](torch.cat([h_k, h], dim=-1))
                 h = a * h_k + (1 - a) * h
             return h

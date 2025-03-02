@@ -1,9 +1,13 @@
-from torch import nn
+"""LSTM
+"""
 
-from .MLP import MLP
+# pylint: disable=invalid-name
+from torch import nn
 
 
 class LSTM(nn.Module):
+    """LSTM."""
+
     def __init__(
         self,
         input_dim,
@@ -19,15 +23,15 @@ class LSTM(nn.Module):
             num_layers,
             batch_first=True,
         )
-        self.fc = MLP(
-            in_feats=hidden_dim,
-            h_feats=[output_dim],
-            acts=[nn.ReLU()],
-            dropout=dropout,
+        self.fc = nn.Sequential(
+            nn.Dropout(p=dropout),
+            nn.Linear(hidden_dim, output_dim),
+            nn.LayerNorm(output_dim),
+            nn.ReLU(),
         )
 
     def forward(self, x, nfc=True):
-        lstm_out, (h_n, c_n) = self.lstm(x)
+        _, (h_n, _) = self.lstm(x)
         if nfc:
             return h_n[-1]
         out = self.fc(h_n[-1])

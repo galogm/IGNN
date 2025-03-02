@@ -1,6 +1,6 @@
 """MLP"""
 
-# pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals
+# pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals,invalid-name
 from typing import Callable, List
 
 from torch import nn
@@ -48,7 +48,6 @@ class MLP(nn.Module):
                     else nn.Sequential(
                         nn.Dropout(p=dropout),
                         nn.Linear(in_feats[i], h_feats[i]),
-                        acts[i],
                     )
                 )
         self.ec = nn.ModuleList(module_list)

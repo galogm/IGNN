@@ -283,7 +283,6 @@ class GCNConv(MessagePassing):
                 else:
                     edge_index = cache
 
-        edge_index = edge_index.to(x.device)
         if self.weight:
             x = self.lin(x)
 
