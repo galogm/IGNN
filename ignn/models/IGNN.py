@@ -118,44 +118,47 @@ class IGNN(nn.Module):
     ):
         with torch.no_grad():
             self.train(False)
-            if epoch % eval_interval == 0 and epoch >= eval_start and test_loader is not None:
-                y_true = {"train": [], "val": [], "test": []}
-                y_pred = {"train": [], "val": [], "test": []}
-                for data in tqdm(test_loader, "val step"):
-                    data = self.transform(data)
-                    embeddings = self.forward(
-                        edge_index=data.adj_t,
-                        features=data.x,
-                        IN_config=IN_config,
-                        device=self.device,
-                        fast=False,
+            if epoch % eval_interval == 0 and epoch >= eval_start:
+                if test_loader is not None:
+                    y_true = {"train": [], "val": [], "test": []}
+                    y_pred = {"train": [], "val": [], "test": []}
+                    for data in tqdm(test_loader, "val step"):
+                        data = self.transform(data)
+                        embeddings = self.forward(
+                            edge_index=data.adj_t,
+                            features=data.x,
+                            IN_config=IN_config,
+                            device=self.device,
+                            fast=False,
+                        )
+                        logits = self.classifier(embeddings)
+                        for split in ["train", "val", "test"]:
+                            mask = data[f"{split}_mask"]
+                            y_true[split].append(data.y[mask].detach().cpu())
+                            y_pred[split].append(logits[mask].detach().cpu())
+
+                    train_acc = metric(
+                        IN_config.name,
+                        logits=torch.cat(y_pred["train"], dim=0),
+                        labels=torch.cat(y_true["train"], dim=0),
                     )
-                    logits = self.classifier(embeddings)
-                    for split in ["train", "val", "test"]:
-                        mask = data[f"{split}_mask"]
-                        y_true[split].append(data.y[mask].detach().cpu())
-                        y_pred[split].append(logits[mask].detach().cpu())
+                    valid_acc = metric(
+                        IN_config.name,
+                        logits=torch.cat(y_pred["val"], dim=0),
+                        labels=torch.cat(y_true["val"], dim=0),
+                    )
+                    test_acc = metric(
+                        IN_config.name,
+                        logits=torch.cat(y_pred["test"], dim=0),
+                        labels=torch.cat(y_true["test"], dim=0),
+                    )
+                    return train_acc, valid_acc, test_acc
 
-                train_acc = metric(
-                    IN_config.name,
-                    logits=torch.cat(y_pred["train"], dim=0),
-                    labels=torch.cat(y_true["train"], dim=0),
-                )
-                valid_acc = metric(
-                    IN_config.name,
-                    logits=torch.cat(y_pred["val"], dim=0),
-                    labels=torch.cat(y_true["val"], dim=0),
-                )
-                test_acc = metric(
-                    IN_config.name,
-                    logits=torch.cat(y_pred["test"], dim=0),
-                    labels=torch.cat(y_true["test"], dim=0),
-                )
-                return train_acc, valid_acc, test_acc
+                embeddings = self.forward(edge_index, features, IN_config, device=self.device)
+                logits = self.classifier(embeddings)
+                return metric(IN_config.name, logits, labels, train_mask, val_mask, test_mask)
 
-            embeddings = self.forward(edge_index, features, IN_config, device=self.device)
-            logits = self.classifier(embeddings)
-            return metric(IN_config.name, logits, labels, train_mask, val_mask, test_mask)
+            return 0, 0, 0
 
     def forward(self, edge_index, features, IN_config: INConf, device=None, fast=None):
         H = None

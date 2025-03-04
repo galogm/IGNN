@@ -84,7 +84,8 @@ def metric(
 
         onetime_reminder(f"Evaluate {name} with ACC.\n")
         if train_mask is None:
-            return ACC(labels, y_pred)
+            return ACC(labels.cpu(), y_pred.cpu())
+
         return (
             ACC(labels[train_mask].cpu(), y_pred[train_mask].cpu()),
             ACC(labels[val_mask].cpu(), y_pred[val_mask].cpu()),
@@ -93,7 +94,8 @@ def metric(
 
     onetime_reminder(f"Evaluate {name} with ROCAUC.\n")
     if train_mask is None:
-        return eval_rocauc(labels, logits)["rocauc"]
+        return eval_rocauc(labels.cpu().numpy(), logits.cpu().numpy())["rocauc"]
+
     return (
         eval_rocauc(
             labels[train_mask].cpu().numpy(),

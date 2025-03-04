@@ -1,56 +1,93 @@
-RN=concat
+RN=attentive
 log_path=logs/$RN
 mkdir -p $log_path
 
 f=512 v=1.0
-IN=gcn-IN-SN
+IN=gcn
 
-g=0
-hops=1
-d=actor s=pyg
-m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops > $log_path/$d.log &
-
-g=0
-hops=64
-d=chameleon s=critical
-m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops > $log_path/$d.log &
-
-g=0
-hops=64
-d=squirrel s=critical
-m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops > $log_path/$d.log &
-
-g=1
+d=arxiv s=ogb
+g=6
+f=512
 hops=10
-d=flickr s=cola
+layers=1
+lr=0.001
+l2_coef=0.00005
+nas_dropout=0
+nss_dropout=0.8
+clf_dropout=0.5
+m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops -layers $layers -lr $lr -l2_coef $l2_coef -nas_dropout $nas_dropout -nss_dropout $nss_dropout -clf_dropout $clf_dropout > $log_path/$d.log &
+# $d-$hops-$layers-$f-$lr-$l2_coef-$nas_dropout-$nss_dropout-$clf_dropout.log &
+
+d=products s=ogb
+g=7
+f=200
+hops=5
+layers=1
+lr=0.003
+l2_coef=0.00000
+nas_dropout=0
+nss_dropout=0.5
+clf_dropout=0.5
+m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops -layers $layers -lr $lr -l2_coef $l2_coef -nas_dropout $nas_dropout -nss_dropout $nss_dropout -clf_dropout $clf_dropout -eval 1 -t > $log_path/$d-$hops-$layers-$f-$lr-$l2_coef-$nas_dropout-$nss_dropout-$clf_dropout-$b.log &
+
+d=pokec s=linkx
+g=7
+f=256
+hops=5
+layers=1
+lr=0.001
+l2_coef=0.000005
+nas_dropout=0
+nss_dropout=0.2
+clf_dropout=0.2
+m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops -layers $layers -lr $lr -l2_coef $l2_coef -nas_dropout $nas_dropout -nss_dropout $nss_dropout -clf_dropout $clf_dropout -eval 1 > $log_path/$d-$hops-$layers-$f-$lr-$l2_coef-$nas_dropout-$nss_dropout-$clf_dropout-$b.log &
+
+d=actor s=pyg
+g=0
+hops=10
 m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops > $log_path/$d.log &
 
+d=chameleon s=critical
+g=0
+hops=2
+m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops > $log_path/$d.log &
+
+d=squirrel s=critical
+g=0
+hops=2
+m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops > $log_path/$d.log &
+
+d=flickr s=cola
+g=1
+hops=2
+m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops > $log_path/$d.log &
+
+d=blogcatalog s=cola
 g=2
 hops=10
-d=blogcatalog s=cola
 m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops > $log_path/$d.log &
 
-g=3
-hops=1
 d=roman-empire s=critical
+g=3
+hops=16
 m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops > $log_path/$d.log &
 
-g=4
-hops=10
 d=amazon-ratings s=critical
-m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops > $log_path/$d.log &
-
-g=5
-hops=10
-d=photo s=pyg
-m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops > $log_path/$d.log &
-
-g=6
+g=4
 hops=4
-d=pubmed s=pyg
 m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops > $log_path/$d.log &
 
+d=photo s=pyg
+g=5
+hops=2
+m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops > $log_path/$d.log &
+
+d=pubmed s=pyg
+g=6
+hops=16
+m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops > $log_path/$d.log &
+
+d=wikics s=pyg
 g=7
 hops=8
-d=wikics s=pyg
 m=IGNN-$IN-$RN; nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN  -RN $RN -hops $hops > $log_path/$d.log &

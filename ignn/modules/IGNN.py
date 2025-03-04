@@ -268,6 +268,8 @@ class IGNNConv(nn.Module):
                         repeats=int(h_feats / chunk_size),
                     )
                 )
+        elif RN == "none":
+            pass
         else:
             raise ValueError(f"RN={RN} is not supported.")
 
@@ -377,20 +379,27 @@ class IGNNConv(nn.Module):
             row, col = edge_index[0].long(), edge_index[1].long()
             edge_index = SparseTensor(row=row, col=col, sparse_sizes=(n_nodes, n_nodes))
 
-        if self.IN == "gcn" and self.RN == "residual":
-            h = self.nei_ind_emb[0](features)
-            for i in range(1, self.n_nie):
-                h = self.nei_ind_emb[i](x=h, edge_index=edge_index) + h
-            return h
+        if self.IN == "gcn":
+            if self.RN == "residual":
+                h = self.nei_ind_emb[0](features)
+                for i in range(1, self.n_nie):
+                    h = self.nei_ind_emb[i](x=h, edge_index=edge_index) + h
+                return h
 
-        if self.IN == "gcn" and self.RN == "attentive":
-            h = self.nei_ind_emb[0](features)
-            for i in range(1, self.n_nie):
-                h_k = self.nei_ind_emb[i](x=h, edge_index=edge_index)
-                # h_k = self.nei_ind_emb[i](graph=to_dgl(Data(edge_index=edge_index, num_nodes=features.shape[0])), feat=h)
-                a = self.nei_rel_learn[i](torch.cat([h_k, h], dim=-1))
-                h = a * h_k + (1 - a) * h
-            return h
+            if self.RN == "attentive":
+                h = self.nei_ind_emb[0](features)
+                for i in range(1, self.n_nie):
+                    h_k = self.nei_ind_emb[i](x=h, edge_index=edge_index)
+                    # h_k = self.nei_ind_emb[i](graph=to_dgl(Data(edge_index=edge_index, num_nodes=features.shape[0])), feat=h)
+                    a = self.nei_rel_learn[i](torch.cat([h_k, h], dim=-1))
+                    h = a * h_k + (1 - a) * h
+                return h
+
+            if self.RN == "none":
+                h = self.nei_ind_emb[0](features)
+                for i in range(1, self.n_nie):
+                    h = self.nei_ind_emb[i](x=h, edge_index=edge_index)
+                return h
 
         if not IN_config.fast or self.nei_feats is None:
             self.nei_feats, _ = self.inceptive_aggregation(

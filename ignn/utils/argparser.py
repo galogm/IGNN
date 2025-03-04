@@ -202,7 +202,7 @@ def parse_ignn_args() -> argparse.Namespace:
         "-eval",
         "--eval_start",
         type=int,
-        default=1,
+        default=0,
         help="eval_start epoch",
     )
     parser.add_argument(
