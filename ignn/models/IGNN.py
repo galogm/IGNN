@@ -6,6 +6,7 @@ import time
 
 import torch
 import torch_geometric.transforms as T
+from the_utils import get_str_time, save_model
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -60,7 +61,6 @@ class IGNN(nn.Module):
         self.n_clusters = n_clusters
         self.device = device
         self.best_model = None
-        self.transform = T.Compose([T.ToDevice(device), T.ToSparseTensor()])
 
         self.ignnconvs = nn.ModuleList(
             [
@@ -118,20 +118,28 @@ class IGNN(nn.Module):
     ):
         with torch.no_grad():
             self.train(False)
+
             if epoch % eval_interval == 0 and epoch >= eval_start:
                 if test_loader is not None:
+                    device = (
+                        torch.device("cpu")
+                        if IN_config.name in ["products_ogb", "pokec_linkx"]
+                        and len(test_loader) == 1
+                        else self.device
+                    )
+                    transform = T.Compose([T.ToDevice(device), T.ToSparseTensor()])
                     y_true = {"train": [], "val": [], "test": []}
                     y_pred = {"train": [], "val": [], "test": []}
                     for data in tqdm(test_loader, "val step"):
-                        data = self.transform(data)
+                        data = transform(data)
                         embeddings = self.forward(
                             edge_index=data.adj_t,
                             features=data.x,
                             IN_config=IN_config,
-                            device=self.device,
+                            device=device,
                             fast=False,
                         )
-                        logits = self.classifier(embeddings)
+                        logits = self.classifier(embeddings.to(self.device))
                         for split in ["train", "val", "test"]:
                             mask = data[f"{split}_mask"]
                             y_true[split].append(data.y[mask].detach().cpu())
@@ -184,11 +192,16 @@ class IGNN(nn.Module):
         train_mask=None,
         val_mask=None,
         test_mask=None,
+        eval_interval=1,
+        eval_start=0,
+        save_state=False,
         device: torch.device = torch.device("cpu"),
-        eval_start=1000,
     ):
         self.device = device
         self.to(self.device)
+        transform = T.Compose(
+            [T.ToDevice(device if not IN_config.fast else torch.device("cpu")), T.ToSparseTensor()]
+        )
         labels = labels.to(self.device)
 
         best_epoch = 0
@@ -208,7 +221,7 @@ class IGNN(nn.Module):
             self.train()
             if train_loader is not None:
                 for data in tqdm(train_loader, "train step"):
-                    data = self.transform(data)
+                    data = transform(data)
                     self.optimizer.zero_grad()
 
                     embeddings = self.forward(data.adj_t, data.x, IN_config, device, fast=False)
@@ -255,28 +268,34 @@ class IGNN(nn.Module):
                     labels,
                     IN_config,
                     epoch,
+                    eval_interval=eval_interval,
                     eval_start=eval_start,
                     train_mask=train_mask,
                     val_mask=val_mask,
                     test_mask=test_mask,
                 )
 
-            print(
-                f"epoch:{epoch},loss: {loss_value}, train acc: {train_acc:.4f}, valid acc: {valid_acc:.4f}, test acc: {test_acc:.4f}"
-            )
-            if valid_acc >= best_acc:
-                cnt = 0
-                best_acc = valid_acc
-                best_acc_t = test_acc
-                best_epoch = epoch
-                best_state_dict = copy.deepcopy(self.state_dict())
+            if valid_acc == 0:
+                print(f"Epoch {epoch} done.")
             else:
-                cnt += 1
-                if cnt == self.estop_steps:
-                    print(
-                        f"Early Stopping! Best Epoch: {best_epoch}, best val acc: {best_acc:.4f}, test acc: {best_acc_t:.4f}"
-                    )
-                    break
+                print(
+                    f"epoch:{epoch},loss: {loss_value}, train acc: {train_acc:.4f},"
+                    f"valid acc: {valid_acc:.4f}, test acc: {test_acc:.4f}"
+                )
+                if valid_acc >= best_acc:
+                    cnt = 0
+                    best_acc = valid_acc
+                    best_acc_t = test_acc
+                    best_epoch = epoch
+                    best_state_dict = copy.deepcopy(self.state_dict())
+                else:
+                    cnt += 1
+                    if cnt == self.estop_steps:
+                        print(
+                            f"Early Stopping! Best Epoch: {best_epoch}, "
+                            f"best val acc: {best_acc:.4f}, test acc: {best_acc_t:.4f}"
+                        )
+                        break
 
             # writer.add_scalar("joint/time/train", time.time() - t, epoch)
 
@@ -289,12 +308,10 @@ class IGNN(nn.Module):
 
         if best_state_dict is not None:
             self.load_state_dict(best_state_dict)
-
-        t_finish = time.time()
-        tm = (t_finish - t_start) / epoch * 10
-        print(f"10 epoch cost: {tm:.4f}s")
+        if save_state:
+            file = f"{IN_config.name}.{get_str_time()}"
+            save_model(file, self, self.optimizer, epoch, loss)
+            print(f"Save best state dict to {file}.")
+        tm = (time.time() - t_start) / epoch * 10
+        print(f"10 epoch cost: {tm:.4f}s.")
         return tm
-
-    def get_embeddings(self):
-        with torch.no_grad():
-            pass

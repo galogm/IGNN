@@ -52,7 +52,8 @@ def main(
     nas_dropout=0.0,
     nss_dropout=0.0,
     clf_dropout=0.0,
-    eval_start=1,
+    eval_interval=1,
+    eval_start=0,
     transform_first=False,
     TRAIN_RATIO=48,
     VALID_RATIO=32,
@@ -109,7 +110,7 @@ def main(
         "IN": IN,
         "RN": RN if RN is not None else RNs[dataset],
         "lr": LR,
-        "h_feats": min(h_feats, feats[dataset]),
+        "h_feats": h_feats if h_feats is None else feats[dataset],
         "l2_coef": COEF,
         "nas_dropout": DNAS,
         "nss_dropout": DNSS,
@@ -159,14 +160,15 @@ def main(
                 )
             train_loader = RandomNodeLoader(
                 data,
-                num_parts={"products_ogb": 10, "pokec_linkx": 7}[name],
+                num_parts={
+                    "products_ogb": f"{18/16*N_HOPS:.0f}",
+                    "pokec_linkx": f"{15/16*N_HOPS:.0f}",
+                }[name],
                 shuffle=True,
                 num_workers=5,
             )
-            # Increase the num_parts of the test loader if you cannot fit
-            # the full batch graph into your GPU:
             test_loader = RandomNodeLoader(
-                data, num_parts={"products_ogb": 2, "pokec_linkx": 3}[name], num_workers=5
+                data, num_parts={"products_ogb": 5, "pokec_linkx": 5}[name], num_workers=5
             )
         else:
             train_mask, val_mask, test_mask = get_splits(
@@ -191,6 +193,7 @@ def main(
             val_mask=val_mask,
             test_mask=test_mask,
             device=device,
+            eval_interval=eval_interval,
             eval_start=eval_start,
         )
 
@@ -281,6 +284,7 @@ if __name__ == "__main__":
         nas_dropout=args.nas_dropout,
         nss_dropout=args.nss_dropout,
         clf_dropout=args.clf_dropout,
+        eval_interval=args.eval_interval,
         eval_start=args.eval_start,
         transform_first=args.transform_first,
         TRAIN_RATIO=48,

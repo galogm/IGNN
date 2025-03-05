@@ -161,7 +161,7 @@ def parse_ignn_args() -> argparse.Namespace:
         "-f",
         "--h_feats",
         type=int,
-        default=512,
+        default=None,
         help="h feats",
     )
     parser.add_argument(
@@ -204,6 +204,13 @@ def parse_ignn_args() -> argparse.Namespace:
         type=int,
         default=0,
         help="eval_start epoch",
+    )
+    parser.add_argument(
+        "-ei",
+        "--eval_interval",
+        type=int,
+        default=1,
+        help="eval interval",
     )
     parser.add_argument(
         "-IN",

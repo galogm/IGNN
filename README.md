@@ -16,15 +16,15 @@ bash .ci/install.sh
 
 ## Usage
 
-- c-IGNN: see `scripts/00-cIGNN.sh` for running scripts of each dataset.
+Detailed scripts for each IGNN variant across all datasets:
 
-- r-IGNN: see `scripts/01-rIGNN.sh` for running scripts of each dataset.
+- c-IGNN: `scripts/01-cIGNN.sh`
 
-- a-IGNN: see `scripts/02-aIGNN.sh` for running scripts of each dataset.
+- r-IGNN: `scripts/02-rIGNN.sh`
 
-For large datasets, see `scripts/00-lcIGNN.sh` for running scripts.
+- a-IGNN: `scripts/03-aIGNN.sh`
 
 
 ## Requirements
 
-See [requirements-dev.txt](./requirements-dev.txt), [requirements.txt](./requirements.txt) and [pyproject.toml:dependencies](./pyproject.toml).
+See [requirements-dev.txt](./requirements-dev.txt), [requirements.txt](./requirements.txt) or [pyproject.toml:dependencies](./pyproject.toml).

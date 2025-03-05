@@ -82,7 +82,7 @@ lrs = defaultdict(
 ess = defaultdict(
     lambda: 100,
     {
-        "chameleon": 30,
+        "chameleon": 100,
         "squirrel": 100,
         "actor": 50,
         "pubmed": 100,
@@ -93,9 +93,9 @@ ess = defaultdict(
         "flickr": 100,
         "blogcatalog": 100,
         "wikics": 200,
-        "arxiv": 200,
-        "products": 200,
-        "pokec": 200,
+        "arxiv": 100,
+        "products": 100,
+        "pokec": 100,
     },
 )
 
@@ -293,7 +293,7 @@ self_loop_attentive = defaultdict(
 repeats = defaultdict(
     lambda: 5,
     {
-        "pokec": 5,
+        "pokec": 3,
         "arxiv": 5,
         "products": 3,
         "actor": 10,

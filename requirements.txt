@@ -1,4 +1,9 @@
-# torch
+# See `.ci/install.sh` for the installation scripts of torch, torch-scatter, torch-sparse, dgl
+# torch==2.1.2
+# torch-scatter
+# torch-sparse
+# dgl==2.0
+
 the_utils>=0.8.0
 graph_datasets>=0.14.1
 torch_geometric==2.6.1

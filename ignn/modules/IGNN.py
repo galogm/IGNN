@@ -3,6 +3,7 @@
 # pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals,invalid-name,too-many-branches,too-many-statements,
 import os
 from pathlib import Path
+from typing import Generator
 
 import torch
 import torch.nn.functional as F
@@ -156,6 +157,8 @@ class IGNNConv(nn.Module):
         else:
             self.init_custom_RNs(RN, h_feats, act_func, nss_dropout, layer_norm, n_hops)
 
+        self.reset_parameters()
+
     def init_custom_INs(self, IN, in_feats, h_feats, act_func, nas_dropout, layer_norm):
         if IN == "gcn-IN-nSN":
             self.nei_ind_emb = nn.Sequential(
@@ -273,6 +276,17 @@ class IGNNConv(nn.Module):
         else:
             raise ValueError(f"RN={RN} is not supported.")
 
+    def get_leaf_modules(self, module: nn.Module) -> Generator[nn.Module, nn.Module, nn.Module]:
+        if len(list(module.children())) == 0:
+            yield module
+        for m in module.children():
+            yield from self.get_leaf_modules(module=m)
+
+    def reset_parameters(self):
+        for module in self.get_leaf_modules(module=self):
+            if hasattr(module, "reset_parameters"):
+                module.reset_parameters()
+
     @staticmethod
     def inceptive_aggregation(
         adj: SparseTensor,
@@ -371,13 +385,12 @@ class IGNNConv(nn.Module):
     def forward(self, edge_index, features, IN_config: INConf, device=torch.device("cpu")):
         self.to(device=device)
         self.device = device
-        edge_index = edge_index.to(device)
-        features = features.to(device)
 
         if not isinstance(edge_index, SparseTensor):
             n_nodes = features.shape[0]
-            row, col = edge_index[0].long(), edge_index[1].long()
-            edge_index = SparseTensor(row=row, col=col, sparse_sizes=(n_nodes, n_nodes))
+            edge_index = SparseTensor(
+                row=edge_index[0].long(), col=edge_index[1].long(), sparse_sizes=(n_nodes, n_nodes)
+            )
 
         if self.IN == "gcn":
             if self.RN == "residual":

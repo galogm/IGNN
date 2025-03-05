@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "py_setting"
+name = "IGNN"
 version = "0.0.1"
 authors = [{ name = "", email = "" }]
 keywords = [""]
@@ -17,7 +17,13 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    # "torch>=1.12",
+    "torch==2.1.2",
+    "torch-scatter",
+    "torch-sparse",
+    "dgl==2.0",
+    "the_utils>=0.8.0",
+    "graph_datasets>=0.14.1",
+    "torch_geometric==2.6.1",
 ]
 
 [project.urls]
@@ -38,7 +44,10 @@ column_limit = 100
 line-length = 100
 
 [tool.semantic_release]
-version_variables = ["py_setting/__init__.py:__version__", "docs/conf.py:release"]
+version_variables = [
+    "py_setting/__init__.py:__version__",
+    "docs/conf.py:release",
+]
 version_toml = ["pyproject.toml:project.version"]
 major_on_zero = false
 changelog_file = "CHANGELOG.md"
