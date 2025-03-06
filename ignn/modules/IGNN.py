@@ -3,12 +3,12 @@
 # pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals,invalid-name,too-many-branches,too-many-statements,
 import os
 from pathlib import Path
-from typing import Generator
+from typing import Generator, Literal, Optional
 
 import torch
 import torch.nn.functional as F
 from torch import nn
-from torch.nn import LayerNorm, Linear, ModuleList
+from torch.nn import BatchNorm1d, LayerNorm, Linear, ModuleList
 from torch.utils.tensorboard import SummaryWriter
 from torch_geometric.nn import GATConv, MessagePassing, SAGEConv
 from torch_sparse import remove_diag, set_diag
@@ -60,12 +60,12 @@ class IGNNConv(nn.Module):
         h_feats,
         act,
         nas_dropout,
-        layer_norm,
         transform_first,
         nss_dropout,
         RN,
         n_hops,
         ndim_fc,
+        norm: Optional[Literal["bn", "ln"]] = None,
     ):
         super().__init__()
         self.n_hops = n_hops
@@ -78,6 +78,9 @@ class IGNNConv(nn.Module):
         self.nei_feats = None
         self.adj = None
         self.device = None
+        self.norm = lambda x: (
+            {"ln": LayerNorm, "bn": BatchNorm1d}[norm](x) if norm else nn.Identity()
+        )
 
         if IN == "gcn":
             self.nei_ind_emb = nn.ModuleList(
@@ -106,7 +109,7 @@ class IGNNConv(nn.Module):
                     else nn.Sequential(
                         nn.Dropout(p=nas_dropout),
                         nn.Linear(in_feats, h_feats),
-                        nn.LayerNorm(h_feats),
+                        self.norm(h_feats),
                         act_func,
                     )
                 )
@@ -117,26 +120,26 @@ class IGNNConv(nn.Module):
                 self.nei_uni_emb = nn.Sequential(
                     nn.Dropout(p=nas_dropout),
                     nn.Linear(in_feats, h_feats),
-                    nn.LayerNorm(h_feats),
+                    self.norm(h_feats),
                     act_func,
                 )
             self.nei_ind_emb = nn.ModuleList(
                 nn.Sequential(
                     nn.Dropout(p=nas_dropout),
                     nn.Linear(h_feats if transform_first else in_feats, h_feats),
-                    nn.LayerNorm(h_feats) if layer_norm else nn.Identity(),
+                    self.norm(h_feats),
                     act_func,
                 )
                 for _ in range(self.n_nie)
             )
         else:
-            self.init_custom_INs(IN, in_feats, h_feats, act_func, nas_dropout, layer_norm)
+            self.init_custom_INs(IN, in_feats, h_feats, act_func, nas_dropout)
 
         if RN == "concat":
             self.nei_rel_learn = nn.Sequential(
                 nn.Dropout(p=nss_dropout),
                 nn.Linear(ndim_fc, h_feats),
-                nn.LayerNorm(h_feats) if layer_norm else nn.Identity(),
+                self.norm(h_feats),
                 act_func,
             )
         elif RN == "residual":
@@ -148,23 +151,23 @@ class IGNNConv(nn.Module):
                     nn.Sequential(
                         nn.Dropout(p=nss_dropout),
                         nn.Linear(h_feats * 2, 1),
-                        nn.LayerNorm(1) if layer_norm else nn.Identity(),
+                        self.norm(1),
                         acts["tanh"](),
                     )
                     for _ in range(self.n_nie)
                 ]
             )
         else:
-            self.init_custom_RNs(RN, h_feats, act_func, nss_dropout, layer_norm, n_hops)
+            self.init_custom_RNs(RN, h_feats, act_func, nss_dropout, n_hops)
 
         self.reset_parameters()
 
-    def init_custom_INs(self, IN, in_feats, h_feats, act_func, nas_dropout, layer_norm):
+    def init_custom_INs(self, IN, in_feats, h_feats, act_func, nas_dropout):
         if IN == "gcn-IN-nSN":
             self.nei_ind_emb = nn.Sequential(
                 nn.Dropout(p=nas_dropout),
                 nn.Linear(in_feats, h_feats),
-                nn.LayerNorm(h_feats) if layer_norm else nn.Identity(),
+                self.norm(h_feats),
                 act_func,
             )
         elif IN == "gcn-nIN-SN":
@@ -185,7 +188,7 @@ class IGNNConv(nn.Module):
                     else nn.Sequential(
                         nn.Dropout(p=nas_dropout),
                         nn.Linear(in_feats, h_feats),
-                        nn.LayerNorm(h_feats) if layer_norm else nn.Identity(),
+                        self.norm(h_feats),
                         act_func,
                     )
                 )
@@ -209,7 +212,7 @@ class IGNNConv(nn.Module):
                     else nn.Sequential(
                         nn.Dropout(p=nas_dropout),
                         nn.Linear(in_feats, h_feats),
-                        nn.LayerNorm(h_feats) if layer_norm else nn.Identity(),
+                        self.norm(h_feats),
                         act_func,
                     )
                 )
@@ -218,14 +221,14 @@ class IGNNConv(nn.Module):
         else:
             raise ValueError(f"IN={IN} is not supported.")
 
-    def init_custom_RNs(self, RN, h_feats, act_func, nss_dropout, layer_norm, n_hops):
+    def init_custom_RNs(self, RN, h_feats, act_func, nss_dropout, n_hops):
         if RN in ["max", "sum", "mean"]:
             self.nei_rel_learn = nn.ModuleList(
                 [
                     nn.Sequential(
                         nn.Dropout(p=nss_dropout),
                         nn.Linear(h_feats, h_feats),
-                        nn.LayerNorm(h_feats) if layer_norm else nn.Identity(),
+                        self.norm(h_feats),
                         act_func,
                     )
                 ],
@@ -424,13 +427,19 @@ class IGNNConv(nn.Module):
             )
 
         if self.IN == "gcn-IN-SN":
-            init_trans = self.nei_uni_emb if self.transform_first else nn.Identity()
-            ns = [self.nei_ind_emb[i](init_trans(self.nei_feats[i])) for i in range(self.n_nie)]
+            if self.transform_first:
+                ns = [
+                    self.nei_ind_emb[i](self.nei_uni_emb(self.nei_feats[i]))
+                    for i in range(self.n_nie)
+                ]
+            else:
+                ns = [self.nei_ind_emb[i](self.nei_feats[i]) for i in range(self.n_nie)]
         elif self.IN == "gcn-IN-nSN":
             ns = [self.nei_ind_emb(self.nei_feats[i]) for i in range(self.n_nie)]
         else:
             ns = self.custom_INs(features=features, edge_index=edge_index, device=device)
 
         if self.RN == "concat":
-            return self.nei_rel_learn(torch.cat(ns, dim=1))
+            ns = torch.cat(ns, dim=1)
+            return self.nei_rel_learn(ns)
         return self.custom_RNs(ns)

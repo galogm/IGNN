@@ -1,7 +1,6 @@
 """IGNN"""
 
 # pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals,invalid-name,too-many-statements
-import random
 import time
 
 import numpy as np
@@ -19,14 +18,14 @@ from ignn.configs.params import (
     ess,
     feats,
     l2_coefs,
-    layer_norms,
-    layer_norms_att,
     lrs,
     n_hopss,
     n_layerss,
     nas_dropouts,
     norms,
+    norms_att,
     nss_dropouts,
+    pre_norms,
     repeats,
     self_loop_attentive,
 )
@@ -54,6 +53,7 @@ def main(
     clf_dropout=0.0,
     eval_interval=1,
     eval_start=0,
+    norm=None,
     transform_first=False,
     TRAIN_RATIO=48,
     VALID_RATIO=32,
@@ -65,7 +65,7 @@ def main(
         dataset_name=dataset,
         source=source,
         directory=DATA_INFO.DATA_DIR,
-        row_normalize=norms[dataset],
+        row_normalize=pre_norms[dataset],
         rm_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
         add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
         # products and arxiv-year are already simple graphs
@@ -102,7 +102,7 @@ def main(
         add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
         remove_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
         symm_norm=True,
-        row_normalized=norms[dataset],
+        row_normalized=pre_norms[dataset],
         fast=False,
         name=name,
     )
@@ -110,7 +110,7 @@ def main(
         "IN": IN,
         "RN": RN if RN is not None else RNs[dataset],
         "lr": LR,
-        "h_feats": h_feats if h_feats is None else feats[dataset],
+        "h_feats": h_feats if h_feats is not None else feats[dataset],
         "l2_coef": COEF,
         "nas_dropout": DNAS,
         "nss_dropout": DNSS,
@@ -120,7 +120,11 @@ def main(
         "n_layers": N_LAYERS,
         "early_stop": ess[dataset],
         "act": acts[dataset],
-        "layer_norm": layer_norms[dataset] if RN != "attentive" else layer_norms_att[dataset],
+        "norm": (
+            None
+            if norm is False
+            else norm or (norms_att[dataset] if RN == "attentive" else norms[dataset])
+        ),
         "loss": "ce" if dataset not in ["proteins"] else "bce",
         "transform_first": transform_first,
     }
@@ -161,14 +165,14 @@ def main(
             train_loader = RandomNodeLoader(
                 data,
                 num_parts={
-                    "products_ogb": f"{18/16*N_HOPS:.0f}",
-                    "pokec_linkx": f"{15/16*N_HOPS:.0f}",
+                    "products_ogb": int(f"{4}"),
+                    "pokec_linkx": int(f"{3}"),
                 }[name],
                 shuffle=True,
                 num_workers=5,
             )
             test_loader = RandomNodeLoader(
-                data, num_parts={"products_ogb": 5, "pokec_linkx": 5}[name], num_workers=5
+                data, num_parts={"products_ogb": 1, "pokec_linkx": 1}[name], num_workers=5
             )
         else:
             train_mask, val_mask, test_mask = get_splits(
@@ -199,11 +203,17 @@ def main(
 
         with torch.no_grad():
             model.train(False)
+            device = (
+                torch.device("cpu")
+                if IN_config.name in ["products_ogb", "pokec_linkx"] and len(test_loader) == 1
+                else device
+            )
+            transform = T.Compose([T.ToDevice(device), T.ToSparseTensor()])
             if test_loader is not None:
                 y_true = {"train": [], "val": [], "test": []}
                 y_pred = {"train": [], "val": [], "test": []}
                 for data_t in tqdm(test_loader, "test step"):
-                    data_t = model.transform(data_t)
+                    data_t = transform(data_t)
                     embeddings = model(
                         edge_index=data_t.adj_t,
                         features=data_t.x,
@@ -211,7 +221,7 @@ def main(
                         device=device,
                         fast=False,
                     )
-                    logits = model.classifier(embeddings)
+                    logits = model.classifier(embeddings.to(device))
                     for split in ["train", "val", "test"]:
                         mask = data_t[f"{split}_mask"]
                         y_true[split].append(data_t.y[mask].cpu())
@@ -287,6 +297,7 @@ if __name__ == "__main__":
         eval_interval=args.eval_interval,
         eval_start=args.eval_start,
         transform_first=args.transform_first,
+        norm=args.norm,
         TRAIN_RATIO=48,
         VALID_RATIO=32,
         VERSION=args.version,

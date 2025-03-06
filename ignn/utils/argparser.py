@@ -206,7 +206,7 @@ def parse_ignn_args() -> argparse.Namespace:
         help="eval_start epoch",
     )
     parser.add_argument(
-        "-ei",
+        "-i",
         "--eval_interval",
         type=int,
         default=1,
@@ -281,5 +281,14 @@ def parse_ignn_args() -> argparse.Namespace:
         type=lambda x: None if x == "None" else float(x),
         default=None,
         help="clf_dropout",
+    )
+    parser.add_argument(
+        "-n",
+        "--norm",
+        # type=Optional[Literal["ln", "bn"]],
+        type=lambda x: False if x == "False" else x,
+        choices=["bn", "ln", False],
+        default=None,
+        help="Normalization type: 'bn' (BatchNorm) or 'ln' (LayerNorm) or None",
     )
     return parser.parse_args()

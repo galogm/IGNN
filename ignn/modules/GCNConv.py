@@ -8,7 +8,7 @@ from typing import Callable, Optional
 
 import torch
 from torch import Tensor
-from torch.nn import LayerNorm, Parameter
+from torch.nn import Module, Parameter
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.dense.linear import Linear
 from torch_geometric.nn.inits import zeros
@@ -187,8 +187,8 @@ class GCNConv(MessagePassing):
         normalize: bool = True,
         bias: bool = True,
         weight: bool = True,
-        act: Callable = None,
-        layer_norm: bool = True,
+        act: Optional[Callable] = None,
+        norm: Optional[Module] = None,
         **kwargs,
     ):
         kwargs.setdefault("aggr", "add")
@@ -211,7 +211,6 @@ class GCNConv(MessagePassing):
         self.add_self_loops = add_self_loops
         self.normalize = normalize
         self.weight = weight
-        self.ln = layer_norm
         self.act = act
 
         self._cached_edge_index = None
@@ -222,10 +221,10 @@ class GCNConv(MessagePassing):
         else:
             self.register_parameter("lin", None)
 
-        if self.ln:
-            self.ln = LayerNorm(out_channels)
+        if norm is not None:
+            self.norm = self.norm(out_channels)
         else:
-            self.register_parameter("ln", None)
+            self.register_parameter("norm", None)
 
         if bias:
             self.bias = Parameter(torch.empty(out_channels))
@@ -238,8 +237,8 @@ class GCNConv(MessagePassing):
         super().reset_parameters()
         if self.weight:
             self.lin.reset_parameters()
-        if self.ln:
-            self.ln.reset_parameters()
+        if self.norm:
+            self.norm.reset_parameters()
         zeros(self.bias)
         self._cached_edge_index = None
         self._cached_adj_t = None
@@ -301,8 +300,8 @@ class GCNConv(MessagePassing):
         if self.bias is not None:
             out = out + self.bias
 
-        if self.ln is not None:
-            out = self.ln(out)
+        if self.norm is not None:
+            out = self.norm(out)
 
         if self.act is not None:
             out = self.act(out)

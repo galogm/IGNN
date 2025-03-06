@@ -2,8 +2,9 @@
 """
 
 from collections import defaultdict
+from typing import Literal, Optional
 
-norms = defaultdict(
+pre_norms = defaultdict(
     lambda: True,
     {
         "chameleon": False,
@@ -82,7 +83,7 @@ lrs = defaultdict(
 ess = defaultdict(
     lambda: 100,
     {
-        "chameleon": 100,
+        "chameleon": 50,
         "squirrel": 100,
         "actor": 50,
         "pubmed": 100,
@@ -233,41 +234,41 @@ acts = defaultdict(
     },
 )
 
-layer_norms = defaultdict(
-    lambda: True,
+norms: Optional[Literal["bn", "ln"]] = defaultdict(
+    lambda: "ln",
     {
-        "chameleon": True,
-        "squirrel": True,
-        "actor": True,
-        "flickr": True,
-        "blogcatalog": True,
-        "roman-empire": True,
-        "amazon-ratings": True,
-        "photo": True,
-        "pubmed": True,
-        "wikics": True,
-        "arxiv": True,
-        "products": True,
-        "pokec": True,
+        "chameleon": "ln",
+        "squirrel": "ln",
+        "actor": "ln",
+        "flickr": "ln",
+        "blogcatalog": "ln",
+        "roman-empire": "ln",
+        "amazon-ratings": "ln",
+        "photo": "ln",
+        "pubmed": "ln",
+        "wikics": "ln",
+        "arxiv": "ln",
+        "products": "ln",
+        "pokec": "ln",
     },
 )
 
-layer_norms_att = defaultdict(
-    lambda: False,
+norms_att: Optional[Literal["bn", "ln"]] = defaultdict(
+    lambda: None,
     {
-        "chameleon": False,
-        "squirrel": False,
-        "actor": True,
-        "flickr": False,
-        "blogcatalog": True,
-        "roman-empire": False,
-        "amazon-ratings": True,
-        "photo": False,
-        "pubmed": True,
-        "wikics": False,
-        "arxiv": False,
-        "products": False,
-        "pokec": False,
+        "chameleon": None,
+        "squirrel": None,
+        "actor": "ln",
+        "flickr": None,
+        "blogcatalog": "ln",
+        "roman-empire": None,
+        "amazon-ratings": "ln",
+        "photo": None,
+        "pubmed": "ln",
+        "wikics": None,
+        "arxiv": None,
+        "products": None,
+        "pokec": None,
     },
 )
 

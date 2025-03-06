@@ -3,6 +3,8 @@
 # pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals,invalid-name,too-many-branches,too-many-statements
 import copy
 import time
+import traceback
+from typing import Literal, Optional
 
 import torch
 import torch_geometric.transforms as T
@@ -42,7 +44,7 @@ class IGNN(nn.Module):
         RN="concat",
         n_layers=1,
         act="relu",
-        layer_norm=True,
+        norm: Optional[Literal["bn", "ln"]] = None,
         loss="ce",
         num_heads=1,
         transform_first=False,
@@ -71,7 +73,7 @@ class IGNN(nn.Module):
                     act=act,
                     nas_dropout=nas_dropout,
                     nss_dropout=nss_dropout,
-                    layer_norm=layer_norm,
+                    norm=norm,
                     transform_first=transform_first,
                     RN=RN,
                     n_hops=n_hops,
@@ -119,54 +121,59 @@ class IGNN(nn.Module):
         with torch.no_grad():
             self.train(False)
 
-            if epoch % eval_interval == 0 and epoch >= eval_start:
-                if test_loader is not None:
-                    device = (
-                        torch.device("cpu")
-                        if IN_config.name in ["products_ogb", "pokec_linkx"]
-                        and len(test_loader) == 1
-                        else self.device
-                    )
-                    transform = T.Compose([T.ToDevice(device), T.ToSparseTensor()])
-                    y_true = {"train": [], "val": [], "test": []}
-                    y_pred = {"train": [], "val": [], "test": []}
-                    for data in tqdm(test_loader, "val step"):
-                        data = transform(data)
-                        embeddings = self.forward(
-                            edge_index=data.adj_t,
-                            features=data.x,
-                            IN_config=IN_config,
-                            device=device,
-                            fast=False,
+            try:
+                if epoch % eval_interval == 0 and epoch >= eval_start:
+                    if test_loader is not None:
+                        device = (
+                            torch.device("cpu")
+                            if IN_config.name in ["products_ogb", "pokec_linkx"]
+                            and len(test_loader) == 1
+                            else self.device
                         )
-                        logits = self.classifier(embeddings.to(self.device))
-                        for split in ["train", "val", "test"]:
-                            mask = data[f"{split}_mask"]
-                            y_true[split].append(data.y[mask].detach().cpu())
-                            y_pred[split].append(logits[mask].detach().cpu())
+                        transform = T.Compose([T.ToDevice(device), T.ToSparseTensor()])
+                        y_true = {"train": [], "val": [], "test": []}
+                        y_pred = {"train": [], "val": [], "test": []}
+                        for data in tqdm(test_loader, "val step"):
+                            data = transform(data)
+                            embeddings = self.forward(
+                                edge_index=data.adj_t,
+                                features=data.x,
+                                IN_config=IN_config,
+                                device=device,
+                                fast=False,
+                            )
+                            logits = self.classifier(embeddings.to(self.device))
+                            for split in ["train", "val", "test"]:
+                                mask = data[f"{split}_mask"]
+                                y_true[split].append(data.y[mask].detach().cpu())
+                                y_pred[split].append(logits[mask].detach().cpu())
 
-                    train_acc = metric(
-                        IN_config.name,
-                        logits=torch.cat(y_pred["train"], dim=0),
-                        labels=torch.cat(y_true["train"], dim=0),
-                    )
-                    valid_acc = metric(
-                        IN_config.name,
-                        logits=torch.cat(y_pred["val"], dim=0),
-                        labels=torch.cat(y_true["val"], dim=0),
-                    )
-                    test_acc = metric(
-                        IN_config.name,
-                        logits=torch.cat(y_pred["test"], dim=0),
-                        labels=torch.cat(y_true["test"], dim=0),
-                    )
-                    return train_acc, valid_acc, test_acc
+                        train_acc = metric(
+                            IN_config.name,
+                            logits=torch.cat(y_pred["train"], dim=0),
+                            labels=torch.cat(y_true["train"], dim=0),
+                        )
+                        valid_acc = metric(
+                            IN_config.name,
+                            logits=torch.cat(y_pred["val"], dim=0),
+                            labels=torch.cat(y_true["val"], dim=0),
+                        )
+                        test_acc = metric(
+                            IN_config.name,
+                            logits=torch.cat(y_pred["test"], dim=0),
+                            labels=torch.cat(y_true["test"], dim=0),
+                        )
+                        return train_acc, valid_acc, test_acc
 
-                embeddings = self.forward(edge_index, features, IN_config, device=self.device)
-                logits = self.classifier(embeddings)
-                return metric(IN_config.name, logits, labels, train_mask, val_mask, test_mask)
+                    embeddings = self.forward(edge_index, features, IN_config, device=self.device)
+                    logits = self.classifier(embeddings)
+                    return metric(IN_config.name, logits, labels, train_mask, val_mask, test_mask)
+                return 0, 0, 0
 
-            return 0, 0, 0
+            except RuntimeError:
+                traceback.print_exc()
+                self.save_model(IN_config.name, epoch, None)
+                return 0, 0, 0
 
     def forward(self, edge_index, features, IN_config: INConf, device=None, fast=None):
         H = None
@@ -215,8 +222,8 @@ class IGNN(nn.Module):
         t_start = time.time()
         for epoch in range(self.n_epochs):
             loss_value = 0
-            loss_val_value = 0
-            loss_test_value = 0
+            # loss_val_value = 0
+            # loss_test_value = 0
 
             self.train()
             if train_loader is not None:
@@ -228,11 +235,11 @@ class IGNN(nn.Module):
                     logits = self.classifier(embeddings)
 
                     loss = self.criterion(logits[data.train_mask], data.y[data.train_mask])
-                    loss_val = self.criterion(logits[data.val_mask], data.y[data.val_mask])
-                    loss_test = self.criterion(logits[data.test_mask], data.y[data.test_mask])
+                    # loss_val = self.criterion(logits[data.val_mask], data.y[data.val_mask])
+                    # loss_test = self.criterion(logits[data.test_mask], data.y[data.test_mask])
                     loss_value += loss.item()
-                    loss_val_value += loss_val.item()
-                    loss_test_value += loss_test.item()
+                    # loss_val_value += loss_val.item()
+                    # loss_test_value += loss_test.item()
 
                     loss.backward()
                     self.optimizer.step()
@@ -253,11 +260,11 @@ class IGNN(nn.Module):
                 logits = self.classifier(embeddings)
 
                 loss = self.criterion(logits[train_mask], labels[train_mask])
-                loss_val = self.criterion(logits[val_mask], labels[val_mask])
-                loss_test = self.criterion(logits[test_mask], labels[test_mask])
+                # loss_val = self.criterion(logits[val_mask], labels[val_mask])
+                # loss_test = self.criterion(logits[test_mask], labels[test_mask])
                 loss_value = loss.item()
-                loss_val_value = loss_val.item()
-                loss_test_value = loss_test.item()
+                # loss_val_value = loss_val.item()
+                # loss_test_value = loss_test.item()
 
                 loss.backward()
                 self.optimizer.step()
@@ -278,10 +285,6 @@ class IGNN(nn.Module):
             if valid_acc == 0:
                 print(f"Epoch {epoch} done.")
             else:
-                print(
-                    f"epoch:{epoch},loss: {loss_value}, train acc: {train_acc:.4f},"
-                    f"valid acc: {valid_acc:.4f}, test acc: {test_acc:.4f}"
-                )
                 if valid_acc >= best_acc:
                     cnt = 0
                     best_acc = valid_acc
@@ -297,6 +300,12 @@ class IGNN(nn.Module):
                         )
                         break
 
+                print(
+                    f"epoch:{epoch},loss: {loss_value:.4f}, train: {train_acc:.4f}, "
+                    f"valid: {valid_acc:.4f}, test: {test_acc:.4f}, "
+                    f"best valid: {best_acc:.4f}, best test: {best_acc_t:.4f}"
+                )
+
             # writer.add_scalar("joint/time/train", time.time() - t, epoch)
 
             # writer.add_scalar("joint/metric/train", train_acc, epoch)
@@ -309,9 +318,12 @@ class IGNN(nn.Module):
         if best_state_dict is not None:
             self.load_state_dict(best_state_dict)
         if save_state:
-            file = f"{IN_config.name}.{get_str_time()}"
-            save_model(file, self, self.optimizer, epoch, loss)
-            print(f"Save best state dict to {file}.")
+            self.save_model(IN_config.name, epoch, loss)
         tm = (time.time() - t_start) / epoch * 10
         print(f"10 epoch cost: {tm:.4f}s.")
         return tm
+
+    def save_model(self, name, epoch, loss):
+        file = f"{name}.{get_str_time()}"
+        save_model(file, self, self.optimizer, epoch, loss)
+        print(f"Save best state dict to {file}.")
