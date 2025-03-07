@@ -212,7 +212,7 @@ class IGNN(nn.Module):
         labels = labels.to(self.device)
 
         best_epoch = 0
-        best_acc = 0.0
+        best_acc = best_acc_t = 0.0
         cnt = 0
         best_state_dict = None
         # writer = SummaryWriter(
@@ -250,6 +250,7 @@ class IGNN(nn.Module):
                     labels,
                     IN_config,
                     epoch,
+                    eval_interval=eval_interval,
                     eval_start=eval_start,
                     test_loader=test_loader,
                 )
@@ -282,7 +283,7 @@ class IGNN(nn.Module):
                     test_mask=test_mask,
                 )
 
-            if valid_acc == 0:
+            if valid_acc == 0 and best_acc == 0:
                 print(f"Epoch {epoch} done.")
             else:
                 if valid_acc >= best_acc:
@@ -293,18 +294,18 @@ class IGNN(nn.Module):
                     best_state_dict = copy.deepcopy(self.state_dict())
                 else:
                     cnt += 1
-                    if cnt == self.estop_steps:
-                        print(
-                            f"Early Stopping! Best Epoch: {best_epoch}, "
-                            f"best val acc: {best_acc:.4f}, test acc: {best_acc_t:.4f}"
-                        )
-                        break
 
                 print(
-                    f"epoch:{epoch},loss: {loss_value:.4f}, train: {train_acc:.4f}, "
-                    f"valid: {valid_acc:.4f}, test: {test_acc:.4f}, "
-                    f"best valid: {best_acc:.4f}, best test: {best_acc_t:.4f}"
+                    f"epoch:{epoch}/best:{best_epoch}, loss:{loss_value:.4f}, train:{train_acc:.4f}, "
+                    f"valid:{valid_acc:.4f}/best:{best_acc:.4f}, test:{test_acc:.4f}/best:{best_acc_t:.4f}"
                 )
+
+            if cnt == self.estop_steps:
+                print(
+                    f"Early Stopping! Best Epoch: {best_epoch}, "
+                    f"best val acc: {best_acc:.4f}, test acc: {best_acc_t:.4f}"
+                )
+                break
 
             # writer.add_scalar("joint/time/train", time.time() - t, epoch)
 
@@ -319,7 +320,7 @@ class IGNN(nn.Module):
             self.load_state_dict(best_state_dict)
         if save_state:
             self.save_model(IN_config.name, epoch, loss)
-        tm = (time.time() - t_start) / epoch * 10
+        tm = (time.time() - t_start) / max(1, epoch) * 10
         print(f"10 epoch cost: {tm:.4f}s.")
         return tm
 

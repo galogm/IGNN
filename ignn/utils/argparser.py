@@ -199,6 +199,13 @@ def parse_ignn_args() -> argparse.Namespace:
         help="model",
     )
     parser.add_argument(
+        "-p",
+        "--num_parts",
+        type=int,
+        default=3,
+        help="Graph partition parts for batch learning",
+    )
+    parser.add_argument(
         "-eval",
         "--eval_start",
         type=int,
@@ -239,6 +246,13 @@ def parse_ignn_args() -> argparse.Namespace:
         type=lambda x: None if x == "None" else int(x),
         default=None,
         help="n_hops",
+    )
+    parser.add_argument(
+        "-es",
+        "--early_stop",
+        type=lambda x: None if x == "None" else int(x),
+        default=None,
+        help="early stop",
     )
     parser.add_argument(
         "-layers",

@@ -5,7 +5,7 @@ from collections import defaultdict
 from typing import Literal, Optional
 
 pre_norms = defaultdict(
-    lambda: True,
+    lambda: False,
     {
         "chameleon": False,
         "squirrel": True,
@@ -15,7 +15,7 @@ pre_norms = defaultdict(
         "roman-empire": False,
         "amazon-ratings": True,
         "photo": True,
-        "pubmed": True,
+        "pubmed": False,
         "wikics": False,
         "arxiv": False,
         "products": False,
@@ -36,9 +36,9 @@ feats = defaultdict(
         "flickr": 512,
         "blogcatalog": 512,
         "wikics": 300,
-        "arxiv": 512,
-        "products": 512,
-        "pokec": 512,
+        "arxiv": 256,
+        "products": 200,
+        "pokec": 256,
     },
 )
 
@@ -47,9 +47,9 @@ l2_coefs = defaultdict(
     {
         "chameleon": 5e-5,
         "squirrel": 5e-5,
-        "actor": 0.0000,
+        "actor": 0.0,
         "pubmed": 5e-5,
-        "photo": 5e-5,
+        "photo": 5e-8,
         "roman-empire": 5e-5,
         "amazon-ratings": 5e-5,
         "flickr": 5e-5,
@@ -57,7 +57,7 @@ l2_coefs = defaultdict(
         "wikics": 5e-5,
         "arxiv": 5e-5,
         "products": 5e-5,
-        "pokec": 5e-5,
+        "pokec": 5e-8,
     },
 )
 
@@ -89,14 +89,13 @@ ess = defaultdict(
         "pubmed": 100,
         "photo": 100,
         "roman-empire": 300,
-        # "roman-empire": 100,
-        "amazon-ratings": 100,
+        "amazon-ratings": 300,
         "flickr": 100,
         "blogcatalog": 100,
         "wikics": 200,
-        "arxiv": 100,
-        "products": 100,
-        "pokec": 100,
+        "arxiv": 200,
+        "products": 200,
+        "pokec": 200,
     },
 )
 
@@ -108,7 +107,7 @@ nas_dropouts = defaultdict(
         "chameleon": 0.8,
         "squirrel": 0.8,
         "actor": 0.0,
-        "pubmed": 0.2,
+        "pubmed": 0.5,
         "photo": 0.4,
         "roman-empire": 0.2,
         "amazon-ratings": 0.0,
@@ -127,14 +126,14 @@ nss_dropouts = defaultdict(
         "chameleon": 0.8,
         "squirrel": 0.8,
         "actor": 0.8,
-        "pubmed": 0.8,
-        "photo": 0.5,
+        "pubmed": 0.9,
+        "photo": 0.8,
         "roman-empire": 0.2,
-        "amazon-ratings": 0.5,
+        "amazon-ratings": 0.8,
         "wikics": 0.5,
         "arxiv": 0.8,
-        "products": 0.8,
-        "pokec": 0.8,
+        "products": 0.5,
+        "pokec": 0.2,
     },
 )
 
@@ -153,7 +152,7 @@ clf_dropouts = defaultdict(
         "wikics": 0.9,
         "arxiv": 0.5,
         "products": 0.5,
-        "pokec": 0.5,
+        "pokec": 0.2,
     },
 )
 
@@ -166,13 +165,13 @@ n_hopss = defaultdict(
         "flickr": 10,
         "blogcatalog": 10,
         "roman-empire": 1,
-        "amazon-ratings": 10,
-        "photo": 10,
+        "amazon-ratings": 16,
+        "photo": 16,
         "pubmed": 4,
         "wikics": 8,
         "arxiv": 10,
-        "products": 10,
-        "pokec": 10,
+        "products": 5,
+        "pokec": 6,
     },
 )
 
@@ -184,7 +183,6 @@ n_layerss = defaultdict(
         "actor": 1,
         "flickr": 1,
         "blogcatalog": 1,
-        # "roman-empire": 3,
         "roman-empire": 5,
         "amazon-ratings": 1,
         "photo": 1,
@@ -249,7 +247,7 @@ norms: Optional[Literal["bn", "ln"]] = defaultdict(
         "wikics": "ln",
         "arxiv": "ln",
         "products": "ln",
-        "pokec": "ln",
+        "pokec": "bn",
     },
 )
 
@@ -268,7 +266,7 @@ norms_att: Optional[Literal["bn", "ln"]] = defaultdict(
         "wikics": None,
         "arxiv": None,
         "products": None,
-        "pokec": None,
+        "pokec": "bn",
     },
 )
 
@@ -294,9 +292,6 @@ self_loop_attentive = defaultdict(
 repeats = defaultdict(
     lambda: 5,
     {
-        "pokec": 3,
-        "arxiv": 5,
-        "products": 3,
         "actor": 10,
         "blogcatalog": 10,
         "flickr": 10,
@@ -307,6 +302,9 @@ repeats = defaultdict(
         "photo": 10,
         "pubmed": 10,
         "wikics": 10,
+        "arxiv": 5,
+        "products": 3,
+        "pokec": 3,
     },
 )
 

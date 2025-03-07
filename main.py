@@ -51,6 +51,8 @@ def main(
     nas_dropout=0.0,
     nss_dropout=0.0,
     clf_dropout=0.0,
+    early_stop=None,
+    num_parts=3,
     eval_interval=1,
     eval_start=0,
     norm=None,
@@ -118,7 +120,7 @@ def main(
         "n_epochs": 2000,
         "n_hops": N_HOPS,
         "n_layers": N_LAYERS,
-        "early_stop": ess[dataset],
+        "early_stop": early_stop or ess[dataset],
         "act": acts[dataset],
         "norm": (
             None
@@ -130,6 +132,7 @@ def main(
     }
     params_all = {
         "eval_start": eval_start,
+        "eval_interval": eval_interval,
         "IN_config": IN_config,
         **params,
     }
@@ -162,18 +165,8 @@ def main(
                     DATA=DATA_INFO,
                     labeled_idx=labeled_idx,
                 )
-            train_loader = RandomNodeLoader(
-                data,
-                num_parts={
-                    "products_ogb": int(f"{4}"),
-                    "pokec_linkx": int(f"{3}"),
-                }[name],
-                shuffle=True,
-                num_workers=5,
-            )
-            test_loader = RandomNodeLoader(
-                data, num_parts={"products_ogb": 1, "pokec_linkx": 1}[name], num_workers=5
-            )
+            train_loader = RandomNodeLoader(data, num_parts=num_parts, shuffle=True, num_workers=5)
+            test_loader = RandomNodeLoader(data, num_parts=1, num_workers=5)
         else:
             train_mask, val_mask, test_mask = get_splits(
                 data,
@@ -203,49 +196,28 @@ def main(
 
         with torch.no_grad():
             model.train(False)
-            device = (
-                torch.device("cpu")
-                if IN_config.name in ["products_ogb", "pokec_linkx"] and len(test_loader) == 1
-                else device
-            )
-            transform = T.Compose([T.ToDevice(device), T.ToSparseTensor()])
             if test_loader is not None:
+                device = torch.device("cpu") if len(test_loader) == 1 else device
+                transform = T.Compose([T.ToDevice(device), T.ToSparseTensor()])
+                model = model.to(device)
                 y_true = {"train": [], "val": [], "test": []}
                 y_pred = {"train": [], "val": [], "test": []}
                 for data_t in tqdm(test_loader, "test step"):
                     data_t = transform(data_t)
-                    embeddings = model(
-                        edge_index=data_t.adj_t,
-                        features=data_t.x,
-                        IN_config=IN_config,
-                        device=device,
-                        fast=False,
-                    )
-                    logits = model.classifier(embeddings.to(device))
+                    embeddings = model(data_t.adj_t, data_t.x, IN_config, device, fast=False)
+                    logits = model.classifier(embeddings)
                     for split in ["train", "val", "test"]:
                         mask = data_t[f"{split}_mask"]
                         y_true[split].append(data_t.y[mask].cpu())
                         y_pred[split].append(logits[mask].cpu())
-
-                test_acc = metric(
-                    name,
-                    logits=torch.cat(y_pred["test"], dim=0),
-                    labels=torch.cat(y_true["test"], dim=0),
-                )
+                test_acc = metric(name, torch.cat(y_pred["test"]), torch.cat(y_true["test"]))
             else:
-                embeddings = model(
-                    edge_index=edge_index,
-                    features=features,
-                    IN_config=IN_config,
-                    device=device,
-                )
+                embeddings = model(edge_index, features, IN_config, device)
                 y_pred = model.classifier(embeddings)
-
                 _, _, test_acc = metric(name, y_pred, label, train_mask, val_mask, test_mask)
 
         tms[f"{i}"] = tm
         ts.append(tm)
-
         res_list_acc_joint.append(test_acc)
         print(f"{name} {i} res: {test_acc}\n\n")
 
@@ -276,7 +248,6 @@ def main(
 if __name__ == "__main__":
 
     args = parse_ignn_args()
-
     DEVICE = set_device(str(args.gpu_id))
     set_seed(args.seed)
 
@@ -294,6 +265,8 @@ if __name__ == "__main__":
         nas_dropout=args.nas_dropout,
         nss_dropout=args.nss_dropout,
         clf_dropout=args.clf_dropout,
+        early_stop=args.early_stop,
+        num_parts=args.num_parts,
         eval_interval=args.eval_interval,
         eval_start=args.eval_start,
         transform_first=args.transform_first,
