@@ -1,0 +1,14 @@
+- Homophilic Cora
+  - 10 hops:
+    ![cora 10 hops](./cora_hops10.png)
+  - 32 hops:
+    ![cora 32 hops](./cora_hops32.png)
+  - 64 hops:
+    ![cora 64 hops](./cora_hops64.png)
+- Heterophilic Squirrel
+  - 10 hops:
+    ![sq 10 hops](./squirrel_hops10.png)
+  - 32 hops:
+    ![sq 32 hops](./squirrel_hops32.png)
+  - 64 hops:
+    ![sq 64 hops](./squirrel_hops64.png)
