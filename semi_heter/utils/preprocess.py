@@ -17,6 +17,7 @@ def get_splits_mask(
     repeat,
     split_id,
     SPLIT_DIR,
+    mask=True,
 ):
     train_idx, val_idx, test_idx = split_train_test_nodes(
         num_nodes=graph.num_nodes(),
@@ -28,6 +29,8 @@ def get_splits_mask(
         fixed_split=True,
         split_save_dir=SPLIT_DIR,
     )
+    if not mask:
+        return train_idx, val_idx, test_idx
     train_mask = (
         torch.zeros(graph.num_nodes())
         .scatter_(0, torch.tensor(train_idx, dtype=torch.int64), 1)
