@@ -65,6 +65,7 @@ class IGNNConv(nn.Module):
         RN,
         n_hops,
         ndim_fc,
+        act_att='tanh',
         norm: Optional[Literal["bn", "ln"]] = None,
     ):
         super().__init__()
@@ -152,7 +153,7 @@ class IGNNConv(nn.Module):
                         nn.Dropout(p=nss_dropout),
                         nn.Linear(h_feats * 2, 1),
                         self.norm(1),
-                        acts["tanh"](),
+                        acts[act_att](),
                     )
                     for _ in range(self.n_nie)
                 ]
@@ -385,7 +386,25 @@ class IGNNConv(nn.Module):
 
         return torch.cat(ns, dim=1)
 
-    def forward(self, edge_index, features, IN_config: INConf, device=torch.device("cpu")):
+    def get_Ws(self):
+        if self.RN in ['none','residual']:
+            Ws = [self.nei_ind_emb[0][1].weight.detach().clone()]
+            for i in range(1,len(self.nei_ind_emb)):
+                Ws.append(self.nei_ind_emb[i].lin.weight.detach().clone())
+            return Ws
+        if self.RN == 'attentive':
+            Ws = [self.nei_ind_emb[0][1].weight.detach().clone()]
+            for i in range(1,len(self.nei_rel_learn)):
+                Ws.append(self.nei_rel_learn[i][1].weight.detach().clone())
+            return Ws
+
+        if self.RN == 'concat':
+            Ws = []
+            for i in range(0,len(self.nei_ind_emb)):
+                Ws.append(self.nei_ind_emb[i][1].weight.detach().clone())
+            return Ws, self.nei_rel_learn[1].weight.detach().clone()
+
+    def forward(self, edge_index, features, IN_config: INConf, device=torch.device("cpu"), hiddens=False):
         self.to(device=device)
         self.device = device
 
@@ -398,23 +417,41 @@ class IGNNConv(nn.Module):
         if self.IN == "gcn":
             if self.RN == "residual":
                 h = self.nei_ind_emb[0](features)
+                if hiddens:
+                    hs = [h.detach().clone()]
                 for i in range(1, self.n_nie):
                     h = self.nei_ind_emb[i](x=h, edge_index=edge_index) + h
+                    if hiddens:
+                        hs.append(h.detach().clone())
+                if hiddens:
+                    return h, hs
                 return h
 
             if self.RN == "attentive":
                 h = self.nei_ind_emb[0](features)
+                if hiddens:
+                    hs = [h.detach().clone()]
                 for i in range(1, self.n_nie):
                     h_k = self.nei_ind_emb[i](x=h, edge_index=edge_index)
                     # h_k = self.nei_ind_emb[i](graph=to_dgl(Data(edge_index=edge_index, num_nodes=features.shape[0])), feat=h)
                     a = self.nei_rel_learn[i](torch.cat([h_k, h], dim=-1))
                     h = a * h_k + (1 - a) * h
+                    if hiddens:
+                        hs.append(h.detach().clone())
+                if hiddens:
+                    return h, hs
                 return h
 
             if self.RN == "none":
                 h = self.nei_ind_emb[0](features)
+                if hiddens:
+                    hs = [h.detach().clone()]
                 for i in range(1, self.n_nie):
                     h = self.nei_ind_emb[i](x=h, edge_index=edge_index)
+                    if hiddens:
+                        hs.append(h.detach().clone())
+                if hiddens:
+                    return h, hs
                 return h
 
         if not IN_config.fast or self.nei_feats is None:
@@ -440,6 +477,7 @@ class IGNNConv(nn.Module):
             ns = self.custom_INs(features=features, edge_index=edge_index, device=device)
 
         if self.RN == "concat":
-            ns = torch.cat(ns, dim=1)
-            return self.nei_rel_learn(ns)
+            if hiddens:
+                return self.nei_rel_learn(torch.cat(ns, dim=1)), ns
+            return self.nei_rel_learn(torch.cat(ns, dim=1))
         return self.custom_RNs(ns)

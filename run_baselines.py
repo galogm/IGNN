@@ -15,8 +15,10 @@ from sklearn.metrics import accuracy_score as ACC
 from the_utils import save_to_csv_files, set_device, set_seed, tab_printer
 
 import semi_heter.baselines as baselines
+from ignn.modules import DataConf
+from ignn.utils import read_configs
 from semi_heter.modules import Data
-from semi_heter.utils import get_splits_mask, read_configs, set_args_wrt_dataset
+from semi_heter.utils import get_splits_mask, set_args_wrt_dataset
 
 DATASETS = {
     "critical": [
@@ -60,6 +62,9 @@ DATASETS = {
         "actor",
         "pubmed",
         "wikics",
+    ],
+    "ogb":[
+        "arxiv",
     ],
     "Critical": [
         # 22,662
@@ -379,6 +384,7 @@ def main(dataset, source):
     tab_printer(args)
     tms = {
         "model": args.model,
+        "dataset": args.dataset,
         "hops": getattr(args, model_keys[args.model]),
         "0": 0,
         "1": 0,
@@ -396,14 +402,18 @@ def main(dataset, source):
     for run in range(args.runs):
         print(f"\nRun: {run}\n")
         set_seed(seed_list[run])
-        train_mask, val_mask, test_mask = get_splits_mask(
-            graph=graph,
-            train_ratio=48,
-            valid_ratio=32,
-            repeat=args.runs,
-            split_id=run,
-            SPLIT_DIR=DATA.SPLIT_DIR,
-        )
+        if graph.name=='arxiv_ogb':
+            train_mask, val_mask, test_mask = graph.ndata['train_mask'], graph.ndata['val_mask'], graph.ndata['test_mask']
+        else:
+            train_mask, val_mask, test_mask = get_splits_mask(
+                graph=graph,
+                train_ratio=48,
+                valid_ratio=32,
+                repeat=args.runs,
+                split_id=run,
+                SPLIT_DIR=DATA.SPLIT_DIR,
+            )
+
 
         Model = getattr(
             baselines,
@@ -467,11 +477,13 @@ def main(dataset, source):
 def set_args(args):
     if args.model == "GloGNN":
         # args.nhid = 64
-        args.nhid = 256
+        args.nhid = 512
+        args.orders = args.n_hops
         args.orders_func_id = 2
     elif args.model == "GCNII":
         # args.nhidden = 64
-        args.nhidden = 256
+        args.nhidden = 512
+        args.layers = args.n_hops
     elif args.model == "GGCN":
         args.use_degree = True
         args.use_sign = True
@@ -489,8 +501,8 @@ def set_args(args):
         args.acm_model = "acmgcnp"
     elif args.model == "OrderedGNN":
         args.chunk_size = 64
-        args.hidden_channel = 256
-        args.num_layers = 8
+        args.hidden_channel = 512
+        args.num_layers = args.n_hops
         args.add_self_loops = False
         args.simple_gating = False
         args.tm = True
@@ -522,6 +534,10 @@ def set_args(args):
     elif args.model == "APPNP":
         # args.layers = [512, 512]
         args.layers = [256, 256]
+    elif args.model == "IncepGCN":
+        args.n_layers = args.n_hops
+    elif args.model == "DAGNN":
+        args.k = args.n_hops
     elif args.model in [
         "MLP",
         "GCN",
@@ -576,8 +592,9 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, default="MLP", help="")
 
     args = parser.parse_args()
+    n_hops=args.n_hops
 
-    DATA = Data(**read_configs("data"))
+    DATA = DataConf(**read_configs("data"))
 
     DIM_BOUND = {
         "pubmed": 500,
@@ -597,7 +614,8 @@ if __name__ == "__main__":
         #     if args.dataset in DIM_BOUND.keys() and args.nhidden > DIM_BOUND[args.dataset]
         #     else args.nhidden
         # )
-        args.nhidden = 256
+        args.nhidden = 512
+        args.n_hops = n_hops
 
         # tab_printer(args_dict)
         main(

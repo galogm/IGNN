@@ -158,6 +158,13 @@ def parse_ignn_args() -> argparse.Namespace:
         help="random seed",
     )
     parser.add_argument(
+        "-ne",
+        "--n_epochs",
+        type=int,
+        default=2000,
+        help="maximum epochs",
+    )
+    parser.add_argument(
         "-f",
         "--h_feats",
         type=int,
@@ -184,6 +191,13 @@ def parse_ignn_args() -> argparse.Namespace:
         type=str,
         default="dgl",
         help="return_type",
+    )
+    parser.add_argument(
+        "-at",
+        "--act_att",
+        type=str,
+        default="tanh",
+        help="act attentive",
     )
     parser.add_argument(
         "-t",

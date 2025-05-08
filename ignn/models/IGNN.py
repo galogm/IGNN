@@ -46,6 +46,7 @@ class IGNN(nn.Module):
         act="relu",
         norm: Optional[Literal["bn", "ln"]] = None,
         loss="ce",
+        act_att="tanh",
         num_heads=1,
         transform_first=False,
     ) -> None:
@@ -78,6 +79,7 @@ class IGNN(nn.Module):
                     RN=RN,
                     n_hops=n_hops,
                     ndim_fc=h_feats * (n_hops + 1),
+                    act_att=act_att,
                 )
                 for i in range(n_layers)
             ]
@@ -182,11 +184,28 @@ class IGNN(nn.Module):
                 edge_index,
                 features=features if i == 0 else H,
                 IN_config=INConf(
-                    **{**IN_config.__dict__, "fast": i == 0 if fast is None else fast}
+                    **{**IN_config.__dict__, }
                 ),
                 device=device,
             )
         return H
+
+    def get_hidden(
+        self, edge_index, features, IN_config: INConf, device=None, fast=None, hiddens=True
+    ):
+        H = None
+        Hs = []
+        for i, ignnconv in enumerate(self.ignnconvs):
+            H, Hs = ignnconv(
+                edge_index,
+                features=features if i == 0 else H,
+                IN_config=INConf(
+                    **{**IN_config.__dict__, "fast": i == 0 if fast is None else fast}
+                ),
+                device=device,
+                hiddens=hiddens,
+            )
+        return Hs, ignnconv.get_Ws()
 
     def fit(
         self,
@@ -256,6 +275,10 @@ class IGNN(nn.Module):
                 )
             else:
                 self.optimizer.zero_grad()
+
+                edge_index = edge_index.to(device)
+                features = features.to(device)
+                labels = labels.to(device)
 
                 embeddings = self.forward(edge_index, features, IN_config, device=device)
                 logits = self.classifier(embeddings)

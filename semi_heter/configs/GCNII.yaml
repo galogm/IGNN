@@ -96,6 +96,16 @@ photo:
   variant: False
   patience: 100
 
+arxiv:
+  lr: 0.05
+  l2_coef: 0.
+  dropout: 0.5
+  alpha: 0.4
+  lammbda: 0.5
+  layers: 8
+  variant: False
+  patience: 100
+
 
 wikics:
   lr: 0.01

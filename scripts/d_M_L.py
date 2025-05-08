@@ -4,9 +4,11 @@
 import time
 
 import numpy as np
+import scipy.sparse as sp
 import torch
 import torch_geometric.transforms as T
 from graph_datasets import load_data
+from scipy.sparse.csgraph import connected_components
 from the_utils import save_to_csv_files, set_device, set_seed, tab_printer
 from torch_geometric.loader import RandomNodeLoader
 from tqdm import tqdm
@@ -58,7 +60,7 @@ def main(
     eval_start=0,
     norm=None,
     transform_first=False,
-    act_att="tanh",
+    act_att='tanh',
     TRAIN_RATIO=48,
     VALID_RATIO=32,
     VERSION="1.0",
@@ -83,6 +85,8 @@ def main(
     edge_index = data.edge_index
     features = data.x
     name = data.name
+    if name=='core_pyg':
+        features[(features - 0.0) > 0.0] = 1.0
 
     labeled_idx = torch.where(label != -1)[0] if dataset in ["wiki", "Penn94", "pokec"] else None
     n_clusters = 2 if dataset == "pokec" else n_clusters
@@ -149,6 +153,10 @@ def main(
 
     tms = {"model": f"IGNN-{IN}-{RN}", "dataset": dataset, "hops": N_HOPS}
     ts = []
+
+    W_normss = []
+    H_dms = []
+    Ls = []
 
     for i in range(repeat):
         # set_seed(seed_list[i])
@@ -219,10 +227,77 @@ def main(
                 y_pred = model.classifier(embeddings)
                 _, _, test_acc = metric(name, y_pred, label, train_mask, val_mask, test_mask)
 
+            def get_proj_mat(adj_mat, num_nodes):
+                n_components, components_label = connected_components(adj_mat)
+                E_mat = np.zeros((n_components, num_nodes))
+                for node_i in range(num_nodes):
+                    deg = adj_mat[node_i, :].sum()
+                    E_mat[components_label[node_i], node_i] = 1/np.sqrt(deg)
+                E_mat = (E_mat.T/E_mat.sum(axis=1)).T
+
+                P_mat = np.matmul(E_mat.T, np.linalg.inv(E_mat.dot(E_mat.T))).dot(E_mat)
+                F_mat = np.eye(P_mat.shape[0]) - P_mat
+                return F_mat
+
+            def compute_dM(hiddens, F_mat):
+                dM = [np.linalg.norm(F_mat.dot(hidden.cpu().numpy())) for hidden in hiddens]
+                # dM = np.array(dM)/dM[0]
+                return dM
+
+            F_mat = get_proj_mat(sp.coo_matrix(([1]*data.num_edges, (edge_index[0].numpy(), edge_index[1].numpy()))).toarray(),n_nodes)
+            Hs, Ws = model.get_hidden(edge_index.to(device), features.to(device), IN_config, device)
+            print(Hs, Ws)
+            if RN=='concat':
+                W = Ws[1]
+                Ws = Ws[0]
+                W_norms = [w.data.norm(2).item() for w in Ws ]
+                H_dm = compute_dM(Hs, F_mat)
+                L = 0
+                for idx, w in enumerate(Ws):
+                    L = L + w.t().matmul(W[:,idx*h_feats:(idx+1)*h_feats])
+                L = L.norm(2).item()
+            if RN in ['none']:
+                W_norms = [W.data.norm(2).item() for W in Ws ]
+                H_dm = compute_dM(Hs, F_mat)
+                L=Ws[1]
+                for j in range(2, len(Ws)):
+                    L = L.matmul(Ws[j])
+                L = L.norm(2).item()
+            if RN in ['residual']:
+                W_norms = [W.data.norm(2).item() for W in Ws ]
+                H_dm = compute_dM(Hs, F_mat)
+                L=Ws[1]
+                for j in range(2, len(Ws)):
+                    L = L.matmul((torch.eye(Ws[j].shape[0]).to(L.device)+Ws[j]))
+                L = L.norm(2).item()
+
+            print(W_norms,'\n',H_dm,'\n',L)
+            W_normss.append(W_norms)
+            H_dms.append(H_dm)
+            Ls.append(L)
+
         tms[f"{i}"] = tm
         ts.append(tm)
         res_list_acc_joint.append(test_acc)
         print(f"{name} {i} res: {test_acc}\n\n")
+
+    W_normss = np.array(W_normss)
+    H_dms=np.array(H_dms)
+    Ls = np.array(Ls)
+    Ls = f"{Ls.mean():.2f}±{Ls.std():.2f}"
+
+    save_to_csv_files(
+        results={"model": f"IGNN-{IN}-{RN}", "dataset": dataset, "hops": N_HOPS},
+        append_info={
+            "Ls":Ls,
+            "H_dms_m": H_dms.mean(axis=0),
+            "H_dms_s": H_dms.std(axis=0),
+            "W_normss_m": W_normss.mean(axis=0),
+            "W_normss_s": W_normss.std(axis=0),
+        },
+        csv_name="dml.csv",
+    )
+
 
     save_to_csv_files(
         results={**tms},

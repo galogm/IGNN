@@ -5,7 +5,7 @@ from collections import defaultdict
 from typing import Literal, Optional
 
 pre_norms = defaultdict(
-    lambda: False,
+    lambda: True,
     {
         "chameleon": False,
         "squirrel": True,
@@ -94,8 +94,8 @@ ess = defaultdict(
         "blogcatalog": 100,
         "wikics": 200,
         "arxiv": 200,
-        "products": 200,
-        "pokec": 200,
+        "products": 100,
+        "pokec": 100,
     },
 )
 
@@ -252,7 +252,7 @@ norms: Optional[Literal["bn", "ln"]] = defaultdict(
 )
 
 norms_att: Optional[Literal["bn", "ln"]] = defaultdict(
-    lambda: None,
+    lambda: "ln",
     {
         "chameleon": None,
         "squirrel": None,
@@ -271,7 +271,7 @@ norms_att: Optional[Literal["bn", "ln"]] = defaultdict(
 )
 
 self_loop_attentive = defaultdict(
-    lambda: False,
+    lambda: True,
     {
         "chameleon": False,
         "squirrel": False,
@@ -289,6 +289,25 @@ self_loop_attentive = defaultdict(
     },
 )
 
+act_att = defaultdict(
+    lambda: 'tanh',
+    {
+        "chameleon": 'tanh',
+        "squirrel": 'sigmoid',
+        "actor": 'tanh',
+        "flickr": 'tanh',
+        "blogcatalog": 'tanh',
+        "roman-empire": 'tanh',
+        "amazon-ratings": 'tanh',
+        "photo": 'tanh',
+        "pubmed": 'tanh',
+        "wikics": 'tanh',
+        "arxiv": 'tanh',
+        "products": 'tanh',
+        "pokec": 'tanh',
+    },
+)
+
 repeats = defaultdict(
     lambda: 5,
     {
@@ -302,7 +321,7 @@ repeats = defaultdict(
         "photo": 10,
         "pubmed": 10,
         "wikics": 10,
-        "arxiv": 5,
+        "arxiv": 3,
         "products": 3,
         "pokec": 3,
     },

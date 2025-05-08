@@ -133,6 +133,22 @@ photo:
   use_weight: True
   use_graph: True
 
+arxiv:
+  lr: 0.001
+  l2_coef: 0.00005
+  normalize: 1
+  nhidden: 64
+  dropout: 0.5
+  patience: 100
+  num_layers: 2
+  num_heads: 1
+  kernel: 'simple'
+  alpha: 0.5
+  use_bn: True
+  use_residual: True
+  use_weight: True
+  use_graph: True
+
 
 wikics:
   lr: 0.01

@@ -96,8 +96,8 @@ class SIGN(nn.Module):
         self.to(self.device)
 
         graph = graph.remove_self_loop().add_self_loop()
-        adj = graph.adj_external(scipy_fmt="csr")
-        adj = torch.tensor(adj.todense(), device=self.device, dtype=torch.float)
+        # adj = graph.adj_external(scipy_fmt="csr")
+        # adj = torch.tensor(adj.todense(), device=self.device, dtype=torch.float)
         X = graph.ndata["feat"]
         n_nodes, _ = X.shape
 

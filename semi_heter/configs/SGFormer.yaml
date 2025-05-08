@@ -157,6 +157,25 @@ photo:
   gnn: "gcn"
   aggregate: "add"
 
+arxiv:
+  lr: 0.001
+  l2_coef: 0.00005
+  normalize: 1
+  nhidden: 128
+  dropout: 0.8
+  patience: 100
+  num_layers: 1
+  num_heads: 1
+  alpha: 0.5
+  use_bn: True
+  use_residual: True
+  use_weight: True
+  use_graph: True
+  use_act: False
+  graph_weight: 0.5
+  gnn: "gcn"
+  aggregate: "add"
+
 
 wikics:
   lr: 0.01
