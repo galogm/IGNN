@@ -6,3 +6,7 @@
 	path = semi_heter/baselines/MTGCN
 	url = git@github.com:galogm/forked.git
 	branch = MTGCN/Wrapper
+[submodule "N2"]
+	path = semi_heter/baselines/N2
+	url = git@github.com:galogm/forked.git
+	branch = N2/Wrapper
