@@ -19,15 +19,15 @@ $ bash .ci/install.sh
 
 Detailed scripts for each IGNN variant across all datasets:
 
-- c-IGNN: `scripts/01-cIGNN.sh`
+- c-IGNN: [`./scripts/01-cIGNN.sh`](./scripts/01-cIGNN.sh)
 
-- r-IGNN: `scripts/02-rIGNN.sh`
+- r-IGNN: [`./scripts/02-rIGNN.sh`](./scripts/02-rIGNN.sh)
 
-- a-IGNN: `scripts/03-aIGNN.sh`
+- a-IGNN: [`./scripts/03-aIGNN.sh`](./scripts/03-aIGNN.sh)
 
 ## Datasets and Splits
 
-We use a open-source pip package [`graph_datasets`](https://github.com/galogm/graph_datasets) for unified dataloaders of all datasets.
+We use an open-source pip package [`graph_datasets`](https://github.com/galogm/graph_datasets) for unified dataloaders of all datasets.
 
 ```bash
 $ python -m pip install graph_datasets
@@ -56,6 +56,8 @@ Guided by our theoretical emphasis on generalization, an aspect highly sensitive
 The splits are in [`./data/random_splits/fixed_splits/`](./data/random_splits/fixed_splits/), and can be loaded with:
 
 ```python
+from ignn.utils import get_splits
+
 train_mask, val_mask, test_mask = get_splits(
     data=data,
     name=data.name,
