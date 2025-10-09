@@ -175,6 +175,8 @@ checkpoints/
 .checkpoints/
 tmp/
 
+**/**/logs
+
 .vscode/*
 !.vscode/extensions.json
 !data/random_splits/*
