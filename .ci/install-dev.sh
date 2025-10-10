@@ -12,7 +12,7 @@ python3 -m pip install -U pip
 
 # install requirements
 # add a source if necessary: -i https://pypi.tuna.tsinghua.edu.cn/simple/
-python3 -m pip install -r requirements-dev.txt
+python3 -m pip install -r requirements-dev.txt -c constraints.txt
 
 pre-commit install
 
