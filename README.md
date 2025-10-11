@@ -4,41 +4,54 @@
 
 </div>
 
+NeurIPS 25 Poster: [Making Classic GNNs Strong Baselines Across Varying Homophily: A Smoothness–Generalization Perspective](https://neurips.cc/virtual/2025/poster/118841).
+
 ## Installation
 
-- python>=3.8
-- For installation scripts see [`.ci/install-dev.sh`](.ci/install-dev.sh), [`.ci/install.sh`](.ci/install.sh)
-- For requirements, see [`requirements-dev.txt`](./requirements-dev.txt), [`requirements.txt`](./requirements.txt) or [`pyproject.toml:dependencies`](./pyproject.toml).
+**Requirements:**
+
+* Python ≥ 3.8
+* See venv installation scripts: [`./.ci/install-dev.sh`](./.ci/install-dev.sh), [`./.ci/install.sh`](./.ci/install.sh)
+* Dependencies: [`./requirements-dev.txt`](./requirements-dev.txt), [`./requirements.txt`](./requirements.txt).
+
+**Install scripts:**
 
 ```bash
+# Development environment
 $ bash .ci/install-dev.sh
+
+# Production environment
 $ bash .ci/install.sh
 ```
 
 ## Usage
 
-Detailed scripts for each IGNN variant across all datasets:
+Scripts for running each IGNN variant across all datasets:
 
-- c-IGNN: [`./scripts/01-cIGNN.sh`](./scripts/01-cIGNN.sh)
+| Variant | Script                                           |
+| ------- | ------------------------------------------------ |
+| c-IGNN  | [`./scripts/01-cIGNN.sh`](./scripts/01-cIGNN.sh) |
+| r-IGNN  | [`./scripts/02-rIGNN.sh`](./scripts/02-rIGNN.sh) |
+| a-IGNN  | [`./scripts/03-aIGNN.sh`](./scripts/03-aIGNN.sh) |
 
-- r-IGNN: [`./scripts/02-rIGNN.sh`](./scripts/02-rIGNN.sh)
-
-- a-IGNN: [`./scripts/03-aIGNN.sh`](./scripts/03-aIGNN.sh)
 
 ## Datasets and Splits
 
-We use an open-source pip package [`graph_datasets`](https://github.com/galogm/graph_datasets) for unified dataloaders of all datasets.
+We use the open-source pip package [`graph_datasets`](https://github.com/galogm/graph_datasets) for unified data loading:
 
 ```bash
 $ python -m pip install graph_datasets
 ```
 
+**Example usage:**
+
 ```python
 from graph_datasets import load_data
-from ignn.modules import DataConf
-from ignn.utils import read_configs
+from configs import DataConf
+from utils import read_configs
 
 DATA_INFO = DataConf(**read_configs("data"))
+
 data = load_data(
     dataset_name='squirrel',
     source='critical',
@@ -51,12 +64,12 @@ data = load_data(
 )
 ```
 
-Guided by our theoretical emphasis on generalization, an aspect highly sensitive to dataset splits, we adopted a unified 10× random split scheme with a 48%/32%/20% train/validation/test ratio, which reduces variance across datasets stemming from heterogeneous splitting policies in earlier work.
+To reduce variance across datasets caused by heterogeneous splitting policies, we use a **unified 10× random split scheme** with a **48%/32%/20%** train/validation/test ratio.
 
-The splits are in [`./data/random_splits/fixed_splits/`](./data/random_splits/fixed_splits/), and can be loaded with:
+The splits are stored in [`./data/random_splits/fixed_splits/`](./data/random_splits/fixed_splits/) and can be loaded as follows:
 
 ```python
-from ignn.utils import get_splits
+from utils import get_splits
 
 train_mask, val_mask, test_mask = get_splits(
     data=data,
@@ -69,10 +82,23 @@ train_mask, val_mask, test_mask = get_splits(
 )
 ```
 
-
 ## Baselines
 
-The code of all 30 baselines can be found in the folder [`./semi_heter/baselines/`](./semi_heter/baselines/).
-- If the baseline has a separate folder of its name, then a `search.py` script is placed in it, which can be used for hyper-parameter searching using `optuna`. Check the `README.md` in the folder for details.
-- If a baseline has no folder of its name, then it can be run with [`./run_baselines.py`](./run_baselines.py).
-- All searching spaces used in the experiments can be found in [`./configs/search_grid.md`](./configs/search_grid.md).
+The code for all 30 baselines is in [`./semi_heter/baselines/`](./semi_heter/baselines/):
+
+* If a baseline has its **own folder**, a `search.py` script is included for hyperparameter tuning with `optuna`. See the `README.md` in the folder for details.
+* If a baseline does **not** have its own folder, it can be run with a script like [`./baselines.py`](./baselines.py), which can conveniently derive the corresponding `search.py` script.
+* All search spaces used in the experiments are documented in [`./configs/search_grid.py`](./configs/search_grid.py).
+
+## Citation
+
+If you find this work useful, please cite our paper:
+```kotlin
+@inproceedings{ignn,
+  title={Making Classic {GNN}s Strong Baselines Across Varying Homophily: A Smoothness{\textendash}Generalization Perspective},
+  author={Ming Gu and Zhuonan Zheng and Sheng Zhou and Meihan Liu and Jiawei Chen and Qiaoyu Tan and Liangcheng Li and Jiajun Bu},
+  booktitle={The Thirty-ninth Annual Conference on Neural Information Processing Systems},
+  year={2025},
+  url={https://openreview.net/forum?id=IAGbhDARZd}
+}
+```

@@ -290,21 +290,21 @@ self_loop_attentive = defaultdict(
 )
 
 act_att = defaultdict(
-    lambda: 'tanh',
+    lambda: "tanh",
     {
-        "chameleon": 'tanh',
-        "squirrel": 'sigmoid',
-        "actor": 'tanh',
-        "flickr": 'tanh',
-        "blogcatalog": 'tanh',
-        "roman-empire": 'tanh',
-        "amazon-ratings": 'tanh',
-        "photo": 'tanh',
-        "pubmed": 'tanh',
-        "wikics": 'tanh',
-        "arxiv": 'tanh',
-        "products": 'tanh',
-        "pokec": 'tanh',
+        "chameleon": "tanh",
+        "squirrel": "sigmoid",
+        "actor": "tanh",
+        "flickr": "tanh",
+        "blogcatalog": "tanh",
+        "roman-empire": "tanh",
+        "amazon-ratings": "tanh",
+        "photo": "tanh",
+        "pubmed": "tanh",
+        "wikics": "tanh",
+        "arxiv": "tanh",
+        "products": "tanh",
+        "pokec": "tanh",
     },
 )
 

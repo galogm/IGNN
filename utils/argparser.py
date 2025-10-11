@@ -200,12 +200,6 @@ def parse_ignn_args() -> argparse.Namespace:
         help="act attentive",
     )
     parser.add_argument(
-        "-t",
-        "--transform_first",
-        action="store_true",
-        help="transform_first",
-    )
-    parser.add_argument(
         "-m",
         "--model",
         type=str,

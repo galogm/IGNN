@@ -5,8 +5,8 @@ build-backend = "hatchling.build"
 [project]
 name = "IGNN"
 version = "0.0.1"
-authors = [{ name = "", email = "" }]
-keywords = [""]
+authors = [{ name = "Gu Ming", email = "gumingwork@gmail.com" }]
+keywords = ["Graph Neural Networks", "Varying Homophily", "Homophily", "Heterophily"]
 description = ""
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -24,33 +24,24 @@ dependencies = [
     "the_utils>=0.8.0",
     "graph_datasets>=0.14.1",
     "torch_geometric==2.6.1",
+    "numpy<2",
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/xxx"
-"Bug Tracker" = "https://github.com/xxx"
-
-[tool.yapf]
-based_on_style = "facebook"
-indent_width = 4
-split_before_first_argument = true
-split_arguments_when_comma_terminated = true
-indent_dictionary_value = true
-column_limit = 100
+"Homepage" = "https://github.com/galogm/IGNN"
+"Bug Tracker" = "https://github.com/galogm/IGNN/issues"
 
 [tool.yapfignore]
 
 [tool.black]
 line-length = 100
 
-[tool.semantic_release]
-version_variables = [
-    "py_setting/__init__.py:__version__",
-    "docs/conf.py:release",
-]
-version_toml = ["pyproject.toml:project.version"]
-major_on_zero = false
-changelog_file = "CHANGELOG.md"
-
 [tool.isort]
 profile = "black"
+
+[tool.semantic_release]
+version_variables = [
+    "ignn/__init__.py:__version__",
+]
+version_toml = ["pyproject.toml:project.version"]
+changelog_file = "CHANGELOG.md"

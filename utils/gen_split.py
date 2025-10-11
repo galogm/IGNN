@@ -9,7 +9,7 @@ import torch
 from the_utils import split_train_test_nodes
 from torch_geometric.utils import index_to_mask
 
-from .common import onetime_reminder
+from ignn.utils.common import onetime_reminder
 
 
 def get_random_split_masks(

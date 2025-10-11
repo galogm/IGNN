@@ -1,6 +1,6 @@
 """IGNN"""
 
-# pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals,invalid-name,too-many-statements
+# pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals,invalid-name,too-many-statements, duplicate-code
 import time
 
 import numpy as np
@@ -13,7 +13,7 @@ from the_utils import save_to_csv_files, set_device, set_seed, tab_printer
 from torch_geometric.loader import RandomNodeLoader
 from tqdm import tqdm
 
-from ignn.configs.params import (
+from configs.params import (
     RNs,
     acts,
     clf_dropouts,
@@ -31,14 +31,16 @@ from ignn.configs.params import (
     repeats,
     self_loop_attentive,
 )
+from ignn.configs import DataConf, INConf
 from ignn.models import IGNN
-from ignn.modules import DataConf, INConf
-from ignn.utils import get_splits, metric, parse_ignn_args, read_configs
+from ignn.utils import metric
+from utils import get_splits, parse_ignn_args, read_configs
 
 torch.set_printoptions(threshold=10_000)
 np.set_printoptions(threshold=10_000)
 
 
+# pylint: disable=too-many-branches
 def main(
     dataset,
     source,
@@ -59,8 +61,7 @@ def main(
     eval_interval=1,
     eval_start=0,
     norm=None,
-    transform_first=False,
-    act_att='tanh',
+    act_att="tanh",
     TRAIN_RATIO=48,
     VALID_RATIO=32,
     VERSION="1.0",
@@ -85,7 +86,7 @@ def main(
     edge_index = data.edge_index
     features = data.x
     name = data.name
-    if name=='core_pyg':
+    if name == "core_pyg":
         features[(features - 0.0) > 0.0] = 1.0
 
     labeled_idx = torch.where(label != -1)[0] if dataset in ["wiki", "Penn94", "pokec"] else None
@@ -134,7 +135,6 @@ def main(
             else norm or (norms_att[dataset] if RN == "attentive" else norms[dataset])
         ),
         "loss": "ce" if dataset not in ["proteins"] else "bce",
-        "transform_first": transform_first,
         "act_att": act_att,
     }
     params_all = {
@@ -232,8 +232,8 @@ def main(
                 E_mat = np.zeros((n_components, num_nodes))
                 for node_i in range(num_nodes):
                     deg = adj_mat[node_i, :].sum()
-                    E_mat[components_label[node_i], node_i] = 1/np.sqrt(deg)
-                E_mat = (E_mat.T/E_mat.sum(axis=1)).T
+                    E_mat[components_label[node_i], node_i] = 1 / np.sqrt(deg)
+                E_mat = (E_mat.T / E_mat.sum(axis=1)).T
 
                 P_mat = np.matmul(E_mat.T, np.linalg.inv(E_mat.dot(E_mat.T))).dot(E_mat)
                 F_mat = np.eye(P_mat.shape[0]) - P_mat
@@ -244,34 +244,41 @@ def main(
                 # dM = np.array(dM)/dM[0]
                 return dM
 
-            F_mat = get_proj_mat(sp.coo_matrix(([1]*data.num_edges, (edge_index[0].numpy(), edge_index[1].numpy()))).toarray(),n_nodes)
+            F_mat = get_proj_mat(
+                sp.coo_matrix(
+                    ([1] * data.num_edges, (edge_index[0].numpy(), edge_index[1].numpy()))
+                ).toarray(),
+                n_nodes,
+            )
             Hs, Ws = model.get_hidden(edge_index.to(device), features.to(device), IN_config, device)
             print(Hs, Ws)
-            if RN=='concat':
+            if RN == "concat":
                 W = Ws[1]
                 Ws = Ws[0]
-                W_norms = [w.data.norm(2).item() for w in Ws ]
+                W_norms = [w.data.norm(2).item() for w in Ws]
                 H_dm = compute_dM(Hs, F_mat)
                 L = 0
                 for idx, w in enumerate(Ws):
-                    L = L + w.t().matmul(W[:,idx*h_feats:(idx+1)*h_feats])
+                    L = L + w.t().matmul(W[:, idx * h_feats : (idx + 1) * h_feats])
                 L = L.norm(2).item()
-            if RN in ['none']:
-                W_norms = [W.data.norm(2).item() for W in Ws ]
+            elif RN in ["none"]:
+                W_norms = [W.data.norm(2).item() for W in Ws]
                 H_dm = compute_dM(Hs, F_mat)
-                L=Ws[1]
+                L = Ws[1]
                 for j in range(2, len(Ws)):
                     L = L.matmul(Ws[j])
                 L = L.norm(2).item()
-            if RN in ['residual']:
-                W_norms = [W.data.norm(2).item() for W in Ws ]
+            elif RN in ["residual"]:
+                W_norms = [W.data.norm(2).item() for W in Ws]
                 H_dm = compute_dM(Hs, F_mat)
-                L=Ws[1]
+                L = Ws[1]
                 for j in range(2, len(Ws)):
-                    L = L.matmul((torch.eye(Ws[j].shape[0]).to(L.device)+Ws[j]))
+                    L = L.matmul((torch.eye(Ws[j].shape[0]).to(L.device) + Ws[j]))
                 L = L.norm(2).item()
+            else:
+                raise ValueError(f'{RN} not in ["none", "residual", "attentive", "concat"]')
 
-            print(W_norms,'\n',H_dm,'\n',L)
+            print(W_norms, "\n", H_dm, "\n", L)
             W_normss.append(W_norms)
             H_dms.append(H_dm)
             Ls.append(L)
@@ -282,14 +289,14 @@ def main(
         print(f"{name} {i} res: {test_acc}\n\n")
 
     W_normss = np.array(W_normss)
-    H_dms=np.array(H_dms)
+    H_dms = np.array(H_dms)
     Ls = np.array(Ls)
     Ls = f"{Ls.mean():.2f}±{Ls.std():.2f}"
 
     save_to_csv_files(
         results={"model": f"IGNN-{IN}-{RN}", "dataset": dataset, "hops": N_HOPS},
         append_info={
-            "Ls":Ls,
+            "Ls": Ls,
             "H_dms_m": H_dms.mean(axis=0),
             "H_dms_s": H_dms.std(axis=0),
             "W_normss_m": W_normss.mean(axis=0),
@@ -297,7 +304,6 @@ def main(
         },
         csv_name="dml.csv",
     )
-
 
     save_to_csv_files(
         results={**tms},
@@ -348,7 +354,6 @@ if __name__ == "__main__":
         num_parts=args.num_parts,
         eval_interval=args.eval_interval,
         eval_start=args.eval_start,
-        transform_first=args.transform_first,
         act_att=args.act_att,
         norm=args.norm,
         TRAIN_RATIO=48,

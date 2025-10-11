@@ -1,4 +1,4 @@
-"""Logger: Adapted from the optuna.logging.
+"""Logger: Adapted from `optuna.logging`.
 """
 
 # pylint: disable=global-statement,

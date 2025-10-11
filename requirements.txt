@@ -6,5 +6,5 @@
 
 the_utils>=1.0.2
 graph_datasets>=1.1.1
-torch_geometric==2.6.1
+torch_geometric==2.4.0
 optuna

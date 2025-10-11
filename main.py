@@ -1,6 +1,7 @@
 """IGNN"""
 
 # pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals,invalid-name,too-many-statements
+import logging
 import time
 
 import numpy as np
@@ -11,7 +12,7 @@ from the_utils import save_to_csv_files, set_device, set_seed, tab_printer
 from torch_geometric.loader import RandomNodeLoader
 from tqdm import tqdm
 
-from ignn.configs.params import (
+from configs.params import (
     RNs,
     acts,
     clf_dropouts,
@@ -29,12 +30,18 @@ from ignn.configs.params import (
     repeats,
     self_loop_attentive,
 )
+from ignn.configs import DataConf, INConf
 from ignn.models import IGNN
-from ignn.modules import DataConf, INConf
-from ignn.utils import get_splits, metric, parse_ignn_args, read_configs
+from ignn.utils import metric
+from utils import get_splits, parse_ignn_args, read_configs
 
-torch.set_printoptions(threshold=10_000)
-np.set_printoptions(threshold=10_000)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="[%(levelname)1.1s %(asctime)s %(name)s:%(lineno)d] %(message)s",
+    handlers=[logging.StreamHandler()],
+)
+
+logger = logging.getLogger(__name__)
 
 
 def main(
@@ -57,7 +64,6 @@ def main(
     eval_interval=1,
     eval_start=0,
     norm=None,
-    transform_first=False,
     act_att="tanh",
     TRAIN_RATIO=48,
     VALID_RATIO=32,
@@ -72,9 +78,8 @@ def main(
         row_normalize=pre_norms[dataset],
         rm_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
         add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
-        # products and arxiv-year are already simple graphs
         to_simple=dataset not in ["products", "arxiv-year"],
-        verbosity=1,
+        verbosity=3,
         return_type="pyg",
     )
     label = data.y
@@ -101,13 +106,14 @@ def main(
     DNAS = nas_dropout if nas_dropout is not None else nas_dropouts[dataset]
     DNSS = nss_dropout if nss_dropout is not None else nss_dropouts[dataset]
     DCLF = clf_dropout if clf_dropout is not None else clf_dropouts[dataset]
+    FAST = True
     IN_config = INConf(
         n_hops=N_HOPS,
         add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
         remove_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
         symm_norm=True,
         row_normalized=pre_norms[dataset],
-        fast=False,
+        fast=FAST,
         name=name,
     )
     params = {
@@ -130,7 +136,6 @@ def main(
             else norm or (norms_att[dataset] if RN == "attentive" else norms[dataset])
         ),
         "loss": "ce" if dataset not in ["proteins"] else "bce",
-        "transform_first": transform_first,
         "act_att": act_att,
     }
     params_all = {
@@ -139,11 +144,9 @@ def main(
         "IN_config": IN_config,
         **params,
     }
-    tab_printer({**params_all})
+    logger.info("\n%s", tab_printer({**params_all}, verbose=0))
 
     t_start = time.time()
-
-    # seed_list = [random.randint(0, 99999) for i in range(repeat)]
 
     res_list_acc_joint = []
 
@@ -151,7 +154,6 @@ def main(
     ts = []
 
     for i in range(repeat):
-        # set_seed(seed_list[i])
         model = IGNN(in_feats=features.shape[1], n_clusters=n_clusters, device=device, **params)
 
         train_mask = val_mask = test_mask = train_loader = test_loader = None
@@ -207,7 +209,7 @@ def main(
                 y_pred = {"train": [], "val": [], "test": []}
                 for data_t in tqdm(test_loader, "test step"):
                     data_t = transform(data_t)
-                    embeddings = model(data_t.adj_t, data_t.x, IN_config, device_t, fast=False)
+                    embeddings = model(data_t.adj_t, data_t.x, IN_config, device_t, fast=FAST)
                     logits = model.classifier(embeddings)
                     for split in ["train", "val", "test"]:
                         mask = data_t[f"{split}_mask"]
@@ -222,7 +224,7 @@ def main(
         tms[f"{i}"] = tm
         ts.append(tm)
         res_list_acc_joint.append(test_acc)
-        print(f"{name} {i} res: {test_acc}\n\n")
+        logger.info("%s", f"{name} {i} res: {test_acc}\n\n")
 
     save_to_csv_files(
         results={**tms},
@@ -234,7 +236,7 @@ def main(
     elapsed_time = f"{(time.time() - t_start)/repeat:.2f}"
     acc_jl = f"{np.array(res_list_acc_joint).mean() * 100:.2f}±{np.array(res_list_acc_joint).std() * 100:.2f}"
 
-    print(f"\nResults: \tAcc:{acc_jl} \tTrain cost: {elapsed_time}s")
+    logger.info("%s", f"Results: \tAcc:{acc_jl} \tTrain cost: {elapsed_time}s")
     save_to_csv_files(
         results={"acc_hl": acc_jl, "hop": N_HOPS},
         insert_info={"dataset": dataset},
@@ -273,7 +275,6 @@ if __name__ == "__main__":
         num_parts=args.num_parts,
         eval_interval=args.eval_interval,
         eval_start=args.eval_start,
-        transform_first=args.transform_first,
         act_att=args.act_att,
         norm=args.norm,
         TRAIN_RATIO=48,
