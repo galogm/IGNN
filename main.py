@@ -88,13 +88,12 @@ def main(
     edge_index = data.edge_index
     features = data.x
     name = data.name
-
     labeled_idx = torch.where(label != -1)[0] if dataset in ["wiki", "Penn94", "pokec"] else None
-    n_clusters = 2 if dataset == "pokec" else n_clusters
-    n_clusters = n_clusters if dataset not in ["proteins"] else label.shape[1]
+    n_clusters = (
+        label.shape[1] if dataset == "proteins" else (2 if dataset == "pokec" else n_clusters)
+    )
 
     repeat = repeats[dataset.lower()]
-
     N_HOPS = n_hops if n_hops is not None else n_hopss[dataset]
     N_LAYERS = (
         n_layers
@@ -106,8 +105,8 @@ def main(
     DNAS = nas_dropout if nas_dropout is not None else nas_dropouts[dataset]
     DNSS = nss_dropout if nss_dropout is not None else nss_dropouts[dataset]
     DCLF = clf_dropout if clf_dropout is not None else clf_dropouts[dataset]
-    # FAST = False if dataset in ["pokec", "products"] else True
-    FAST = True
+    BATCH_LOAD = ["products_ogb", "pokec_linkx"]
+    FAST = name not in BATCH_LOAD
     IN_config = INConf(
         n_hops=N_HOPS,
         add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
@@ -117,6 +116,7 @@ def main(
         fast=FAST,
         name=name,
     )
+
     params = {
         "IN": IN,
         "RN": RN if RN is not None else RNs[dataset],
@@ -145,21 +145,18 @@ def main(
         "IN_config": IN_config,
         **params,
     }
+
     logger.info("\n%s", tab_printer({**params_all}, verbose=0))
 
     t_start = time.time()
-
     res_list_acc_joint = []
-
     tms = {"model": f"IGNN-{IN}-{RN}", "dataset": dataset, "hops": N_HOPS}
     ts = []
-
     for i in range(repeat):
         model = IGNN(in_feats=features.shape[1], n_clusters=n_clusters, device=device, **params)
 
         train_mask = val_mask = test_mask = train_loader = test_loader = None
-        batch_list = ["products_ogb", "pokec_linkx"]
-        if name in batch_list:
+        if name in BATCH_LOAD:
             if name == "pokec_linkx":
                 data["train_mask"], data["val_mask"], data["test_mask"] = get_splits(
                     data,
