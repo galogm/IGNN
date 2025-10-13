@@ -78,6 +78,8 @@ def inceptive_aggregation(
             nei_feats.append(x)
         return nei_feats, adj
 
+    logger.info("running fast c-IGNN with caching")
+
     # Fast c-IGNN: caching aggregated features for faster training
     sym = "sym" if symm_norm else "nsy"
     diag = "diag" if add_self_loop else "ndiag"

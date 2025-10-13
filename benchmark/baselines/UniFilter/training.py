@@ -13,6 +13,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data as Data
 from models import *
+
 from utils import data_split, edgeindex_construct, load_dataset, muticlass_f1
 
 sys.path.append("../../..")
@@ -177,9 +178,9 @@ from pathlib import Path
 from graph_datasets import load_data
 from the_utils import make_parent_dirs, save_to_csv_files, set_device, set_seed
 
+from benchmark.utils import get_splits_mask
 from ignn.modules import DataConf
 from ignn.utils import read_configs
-from semi_heter.utils import get_splits_mask
 
 DATA = DataConf(**read_configs("data"))
 DEVICE = set_device(args.dev)
@@ -380,4 +381,5 @@ save_to_csv_files(
         "source": args.source,
     },
     csv_name="baselines_ex.csv",
+)
 )

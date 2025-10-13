@@ -106,6 +106,7 @@ def main(
     DNAS = nas_dropout if nas_dropout is not None else nas_dropouts[dataset]
     DNSS = nss_dropout if nss_dropout is not None else nss_dropouts[dataset]
     DCLF = clf_dropout if clf_dropout is not None else clf_dropouts[dataset]
+    # FAST = False if dataset in ["pokec", "products"] else True
     FAST = True
     IN_config = INConf(
         n_hops=N_HOPS,
@@ -209,7 +210,7 @@ def main(
                 y_pred = {"train": [], "val": [], "test": []}
                 for data_t in tqdm(test_loader, "test step"):
                     data_t = transform(data_t)
-                    embeddings = model(data_t.adj_t, data_t.x, IN_config, device_t, fast=FAST)
+                    embeddings = model(data_t.adj_t, data_t.x, IN_config, device_t)
                     logits = model.classifier(embeddings)
                     for split in ["train", "val", "test"]:
                         mask = data_t[f"{split}_mask"]

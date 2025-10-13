@@ -215,7 +215,7 @@ def main(
                 y_pred = {"train": [], "val": [], "test": []}
                 for data_t in tqdm(test_loader, "test step"):
                     data_t = transform(data_t)
-                    embeddings = model(data_t.adj_t, data_t.x, IN_config, device_t, fast=False)
+                    embeddings = model(data_t.adj_t, data_t.x, IN_config, device_t)
                     logits = model.classifier(embeddings)
                     for split in ["train", "val", "test"]:
                         mask = data_t[f"{split}_mask"]

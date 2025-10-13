@@ -130,7 +130,7 @@ class IGNN(nn.Module):
 
             self.train()
             if train_loader is not None:
-                for data in tqdm(train_loader, "train step"):
+                for _, data in enumerate(train_loader):
                     data = transform(data)
                     self.optimizer.zero_grad()
 

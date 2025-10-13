@@ -14,10 +14,10 @@ from graph_datasets import load_data
 from sklearn.metrics import accuracy_score as ACC
 from the_utils import save_to_csv_files, set_device, set_seed, tab_printer
 
-import semi_heter.baselines as baselines
+import benchmark.baselines as baselines
+from benchmark.modules import Data
+from benchmark.utils import get_splits_mask, set_args_wrt_dataset
 from ignn.configs import DataConf
-from semi_heter.modules import Data
-from semi_heter.utils import get_splits_mask, set_args_wrt_dataset
 from utils import read_configs
 
 DATASETS = {
@@ -115,7 +115,7 @@ model_keys = {
     "DAGNN": "k",
     "GCNII": "layers",
     "H2GCN": "k",
-    "GBKGCNN": None,
+    "GBKGNN": None,
     "GGNN": "nlayers",
     "GloGNN": "orders",
     "HOGGCN": None,
@@ -161,7 +161,11 @@ def main(dataset, source):
     tms = {
         "model": args.model,
         "dataset": args.dataset,
-        "hops": getattr(args, model_keys[args.model]),
+        "hops": (
+            getattr(args, model_keys[args.model])
+            if model_keys[args.model]
+            else "architecturally limited"
+        ),
         "0": 0,
         "1": 0,
         "2": 0,
