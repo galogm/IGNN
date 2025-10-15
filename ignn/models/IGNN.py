@@ -10,7 +10,6 @@ import torch
 import torch_geometric.transforms as T
 from the_utils import get_str_time, save_model
 from torch import nn
-from tqdm import tqdm
 
 from ..configs import INConf
 from ..modules import IGNNConv
@@ -47,6 +46,8 @@ class IGNN(nn.Module):
         norm: Optional[Literal["bn", "ln"]] = None,
         loss="ce",
         act_att="tanh",
+        fast=False,
+        pre_ln=False,
     ) -> None:
         super().__init__()
 
@@ -77,6 +78,8 @@ class IGNN(nn.Module):
                     n_hops=n_hops,
                     ndim_fc=h_feats * (n_hops + 1),
                     act_att=act_att,
+                    fast=fast,
+                    pre_ln=pre_ln,
                 )
                 for i in range(n_layers)
             ]
@@ -88,10 +91,15 @@ class IGNN(nn.Module):
     def forward(self, edge_index, features, IN_config: INConf, device=None):
         H = None
         for i, ignnconv in enumerate(self.ignnconvs):
+            # NOTE: for the same receptive field size k, language graphs like `roman-empire` achieve better performance \
+            # when stacking k IGNN layers than when using a single IGNN layer with RN across k hops.
+            # NOTE: only the first layer of IGNNConv can use the caching trick to improve training efficiency.
             H = ignnconv(
                 edge_index,
                 features=features if i == 0 else H,
-                IN_config=IN_config,
+                IN_config=INConf(
+                    **{**IN_config.__dict__, "fast": IN_config.fast if i == 0 else False}
+                ),
                 device=device,
             )
         return H
@@ -245,7 +253,7 @@ class IGNN(nn.Module):
                         transform = T.Compose([T.ToDevice(device), T.ToSparseTensor()])
                         y_true = {"train": [], "val": [], "test": []}
                         y_pred = {"train": [], "val": [], "test": []}
-                        for data in tqdm(test_loader, "val step"):
+                        for _, data in enumerate(test_loader):
                             data = transform(data)
                             embeddings = self.forward(
                                 edge_index=data.adj_t,

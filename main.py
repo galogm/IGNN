@@ -10,7 +10,6 @@ import torch_geometric.transforms as T
 from graph_datasets import load_data
 from the_utils import save_to_csv_files, set_device, set_seed, tab_printer
 from torch_geometric.loader import RandomNodeLoader
-from tqdm import tqdm
 
 from configs.params import (
     RNs,
@@ -65,6 +64,8 @@ def main(
     eval_start=0,
     norm=None,
     act_att="tanh",
+    fast=None,
+    pre_ln=None,
     TRAIN_RATIO=48,
     VALID_RATIO=32,
     VERSION="1.0",
@@ -106,7 +107,8 @@ def main(
     DNSS = nss_dropout if nss_dropout is not None else nss_dropouts[dataset]
     DCLF = clf_dropout if clf_dropout is not None else clf_dropouts[dataset]
     BATCH_LOAD = ["products_ogb", "pokec_linkx"]
-    FAST = name not in BATCH_LOAD
+    FAST = fast if fast is not None else (name not in BATCH_LOAD)
+    PRE_LN = pre_ln if pre_ln is not None else (name in BATCH_LOAD)
     IN_config = INConf(
         n_hops=N_HOPS,
         add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
@@ -138,6 +140,8 @@ def main(
         ),
         "loss": "ce" if dataset not in ["proteins"] else "bce",
         "act_att": act_att,
+        "fast": IN_config.fast,
+        "pre_ln": PRE_LN,
     }
     params_all = {
         "eval_start": eval_start,
@@ -205,7 +209,7 @@ def main(
                 model = model.to(device_t)
                 y_true = {"train": [], "val": [], "test": []}
                 y_pred = {"train": [], "val": [], "test": []}
-                for data_t in tqdm(test_loader, "test step"):
+                for _, data_t in enumerate(test_loader):
                     data_t = transform(data_t)
                     embeddings = model(data_t.adj_t, data_t.x, IN_config, device_t)
                     logits = model.classifier(embeddings)
@@ -275,6 +279,8 @@ if __name__ == "__main__":
         eval_start=args.eval_start,
         act_att=args.act_att,
         norm=args.norm,
+        fast=args.fast,
+        pre_ln=args.preln,
         TRAIN_RATIO=48,
         VALID_RATIO=32,
         VERSION=args.version,

@@ -8,7 +8,7 @@ from typing import Callable, Optional
 
 import torch
 from torch import Tensor
-from torch.nn import Parameter
+from torch.nn import Module, Parameter
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.dense.linear import Linear
 from torch_geometric.nn.inits import zeros
@@ -188,6 +188,7 @@ class GCNConv(MessagePassing):
         bias: bool = True,
         weight: bool = True,
         act: Optional[Callable] = None,
+        norm: Optional[Module] = None,
         **kwargs,
     ):
         kwargs.setdefault("aggr", "add")
@@ -211,6 +212,7 @@ class GCNConv(MessagePassing):
         self.normalize = normalize
         self.weight = weight
         self.act = act
+        self.norm = norm
 
         self._cached_edge_index = None
         self._cached_adj_t = None
@@ -225,18 +227,29 @@ class GCNConv(MessagePassing):
         else:
             self.register_parameter("bias", None)
 
+        if norm is not None:
+            self.norm: Module = self.norm(out_channels)
+        else:
+            self.register_parameter("norm", None)
+
         self.reset_parameters()
 
     def reset_parameters(self):
         super().reset_parameters()
         if self.weight:
             self.lin.reset_parameters()
+        if self.norm and hasattr(self.norm, "reset_parameters"):
+            self.norm.reset_parameters()
         zeros(self.bias)
+
         self._cached_edge_index = None
         self._cached_adj_t = None
 
     def forward(
-        self, x: Tensor = None, edge_index: Adj = None, edge_weight: OptTensor = None
+        self,
+        x: Optional[Tensor] = None,
+        edge_index: Optional[Adj] = None,
+        edge_weight: OptTensor = None,
     ) -> Tensor:
 
         if isinstance(x, (tuple, list)):
@@ -291,6 +304,9 @@ class GCNConv(MessagePassing):
 
         if self.bias is not None:
             out = out + self.bias
+
+        if self.norm is not None:
+            out = self.norm(out)
 
         if self.act is not None:
             out = self.act(out)

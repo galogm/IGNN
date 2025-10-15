@@ -83,7 +83,7 @@ lrs = defaultdict(
 ess = defaultdict(
     lambda: 100,
     {
-        "chameleon": 50,
+        "chameleon": 20,
         "squirrel": 100,
         "actor": 50,
         "pubmed": 100,

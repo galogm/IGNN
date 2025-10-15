@@ -2,6 +2,7 @@
 
 import argparse
 import os
+from collections import defaultdict
 from pathlib import Path, PurePath
 from typing import Dict
 
@@ -261,6 +262,36 @@ def parse_ignn_args() -> argparse.Namespace:
         type=lambda x: None if x == "None" else int(x),
         default=None,
         help="early stop",
+    )
+    parser.add_argument(
+        "-fs",
+        "--fast",
+        type=lambda x: defaultdict(
+            lambda: None,
+            {
+                "None": None,
+                "True": True,
+                "False": False,
+            },
+        )[x],
+        choices=[True, False, None],
+        default=None,
+        help="fast version",
+    )
+    parser.add_argument(
+        "-pre",
+        "--preln",
+        type=lambda x: defaultdict(
+            lambda: None,
+            {
+                "None": None,
+                "True": True,
+                "False": False,
+            },
+        )[x],
+        choices=[True, False, None],
+        default=None,
+        help="pre linear transformation",
     )
     parser.add_argument(
         "-layers",

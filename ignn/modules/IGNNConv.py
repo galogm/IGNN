@@ -59,7 +59,7 @@ def inceptive_aggregation(
         remove_self_loop,
         symm_norm,
         row_normalized,
-        fast,
+        _,
         save_dir,
     ) = vars(IN_config).values()
     adj = preprocess_adj(adj, add_self_loop, remove_self_loop, symm_norm) if preprocess else adj
@@ -72,11 +72,11 @@ def inceptive_aggregation(
     x = features
 
     # c-IGNN
-    if not fast:
-        for i in range(1, n_hops + 1):
-            x = torch.spmm(adj, x).to(torch.float)
-            nei_feats.append(x)
-        return nei_feats, adj
+    # if not fast:
+    #     for i in range(1, n_hops + 1):
+    #         x = torch.spmm(adj, x).to(torch.float)
+    #         nei_feats.append(x)
+    #     return nei_feats, adj
 
     logger.info("running fast c-IGNN with caching")
 
@@ -92,9 +92,8 @@ def inceptive_aggregation(
     if f"{n_hops}" not in hops:
         for i in range(1, n_hops + 1):
             file = base.joinpath(f"{i}")
-            if file.exists():
-                x = torch.load(file, map_location=device)
-            else:
+            if not file.exists():
+                x = torch.load(base.joinpath(f"{i-1}"), map_location=device) if i > 1 else x
                 x = torch.spmm(adj, x)
                 torch.save(obj=x.to(torch.float), f=file, pickle_protocol=4)
 
@@ -121,6 +120,8 @@ class IGNNConv(nn.Module):
         ndim_fc,
         act_att="tanh",
         norm: Optional[Literal["bn", "ln"]] = None,
+        fast: Optional[bool] = False,
+        pre_ln: Optional[bool] = False,
     ):
         super().__init__()
         self.n_hops = n_hops
@@ -132,6 +133,7 @@ class IGNNConv(nn.Module):
         self.nei_feats = None
         self.adj = None
         self.device = None
+        self.pre_ln = pre_ln
         self.norm = lambda x: (
             {"ln": LayerNorm, "bn": BatchNorm1d}[norm](x) if norm else nn.Identity()
         )
@@ -142,6 +144,8 @@ class IGNNConv(nn.Module):
             h_feats=h_feats,
             act_func=act_func,
             nas_dropout=nas_dropout,
+            nss_dropout=nss_dropout,
+            fast=fast,
         )
 
         self.init_RNs(
@@ -173,6 +177,8 @@ class IGNNConv(nn.Module):
         h_feats: int,
         act_func: nn.Module,
         nas_dropout: float,
+        nss_dropout: float,
+        fast: bool,
     ):
         """Initialize INs. no SN is possible without IN.
 
@@ -184,7 +190,7 @@ class IGNNConv(nn.Module):
             nas_dropout (float): dropout.
         """
         if IN == "gcn-nIN-nSN":
-            self.nei_ind_emb = nn.ModuleList(
+            self.inceptive_agg = nn.ModuleList(
                 (
                     GCNConv(
                         in_channels=h_feats,
@@ -208,14 +214,14 @@ class IGNNConv(nn.Module):
                 for i in range(self.n_nie)
             )
         elif IN == "gcn-IN-nSN":
-            self.nei_ind_emb = nn.ModuleList(
+            self.inceptive_agg = nn.ModuleList(
                 (
                     GCNConv(
                         in_channels=h_feats,
                         out_channels=h_feats,
                         improved=False,
                         cached=False,
-                        add_self_loops=False,
+                        add_self_loops=True,
                         normalize=True,
                         weight=not self.RN == "attentive",
                         bias=True,
@@ -232,14 +238,61 @@ class IGNNConv(nn.Module):
                 for i in range(self.n_nie)
             )
         elif IN == "gcn-IN-SN":
-            self.nei_ind_emb = nn.ModuleList(
+            self.ln = (
                 nn.Sequential(
                     nn.Dropout(p=nas_dropout),
                     nn.Linear(in_feats, h_feats),
                     self.norm(h_feats),
                     act_func,
                 )
-                for _ in range(self.n_nie)
+                if self.pre_ln and not fast
+                else None
+            )
+            self.inceptive_agg = (
+                nn.ModuleList(
+                    nn.Sequential(
+                        nn.Dropout(p=nas_dropout),
+                        nn.Linear(in_feats, h_feats),
+                        self.norm(h_feats),
+                        act_func,
+                    )
+                    for _ in range(self.n_nie)
+                )
+                if fast
+                else nn.ModuleList(
+                    (
+                        nn.ModuleList(
+                            [
+                                GCNConv(
+                                    in_channels=in_feats if not self.ln else h_feats,
+                                    out_channels=in_feats if not self.ln else h_feats,
+                                    improved=False,
+                                    cached=False,
+                                    add_self_loops=True,
+                                    normalize=True,
+                                    weight=False,
+                                    bias=True,
+                                    act=act_func,
+                                    norm=self.norm,
+                                ),
+                                nn.Sequential(
+                                    nn.Dropout(p=nas_dropout if not self.ln else nss_dropout),
+                                    nn.Linear(in_feats if not self.ln else h_feats, h_feats),
+                                    self.norm(h_feats),
+                                    act_func,
+                                ),
+                            ]
+                        )
+                        if i != 0
+                        else nn.Sequential(
+                            nn.Dropout(p=nas_dropout if not self.ln else nss_dropout),
+                            nn.Linear(in_feats if not self.ln else h_feats, h_feats),
+                            self.norm(h_feats),
+                            act_func,
+                        )
+                    )
+                    for i in range(self.n_nie)
+                )
             )
 
     def init_RNs(self, RN, h_feats, act_func, nss_dropout, ndim_fc, act_att):
@@ -280,10 +333,10 @@ class IGNNConv(nn.Module):
             )
 
         if self.IN == "gcn-nIN-nSN":
-            h = self.nei_ind_emb[0](features)
+            h = self.inceptive_agg[0](features)
             hs = [h.detach().clone()] if hiddens else None
             for i in range(1, self.n_nie):
-                h = self.nei_ind_emb[i](x=h, edge_index=edge_index)
+                h = self.inceptive_agg[i](x=h, edge_index=edge_index)
                 if hiddens:
                     hs.append(h.detach().clone())
 
@@ -291,22 +344,22 @@ class IGNNConv(nn.Module):
 
         if self.IN == "gcn-IN-nSN":
             if self.RN == "residual":
-                h = self.nei_ind_emb[0](features)
+                h = self.inceptive_agg[0](features)
                 if hiddens:
                     hs = [h.detach().clone()]
                 for i in range(1, self.n_nie):
-                    h = self.nei_ind_emb[i](x=h, edge_index=edge_index) + h
+                    h = self.inceptive_agg[i](x=h, edge_index=edge_index) + h
                     if hiddens:
                         hs.append(h.detach().clone())
                 return (h, hs) if hiddens else h
 
             if self.RN == "attentive":
-                h = self.nei_ind_emb[0](features)
+                h = self.inceptive_agg[0](features)
                 if hiddens:
                     hs = [h.detach().clone()]
                 for i in range(1, self.n_nie):
-                    h_k = self.nei_ind_emb[i](x=h, edge_index=edge_index)
-                    # h_k = self.nei_ind_emb[i](graph=to_dgl(Data(edge_index=edge_index, num_nodes=features.shape[0])), feat=h)
+                    h_k = self.inceptive_agg[i](x=h, edge_index=edge_index)
+                    # h_k = self.inceptive_agg[i](graph=to_dgl(Data(edge_index=edge_index, num_nodes=features.shape[0])), feat=h)
                     a = self.nei_rel_learn[i](torch.cat([h_k, h], dim=-1))
                     h = a * h_k + (1 - a) * h
                     if hiddens:
@@ -322,19 +375,30 @@ class IGNNConv(nn.Module):
                         preprocess=True,
                         device=device,
                     )
-                ns = [self.nei_ind_emb(self.nei_feats[i]) for i in range(self.n_nie)]
+                ns = [self.inceptive_agg(self.nei_feats[i]) for i in range(self.n_nie)]
                 return torch.cat(ns, dim=1)
 
         if self.IN == "gcn-IN-SN":
-            if not IN_config.fast or self.nei_feats is None:
-                self.nei_feats, _ = inceptive_aggregation(
-                    adj=edge_index,
-                    features=features,
-                    IN_config=IN_config,
-                    preprocess=True,
-                    device=device,
+            if IN_config.fast:
+                self.nei_feats, _ = (
+                    inceptive_aggregation(
+                        adj=edge_index,
+                        features=features,
+                        IN_config=IN_config,
+                        preprocess=True,
+                        device=device,
+                    )
+                    if self.nei_feats is None
+                    else (self.nei_feats, None)
                 )
-            ns = [self.nei_ind_emb[i](self.nei_feats[i]) for i in range(self.n_nie)]
+                ns = [self.inceptive_agg[i](self.nei_feats[i]) for i in range(self.n_nie)]
+            else:
+                ns = [self.inceptive_agg[0](self.ln(features) if self.ln else features)]
+                _h = self.ln(features) if self.ln else features
+                for i in range(1, self.n_nie):
+                    _h = self.inceptive_agg[i][0](x=_h, edge_index=edge_index)
+                    h = self.inceptive_agg[i][1](_h)
+                    ns.append(h)
 
             return {
                 "concat": (
@@ -349,20 +413,20 @@ class IGNNConv(nn.Module):
 
     def get_Ws(self):
         if self.RN in ["none", "residual"]:
-            Ws = [self.nei_ind_emb[0][1].weight.detach().clone()]
-            for i in range(1, len(self.nei_ind_emb)):
-                Ws.append(self.nei_ind_emb[i].lin.weight.detach().clone())
+            Ws = [self.inceptive_agg[0][1].weight.detach().clone()]
+            for i in range(1, len(self.inceptive_agg)):
+                Ws.append(self.inceptive_agg[i].lin.weight.detach().clone())
             return Ws
         if self.RN == "attentive":
-            Ws = [self.nei_ind_emb[0][1].weight.detach().clone()]
+            Ws = [self.inceptive_agg[0][1].weight.detach().clone()]
             for i in range(1, len(self.nei_rel_learn)):
                 Ws.append(self.nei_rel_learn[i][1].weight.detach().clone())
             return Ws
 
         if self.RN == "concat":
             Ws = []
-            for i, nei_ind_emb in enumerate(self.nei_ind_emb):
-                Ws.append(nei_ind_emb[1].weight.detach().clone())
+            for i, inceptive_agg in enumerate(self.inceptive_agg):
+                Ws.append(inceptive_agg[1].weight.detach().clone())
             return Ws, self.nei_rel_learn[1].weight.detach().clone()
 
         raise ValueError(f'{self.RN} not in ["none", "residual", "attentive", "concat"]')
