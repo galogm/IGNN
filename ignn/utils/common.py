@@ -2,6 +2,8 @@
 common utils
 """
 
+from typing import Tuple, Union, overload
+
 import networkx as nx
 import numpy as np
 import scipy.sparse as sp
@@ -16,15 +18,18 @@ evaluators = {
     "arxiv_ogb": Evaluator(name="ogbn-arxiv"),
 }
 
+FloatLike = Union[float, np.floating, torch.Tensor]
+
+
+@overload
+def metric(name, logits, labels) -> float: ...
+@overload
+def metric(name, logits, labels, train_mask, val_mask, test_mask) -> Tuple[float, float, float]: ...
+
 
 def metric(
-    name,
-    logits,
-    labels,
-    train_mask=None,
-    val_mask=None,
-    test_mask=None,
-):
+    name, logits, labels, train_mask=None, val_mask=None, test_mask=None
+) -> Union[Tuple[FloatLike, FloatLike, FloatLike], FloatLike]:
     if name in [
         "Penn94_linxk",
         "genius_linkx",

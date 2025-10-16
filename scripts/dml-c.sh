@@ -3,7 +3,7 @@ log_path=logs/dml/$RN
 mkdir -p $log_path
 
 v=1.0
-IN=gcn-IN-SN
+IN=IN-SN
 g=2
 f=512
 layers=1

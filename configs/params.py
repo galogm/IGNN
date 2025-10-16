@@ -2,7 +2,7 @@
 """
 
 from collections import defaultdict
-from typing import Literal, Optional
+from typing import Dict, Literal
 
 pre_norms = defaultdict(
     lambda: True,
@@ -83,7 +83,7 @@ lrs = defaultdict(
 ess = defaultdict(
     lambda: 100,
     {
-        "chameleon": 20,
+        "chameleon": 50,
         "squirrel": 100,
         "actor": 50,
         "pubmed": 100,
@@ -232,8 +232,8 @@ acts = defaultdict(
     },
 )
 
-norms: Optional[Literal["bn", "ln"]] = defaultdict(
-    lambda: "ln",
+norms: Dict[str, Literal["bn", "ln", "none"]] = defaultdict(
+    lambda: "none",
     {
         "chameleon": "ln",
         "squirrel": "ln",
@@ -251,21 +251,21 @@ norms: Optional[Literal["bn", "ln"]] = defaultdict(
     },
 )
 
-norms_att: Optional[Literal["bn", "ln"]] = defaultdict(
+att_norms: Dict[str, Literal["bn", "ln", "none"]] = defaultdict(
     lambda: "ln",
     {
-        "chameleon": None,
-        "squirrel": None,
+        "chameleon": "none",
+        "squirrel": "none",
         "actor": "ln",
-        "flickr": None,
+        "flickr": "none",
         "blogcatalog": "ln",
-        "roman-empire": None,
+        "roman-empire": "none",
         "amazon-ratings": "ln",
-        "photo": None,
+        "photo": "none",
         "pubmed": "ln",
-        "wikics": None,
-        "arxiv": None,
-        "products": None,
+        "wikics": "none",
+        "arxiv": "none",
+        "products": "none",
         "pokec": "bn",
     },
 )

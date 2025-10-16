@@ -4,7 +4,7 @@
 import copy
 import time
 import traceback
-from typing import Literal, Optional
+from typing import Tuple
 
 import torch
 import torch_geometric.transforms as T
@@ -42,12 +42,13 @@ class IGNN(nn.Module):
         IN="gcn",
         RN="concat",
         n_layers=1,
-        act="relu",
-        norm: Optional[Literal["bn", "ln"]] = None,
         loss="ce",
-        act_att="tanh",
         fast=False,
-        pre_ln=False,
+        pre_lin=False,
+        norm_type: str = "none",
+        act_type: str = "relu",
+        agg_type: str = "gcn",
+        att_act_type: str = "tanh",
     ) -> None:
         super().__init__()
 
@@ -70,22 +71,25 @@ class IGNN(nn.Module):
                     IN=IN,
                     in_feats=in_feats if i == 0 else h_feats,
                     h_feats=h_feats,
-                    act=act,
                     nas_dropout=nas_dropout,
                     nss_dropout=nss_dropout,
-                    norm=norm,
                     RN=RN,
                     n_hops=n_hops,
-                    ndim_fc=h_feats * (n_hops + 1),
-                    act_att=act_att,
+                    norm_type=norm_type,
+                    act_type=act_type,
+                    agg_type=agg_type,
+                    att_act_type=att_act_type,
                     fast=fast,
-                    pre_ln=pre_ln,
+                    pre_lin=pre_lin,
                 )
                 for i in range(n_layers)
             ]
         )
 
-        self.classifier = nn.Sequential(nn.Dropout(p=clf_dropout), nn.Linear(h_feats, n_clusters))
+        self.classifier = nn.Sequential(
+            nn.Dropout(p=clf_dropout),
+            nn.Linear(h_feats if RN != "none" else h_feats * (n_hops + 1), n_clusters),
+        )
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.l2_coef)
 
     def forward(self, edge_index, features, IN_config: INConf, device=None):
@@ -237,7 +241,7 @@ class IGNN(nn.Module):
         train_mask=None,
         val_mask=None,
         test_mask=None,
-    ):
+    ) -> Tuple[float, float, float]:
         with torch.no_grad():
             self.train(False)
 

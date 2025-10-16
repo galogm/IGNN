@@ -4,11 +4,11 @@
 """
 
 # pylint: disable=invalid-name,protected-access,function-redefined,abstract-method,arguments-differ,too-many-branches
-from typing import Callable, Optional
+from typing import Optional
 
 import torch
 from torch import Tensor
-from torch.nn import Module, Parameter
+from torch.nn import Parameter
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.dense.linear import Linear
 from torch_geometric.nn.inits import zeros
@@ -114,10 +114,8 @@ def gcn_norm(  # noqa: F811
     return edge_index, edge_weight
 
 
-class GCNConv(MessagePassing):
-    r"""The graph convolutional operator from the `"Semi-supervised
-    Classification with Graph Convolutional Networks"
-    <https://arxiv.org/abs/1609.02907>`_ paper.
+class GCNIncep(MessagePassing):
+    r"""A GCN layer without the transformation matrix W.
 
     .. math::
         \mathbf{X}^{\prime} = \mathbf{\hat{D}}^{-1/2} \mathbf{\hat{A}}
@@ -162,6 +160,8 @@ class GCNConv(MessagePassing):
             (default: :obj:`True`)
         bias (bool, optional): If set to :obj:`False`, the layer will not learn
             an additive bias. (default: :obj:`True`)
+        weight (bool, optional): If set to :obj:`False`, the layer will not have a
+            linear transformation. (default: :obj:`False`)
         **kwargs (optional): Additional arguments of
             :class:`torch_geometric.nn.conv.MessagePassing`.
 
@@ -172,6 +172,7 @@ class GCNConv(MessagePassing):
           or sparse matrix :math:`(|\mathcal{V}|, |\mathcal{V}|)`,
           edge weights :math:`(|\mathcal{E}|)` *(optional)*
         - **output:** node features :math:`(|\mathcal{V}|, F_{out})`
+
     """
 
     _cached_edge_index: Optional[OptPairTensor]
@@ -183,26 +184,14 @@ class GCNConv(MessagePassing):
         out_channels: int,
         improved: bool = False,
         cached: bool = False,
-        add_self_loops: Optional[bool] = None,
+        add_self_loops: bool = True,
         normalize: bool = True,
         bias: bool = True,
-        weight: bool = True,
-        act: Optional[Callable] = None,
-        norm: Optional[Module] = None,
+        weight: bool = False,
         **kwargs,
     ):
         kwargs.setdefault("aggr", "add")
         super().__init__(**kwargs)
-
-        if add_self_loops is None:
-            add_self_loops = normalize
-
-        if add_self_loops and not normalize:
-            raise ValueError(
-                f"'{self.__class__.__name__}' does not support "
-                f"adding self-loops to the graph when no "
-                f"on-the-fly normalization is applied"
-            )
 
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -210,9 +199,6 @@ class GCNConv(MessagePassing):
         self.cached = cached
         self.add_self_loops = add_self_loops
         self.normalize = normalize
-        self.weight = weight
-        self.act = act
-        self.norm = norm
 
         self._cached_edge_index = None
         self._cached_adj_t = None
@@ -227,30 +213,17 @@ class GCNConv(MessagePassing):
         else:
             self.register_parameter("bias", None)
 
-        if norm is not None:
-            self.norm: Module = self.norm(out_channels)
-        else:
-            self.register_parameter("norm", None)
-
         self.reset_parameters()
 
     def reset_parameters(self):
         super().reset_parameters()
-        if self.weight:
+        if hasattr(self.lin, "reset_parameters"):
             self.lin.reset_parameters()
-        if self.norm and hasattr(self.norm, "reset_parameters"):
-            self.norm.reset_parameters()
         zeros(self.bias)
-
         self._cached_edge_index = None
         self._cached_adj_t = None
 
-    def forward(
-        self,
-        x: Optional[Tensor] = None,
-        edge_index: Optional[Adj] = None,
-        edge_weight: OptTensor = None,
-    ) -> Tensor:
+    def forward(self, x: Tensor, edge_index: Adj, edge_weight: OptTensor = None) -> Tensor:
 
         if isinstance(x, (tuple, list)):
             raise ValueError(
@@ -296,25 +269,19 @@ class GCNConv(MessagePassing):
                 else:
                     edge_index = cache
 
-        if self.weight:
+        if self.lin is not None:
             x = self.lin(x)
 
         # propagate_type: (x: Tensor, edge_weight: OptTensor)
-        out = self.propagate(edge_index, x=x, edge_weight=edge_weight)
+        out = self.propagate(edge_index, x=x, edge_weight=edge_weight, size=None)
 
         if self.bias is not None:
             out = out + self.bias
-
-        if self.norm is not None:
-            out = self.norm(out)
-
-        if self.act is not None:
-            out = self.act(out)
 
         return out
 
     def message(self, x_j: Tensor, edge_weight: OptTensor) -> Tensor:
         return x_j if edge_weight is None else edge_weight.view(-1, 1) * x_j
 
-    def message_and_aggregate(self, adj_t: Adj, x: Tensor) -> Tensor:
+    def message_and_aggregate(self, adj_t: SparseTensor, x: Tensor) -> Tensor:
         return spmm(adj_t, x, reduce=self.aggr)

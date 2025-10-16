@@ -16,6 +16,7 @@ from tqdm import tqdm
 from configs.params import (
     RNs,
     acts,
+    att_norms,
     clf_dropouts,
     ess,
     feats,
@@ -25,7 +26,6 @@ from configs.params import (
     n_layerss,
     nas_dropouts,
     norms,
-    norms_att,
     nss_dropouts,
     pre_norms,
     repeats,
@@ -128,14 +128,14 @@ def main(
         "n_hops": N_HOPS,
         "n_layers": N_LAYERS,
         "early_stop": early_stop or ess[dataset],
-        "act": acts[dataset],
-        "norm": (
+        "act_type": acts[dataset],
+        "norm_type": (
             None
             if norm is False
-            else norm or (norms_att[dataset] if RN == "attentive" else norms[dataset])
+            else norm or (att_norms[dataset] if RN == "attentive" else norms[dataset])
         ),
         "loss": "ce" if dataset not in ["proteins"] else "bce",
-        "act_att": act_att,
+        "att_act_type": act_att,
     }
     params_all = {
         "eval_start": eval_start,

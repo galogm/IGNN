@@ -14,6 +14,7 @@ from torch_geometric.loader import RandomNodeLoader
 from configs.params import (
     RNs,
     acts,
+    att_norms,
     clf_dropouts,
     ess,
     feats,
@@ -23,7 +24,6 @@ from configs.params import (
     n_layerss,
     nas_dropouts,
     norms,
-    norms_att,
     nss_dropouts,
     pre_norms,
     repeats,
@@ -62,26 +62,25 @@ def main(
     num_parts=3,
     eval_interval=1,
     eval_start=0,
-    norm=None,
-    act_att="tanh",
+    norm_type=None,
+    att_act_type="tanh",
+    act_type="relu",
+    agg_type="gcn_incep",
     fast=None,
-    pre_ln=None,
+    pre_lin=None,
     TRAIN_RATIO=48,
     VALID_RATIO=32,
     VERSION="1.0",
     device=torch.device("cpu"),
 ):
     DATA_INFO = DataConf(**read_configs("data"))
+    add_self_loop = RN != "attentive" or self_loop_attentive[dataset]
+    rm_self_loop = False if RN != "attentive" else (not self_loop_attentive[dataset])
+    simple = dataset not in ["products", "arxiv-year"]
+    row_norm = pre_norms[dataset]
+
     data = load_data(
-        dataset_name=dataset,
-        source=source,
-        directory=DATA_INFO.DATA_DIR,
-        row_normalize=pre_norms[dataset],
-        rm_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
-        add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
-        to_simple=dataset not in ["products", "arxiv-year"],
-        verbosity=3,
-        return_type="pyg",
+        dataset, DATA_INFO.DATA_DIR, 3, source, "pyg", row_norm, rm_self_loop, add_self_loop, simple
     )
     label = data.y
     n_clusters = data.num_classes
@@ -94,54 +93,38 @@ def main(
         label.shape[1] if dataset == "proteins" else (2 if dataset == "pokec" else n_clusters)
     )
 
-    repeat = repeats[dataset.lower()]
-    N_HOPS = n_hops if n_hops is not None else n_hopss[dataset]
-    N_LAYERS = (
-        n_layers
-        if n_layers is not None
-        else n_layerss[dataset] if RN not in ["residual", "attentive"] else 1
-    )
+    BATCH_LOAD = ["products_ogb", "pokec_linkx"]
+    N_HOPS = n_hops or n_hopss[dataset]
+    FAST = fast if fast is not None else (name not in BATCH_LOAD)
+    IN_config = INConf(name, N_HOPS, add_self_loop, rm_self_loop, True, row_norm, FAST)
+
+    N_LAYERS = n_layers or n_layerss[dataset]
     LR = lr if lr is not None else lrs[dataset]
     COEF = l2_coef if l2_coef is not None else l2_coefs[dataset]
-    DNAS = nas_dropout if nas_dropout is not None else nas_dropouts[dataset]
-    DNSS = nss_dropout if nss_dropout is not None else nss_dropouts[dataset]
-    DCLF = clf_dropout if clf_dropout is not None else clf_dropouts[dataset]
-    BATCH_LOAD = ["products_ogb", "pokec_linkx"]
-    FAST = fast if fast is not None else (name not in BATCH_LOAD)
-    PRE_LN = pre_ln if pre_ln is not None else (name in BATCH_LOAD)
-    IN_config = INConf(
-        n_hops=N_HOPS,
-        add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
-        remove_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
-        symm_norm=True,
-        row_normalized=pre_norms[dataset],
-        fast=FAST,
-        name=name,
-    )
-
+    DNAS = nas_dropout or nas_dropouts[dataset]
+    DNSS = nss_dropout or nss_dropouts[dataset]
+    DCLF = clf_dropout or clf_dropouts[dataset]
+    PRE_LN = pre_lin if pre_lin is not None else (name in BATCH_LOAD)
     params = {
-        "IN": IN,
-        "RN": RN if RN is not None else RNs[dataset],
+        "h_feats": h_feats or feats[dataset],
+        "n_epochs": n_epochs,
         "lr": LR,
-        "h_feats": h_feats if h_feats is not None else feats[dataset],
         "l2_coef": COEF,
+        "early_stop": early_stop or ess[dataset],  # early_stop or
         "nas_dropout": DNAS,
         "nss_dropout": DNSS,
         "clf_dropout": DCLF,
-        "n_epochs": n_epochs,
         "n_hops": N_HOPS,
+        "IN": IN,
+        "RN": RN or RNs[dataset],
         "n_layers": N_LAYERS,
-        "early_stop": early_stop or ess[dataset],
-        "act": acts[dataset],
-        "norm": (
-            None
-            if norm is False
-            else norm or (norms_att[dataset] if RN == "attentive" else norms[dataset])
-        ),
         "loss": "ce" if dataset not in ["proteins"] else "bce",
-        "act_att": act_att,
         "fast": IN_config.fast,
-        "pre_ln": PRE_LN,
+        "pre_lin": PRE_LN,
+        "norm_type": norm_type or (att_norms[dataset] if RN == "attentive" else norms[dataset]),
+        "agg_type": agg_type,
+        "act_type": act_type or acts[dataset],  # act_type or
+        "att_act_type": att_act_type,
     }
     params_all = {
         "eval_start": eval_start,
@@ -149,13 +132,13 @@ def main(
         "IN_config": IN_config,
         **params,
     }
-
     logger.info("\n%s", tab_printer({**params_all}, verbose=0))
 
     t_start = time.time()
     res_list_acc_joint = []
     tms = {"model": f"IGNN-{IN}-{RN}", "dataset": dataset, "hops": N_HOPS}
     ts = []
+    repeat = repeats[dataset.lower()]
     for i in range(repeat):
         model = IGNN(in_feats=features.shape[1], n_clusters=n_clusters, device=device, **params)
 
@@ -163,42 +146,29 @@ def main(
         if name in BATCH_LOAD:
             if name == "pokec_linkx":
                 data["train_mask"], data["val_mask"], data["test_mask"] = get_splits(
-                    data,
-                    name,
-                    n_nodes,
-                    i,
-                    TRAIN_RATIO=TRAIN_RATIO,
-                    VALID_RATIO=VALID_RATIO,
-                    DATA=DATA_INFO,
-                    labeled_idx=labeled_idx,
+                    data, name, n_nodes, i, TRAIN_RATIO, VALID_RATIO, DATA_INFO, labeled_idx
                 )
             train_loader = RandomNodeLoader(data, num_parts=num_parts, shuffle=True, num_workers=5)
             test_loader = RandomNodeLoader(data, num_parts=1, num_workers=5)
         else:
             train_mask, val_mask, test_mask = get_splits(
-                data,
-                name,
-                n_nodes,
-                i,
-                TRAIN_RATIO=TRAIN_RATIO,
-                VALID_RATIO=VALID_RATIO,
-                DATA=DATA_INFO,
-                labeled_idx=labeled_idx,
+                data, name, n_nodes, i, repeat, TRAIN_RATIO, VALID_RATIO, DATA_INFO, labeled_idx
             )
 
         tm = model.fit(
-            edge_index=edge_index,
-            features=features,
-            labels=label,
-            IN_config=IN_config,
-            train_loader=train_loader,
-            test_loader=test_loader,
-            train_mask=train_mask,
-            val_mask=val_mask,
-            test_mask=test_mask,
+            edge_index,
+            features,
+            label,
+            IN_config,
+            train_loader,
+            test_loader,
+            train_mask,
+            val_mask,
+            test_mask,
+            eval_interval,
+            eval_start,
+            save_state=False,
             device=device,
-            eval_interval=eval_interval,
-            eval_start=eval_start,
         )
 
         with torch.no_grad():
@@ -228,26 +198,18 @@ def main(
         res_list_acc_joint.append(test_acc)
         logger.info("%s", f"{name} {i} res: {test_acc}\n\n")
 
-    save_to_csv_files(
-        results={**tms},
-        append_info={
-            "mean": f"{np.array(ts).mean():.2f}±{np.array(ts).std():.2f}",
-        },
-        csv_name="times.csv",
-    )
     elapsed_time = f"{(time.time() - t_start)/repeat:.2f}"
     acc_jl = f"{np.array(res_list_acc_joint).mean() * 100:.2f}±{np.array(res_list_acc_joint).std() * 100:.2f}"
-
     logger.info("%s", f"Results: \tAcc:{acc_jl} \tTrain cost: {elapsed_time}s")
+    save_to_csv_files(
+        results={**tms},
+        append_info={"mean": f"{np.array(ts).mean():.2f}±{np.array(ts).std():.2f}"},
+        csv_name="times.csv",
+    )
     save_to_csv_files(
         results={"acc_hl": acc_jl, "hop": N_HOPS},
         insert_info={"dataset": dataset},
-        append_info={
-            "args": params_all,
-            "time": elapsed_time,
-            "source": source,
-            "model": MODEL,
-        },
+        append_info={"args": params_all, "time": elapsed_time, "source": source, "model": MODEL},
         csv_name=f"results_v{VERSION}.csv",
     )
 
@@ -277,10 +239,12 @@ if __name__ == "__main__":
         num_parts=args.num_parts,
         eval_interval=args.eval_interval,
         eval_start=args.eval_start,
-        act_att=args.act_att,
-        norm=args.norm,
+        att_act_type=args.att_act_type,
+        act_type=args.act_type,
+        norm_type=args.norm_type,
+        agg_type=args.agg_type,
         fast=args.fast,
-        pre_ln=args.preln,
+        pre_lin=args.preln,
         TRAIN_RATIO=48,
         VALID_RATIO=32,
         VERSION=args.version,

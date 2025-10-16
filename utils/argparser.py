@@ -159,18 +159,11 @@ def parse_ignn_args() -> argparse.Namespace:
         help="random seed",
     )
     parser.add_argument(
-        "-ne",
-        "--n_epochs",
-        type=int,
-        default=2000,
-        help="maximum epochs",
-    )
-    parser.add_argument(
-        "-f",
-        "--h_feats",
-        type=int,
-        default=None,
-        help="h feats",
+        "-v",
+        "--version",
+        type=float,
+        default=1,
+        help="version",
     )
     parser.add_argument(
         "-d",
@@ -194,20 +187,6 @@ def parse_ignn_args() -> argparse.Namespace:
         help="return_type",
     )
     parser.add_argument(
-        "-at",
-        "--act_att",
-        type=str,
-        default="tanh",
-        help="act attentive",
-    )
-    parser.add_argument(
-        "-m",
-        "--model",
-        type=str,
-        default="ignn",
-        help="model",
-    )
-    parser.add_argument(
         "-p",
         "--num_parts",
         type=int,
@@ -215,53 +194,11 @@ def parse_ignn_args() -> argparse.Namespace:
         help="Graph partition parts for batch learning",
     )
     parser.add_argument(
-        "-eval",
-        "--eval_start",
-        type=int,
-        default=0,
-        help="eval_start epoch",
-    )
-    parser.add_argument(
-        "-i",
-        "--eval_interval",
-        type=int,
-        default=1,
-        help="eval interval",
-    )
-    parser.add_argument(
-        "-IN",
-        "--IN",
+        "-m",
+        "--model",
         type=str,
-        default="gcn-IN-SN",
-        help="IN",
-    )
-    parser.add_argument(
-        "-RN",
-        "--RN",
-        type=lambda x: None if x == "None" else x,
-        default=None,
-        help="RN",
-    )
-    parser.add_argument(
-        "-v",
-        "--version",
-        type=float,
-        default=1,
-        help="version",
-    )
-    parser.add_argument(
-        "-hops",
-        "--n_hops",
-        type=lambda x: None if x == "None" else int(x),
-        default=None,
-        help="n_hops",
-    )
-    parser.add_argument(
-        "-es",
-        "--early_stop",
-        type=lambda x: None if x == "None" else int(x),
-        default=None,
-        help="early stop",
+        default="ignn",
+        help="model",
     )
     parser.add_argument(
         "-fs",
@@ -279,6 +216,108 @@ def parse_ignn_args() -> argparse.Namespace:
         help="fast version",
     )
     parser.add_argument(
+        "-a",
+        "--agg_type",
+        choices=["gcn", "gcn_incep", "sage", "gat"],
+        default="gcn",
+        help="AGG type",
+    )
+    parser.add_argument(
+        "-IN",
+        "--IN",
+        type=str,
+        choices=["IN-SN", "IN-nSN"],
+        default="IN-SN",
+        help="IN",
+    )
+    parser.add_argument(
+        "-RN",
+        "--RN",
+        type=str,
+        choices=["none", "concat", "attentive", "residual", None],
+        default=None,
+        help="RN",
+    )
+    parser.add_argument(
+        "-f",
+        "--h_feats",
+        type=int,
+        default=None,
+        help="h feats",
+    )
+    parser.add_argument(
+        "-nas_dropout",
+        "--nas_dropout",
+        type=lambda x: None if x == "None" else float(x),
+        default="None",
+        help="nas_dropout",
+    )
+    parser.add_argument(
+        "-nss_dropout",
+        "--nss_dropout",
+        type=lambda x: None if x == "None" else float(x),
+        default="None",
+        help="nss_dropout",
+    )
+    parser.add_argument(
+        "-clf_dropout",
+        "--clf_dropout",
+        type=lambda x: None if x == "None" else float(x),
+        default="None",
+        help="clf_dropout",
+    )
+    parser.add_argument(
+        "-n",
+        "--norm_type",
+        choices=["bn", "ln", "none", None],
+        default=None,
+        help="Normalization type: 'bn' (BatchNorm) or 'ln' (LayerNorm) or 'none' (None)",
+    )
+    parser.add_argument(
+        "-ac",
+        "--act_type",
+        type=str,
+        choices=["relu", "prelu", None, "none"],
+        default=None,
+        help="act type",
+    )
+    parser.add_argument(
+        "-at",
+        "--att_act_type",
+        choices=["tanh", "sigmoid", "softmax", None, "none"],
+        type=str,
+        default=None,
+        help="act attentive",
+    )
+    parser.add_argument(
+        "-lr",
+        "--lr",
+        type=lambda x: None if x == "None" else float(x),
+        default="None",
+        help="lr",
+    )
+    parser.add_argument(
+        "-l2_coef",
+        "--l2_coef",
+        type=lambda x: None if x == "None" else float(x),
+        default="None",
+        help="l2_coef",
+    )
+    parser.add_argument(
+        "-hops",
+        "--n_hops",
+        type=lambda x: None if x == "None" else int(x),
+        default="None",
+        help="n_hops",
+    )
+    parser.add_argument(
+        "-layers",
+        "--n_layers",
+        type=lambda x: None if x == "None" else int(x),
+        default="None",
+        help="n_layers",
+    )
+    parser.add_argument(
         "-pre",
         "--preln",
         type=lambda x: defaultdict(
@@ -294,54 +333,31 @@ def parse_ignn_args() -> argparse.Namespace:
         help="pre linear transformation",
     )
     parser.add_argument(
-        "-layers",
-        "--n_layers",
+        "-ne",
+        "--n_epochs",
+        type=int,
+        default=2000,
+        help="maximum epochs",
+    )
+    parser.add_argument(
+        "-es",
+        "--early_stop",
         type=lambda x: None if x == "None" else int(x),
-        default=None,
-        help="n_layers",
+        default="None",
+        help="early stop",
     )
     parser.add_argument(
-        "-lr",
-        "--lr",
-        type=lambda x: None if x == "None" else float(x),
-        default=None,
-        help="lr",
+        "-eval",
+        "--eval_start",
+        type=int,
+        default=0,
+        help="eval_start epoch",
     )
     parser.add_argument(
-        "-l2_coef",
-        "--l2_coef",
-        type=lambda x: None if x == "None" else float(x),
-        default=None,
-        help="l2_coef",
-    )
-    parser.add_argument(
-        "-nas_dropout",
-        "--nas_dropout",
-        type=lambda x: None if x == "None" else float(x),
-        default=None,
-        help="nas_dropout",
-    )
-    parser.add_argument(
-        "-nss_dropout",
-        "--nss_dropout",
-        type=lambda x: None if x == "None" else float(x),
-        default=None,
-        help="nss_dropout",
-    )
-    parser.add_argument(
-        "-clf_dropout",
-        "--clf_dropout",
-        type=lambda x: None if x == "None" else float(x),
-        default=None,
-        help="clf_dropout",
-    )
-    parser.add_argument(
-        "-n",
-        "--norm",
-        # type=Optional[Literal["ln", "bn"]],
-        type=lambda x: False if x == "False" else x,
-        choices=["bn", "ln", False],
-        default=None,
-        help="Normalization type: 'bn' (BatchNorm) or 'ln' (LayerNorm) or None",
+        "-i",
+        "--eval_interval",
+        type=int,
+        default=1,
+        help="eval interval",
     )
     return parser.parse_args()
