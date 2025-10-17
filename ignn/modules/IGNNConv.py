@@ -20,7 +20,10 @@ logger = get_logger(__name__)
 ACT_DICT = {
     "relu": nn.ReLU(),
     "prelu": nn.PReLU(),
+    "leakyrelu": nn.LeakyReLU(),
+    "gelu": nn.GELU(),
     "sigmoid": nn.Sigmoid(),
+    "softmax": nn.Softmax(dim=-1),
     "tanh": nn.Tanh(),
     "none": nn.Identity(),
 }
