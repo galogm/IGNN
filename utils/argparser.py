@@ -336,7 +336,7 @@ def parse_ignn_args() -> argparse.Namespace:
         "-ne",
         "--n_epochs",
         type=int,
-        default=2000,
+        default=3000,
         help="maximum epochs",
     )
     parser.add_argument(

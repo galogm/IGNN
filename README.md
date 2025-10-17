@@ -26,7 +26,7 @@ $ bash .ci/install.sh
 
 ## Usage
 
-Scripts for running each IGNN variant across all datasets:
+Running scripts for each IGNN variant across all datasets:
 
 | Variant | Script                                           |
 | ------- | ------------------------------------------------ |
@@ -34,6 +34,13 @@ Scripts for running each IGNN variant across all datasets:
 | r-IGNN  | [`./scripts/02-rIGNN.sh`](./scripts/02-rIGNN.sh) |
 | a-IGNN  | [`./scripts/03-aIGNN.sh`](./scripts/03-aIGNN.sh) |
 
+Hyperparameter searching scripts for each IGNN variant across all datasets:
+
+| Variant | Script                                                   |
+| ------- | -------------------------------------------------------- |
+| c-IGNN  | [`./scripts/cignn_search.py`](./scripts/cignn_search.py) |
+| r-IGNN  | [`./scripts/rignn_search.py`](./scripts/rignn_search.py) |
+| a-IGNN  | [`./scripts/aignn_search.py`](./scripts/aignn_search.py) |
 
 ## Datasets and Splits
 

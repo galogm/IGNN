@@ -3,7 +3,7 @@
 # pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals,invalid-name,too-many-branches,too-many-statements,
 import os
 from pathlib import Path
-from typing import Dict, Generator, Type
+from typing import Dict, Type
 
 import torch
 import torch.nn.functional as F
@@ -12,7 +12,6 @@ from torch_geometric.nn import GATConv, GCNConv, SAGEConv
 from torch_sparse import remove_diag, set_diag
 from torch_sparse.tensor import SparseTensor
 
-from ..configs import INConf
 from ..utils import get_logger
 from .GCNIncep import GCNIncep
 
@@ -111,7 +110,7 @@ class IGNNConv(nn.Module):
         self.init_RNs(RN, h_feats, nss_dropout, h_feats * (n_hops + 1), att_act_type)
         self.reset_parameters()
 
-    def get_leaf_modules(self, module: nn.Module) -> Generator[nn.Module, nn.Module, nn.Module]:
+    def get_leaf_modules(self, module):
         if len(list(module.children())) == 0:
             yield module
         for m in module.children():
@@ -122,24 +121,7 @@ class IGNNConv(nn.Module):
             if hasattr(module, "reset_parameters"):
                 module.reset_parameters()
 
-    def init_INs(
-        self,
-        IN: str,
-        in_feats: int,
-        h_feats: int,
-        nas_dropout: float,
-        nss_dropout: float,
-        fast: bool,
-    ):
-        """Initialize INs. no SN is possible without IN.
-
-        Args:
-            IN (str): IN type.
-            in_feats (int): in_feat dims.
-            h_feats (int): h_feats dims.
-            act_func (Callable): act func.
-            nas_dropout (float): dropout.
-        """
+    def init_INs(self, IN, in_feats, h_feats, nas_dropout, nss_dropout, fast):
         n_feats = in_feats if not self.lin else h_feats
         if IN == "IN-nSN":
             if self.RN == "none":
@@ -253,9 +235,7 @@ class IGNNConv(nn.Module):
             )
 
     # pylint: disable=too-many-return-statements
-    def forward(
-        self, edge_index, features, IN_config: INConf, device=torch.device("cpu"), hiddens=False
-    ):
+    def forward(self, edge_index, features, IN_config, device=torch.device("cpu"), hiddens=False):
         self.to(device=device)
         self.device = device
 
@@ -377,13 +357,7 @@ def preprocess_adj(adj, add_self_loop, remove_self_loop, symm_norm):
     return adj
 
 
-def fast_inceptive_aggregation(
-    adj: SparseTensor,
-    features: torch.FloatTensor,
-    IN_config: INConf,
-    preprocess: bool,
-    device: torch.device = torch.device("cpu"),
-):
+def fast_inceptive_aggregation(adj, features, IN_config, preprocess, device=torch.device("cpu")):
     (
         name,
         n_hops,
