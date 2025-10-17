@@ -20,13 +20,13 @@ from configs.params import (
     clf_dropouts,
     ess,
     feats,
+    hid_dropouts,
     l2_coefs,
     lrs,
     n_hopss,
     n_layerss,
-    nas_dropouts,
     norms,
-    nss_dropouts,
+    pre_dropouts,
     pre_norms,
     repeats,
     self_loop_attentive,
@@ -53,8 +53,8 @@ def main(
     n_epochs=2000,
     lr=0.001,
     l2_coef=5e-5,
-    nas_dropout=0.0,
-    nss_dropout=0.0,
+    pre_dropout=0.0,
+    hid_dropout=0.0,
     clf_dropout=0.0,
     early_stop=None,
     num_parts=3,
@@ -103,8 +103,8 @@ def main(
     )
     LR = lr if lr is not None else lrs[dataset]
     COEF = l2_coef if l2_coef is not None else l2_coefs[dataset]
-    DNAS = nas_dropout if nas_dropout is not None else nas_dropouts[dataset]
-    DNSS = nss_dropout if nss_dropout is not None else nss_dropouts[dataset]
+    DNAS = pre_dropout if pre_dropout is not None else pre_dropouts[dataset]
+    DNSS = hid_dropout if hid_dropout is not None else hid_dropouts[dataset]
     DCLF = clf_dropout if clf_dropout is not None else clf_dropouts[dataset]
     IN_config = INConf(
         n_hops=N_HOPS,
@@ -121,8 +121,8 @@ def main(
         "lr": LR,
         "h_feats": h_feats if h_feats is not None else feats[dataset],
         "l2_coef": COEF,
-        "nas_dropout": DNAS,
-        "nss_dropout": DNSS,
+        "pre_dropout": DNAS,
+        "hid_dropout": DNSS,
         "clf_dropout": DCLF,
         "n_epochs": n_epochs,
         "n_hops": N_HOPS,
@@ -347,8 +347,8 @@ if __name__ == "__main__":
         n_epochs=args.n_epochs,
         lr=args.lr,
         l2_coef=args.l2_coef,
-        nas_dropout=args.nas_dropout,
-        nss_dropout=args.nss_dropout,
+        pre_dropout=args.pre_dropout,
+        hid_dropout=args.hid_dropout,
         clf_dropout=args.clf_dropout,
         early_stop=args.early_stop,
         num_parts=args.num_parts,

@@ -83,8 +83,8 @@ class IGNNConv(nn.Module):
         IN,
         in_feats,
         h_feats,
-        nas_dropout,
-        nss_dropout,
+        pre_dropout,
+        hid_dropout,
         RN,
         n_hops,
         norm_type: str = "none",
@@ -109,8 +109,8 @@ class IGNNConv(nn.Module):
         self.device = None
         self.lin = None
 
-        self.init_INs(IN, in_feats, h_feats, nas_dropout, nss_dropout, fast)
-        self.init_RNs(RN, h_feats, nss_dropout, h_feats * (n_hops + 1), att_act_type)
+        self.init_INs(IN, in_feats, h_feats, pre_dropout, hid_dropout, fast)
+        self.init_RNs(RN, h_feats, hid_dropout, h_feats * (n_hops + 1), att_act_type)
         self.reset_parameters()
 
     def get_leaf_modules(self, module):
@@ -124,11 +124,11 @@ class IGNNConv(nn.Module):
             if hasattr(module, "reset_parameters"):
                 module.reset_parameters()
 
-    def init_INs(self, IN, in_feats, h_feats, nas_dropout, nss_dropout, fast):
+    def init_INs(self, IN, in_feats, h_feats, pre_dropout, hid_dropout, fast):
         if IN == "IN-nSN":
             if self.RN == "none":
                 self.lin = nn.Sequential(
-                    nn.Dropout(p=nas_dropout),
+                    nn.Dropout(p=pre_dropout),
                     nn.Linear(in_feats, h_feats),
                     NORM_DICT[self.norm_type](h_feats),
                     ACT_DICT[self.act_type],
@@ -136,7 +136,7 @@ class IGNNConv(nn.Module):
                 self.inceptive_agg = nn.ModuleList(
                     [
                         nn.Sequential(
-                            nn.Dropout(p=nas_dropout if not self.lin else nss_dropout),
+                            nn.Dropout(p=pre_dropout if not self.lin else hid_dropout),
                             nn.Linear(h_feats, h_feats),
                             NORM_DICT[self.norm_type](h_feats),
                             ACT_DICT[self.act_type],
@@ -149,7 +149,7 @@ class IGNNConv(nn.Module):
                             [
                                 GNNConv(h_feats, h_feats, 0, "none", "none", self.agg_type),
                                 nn.Sequential(
-                                    nn.Dropout(p=nas_dropout if not self.lin else nss_dropout),
+                                    nn.Dropout(p=pre_dropout if not self.lin else hid_dropout),
                                     nn.Linear(in_feats, h_feats),
                                     NORM_DICT[self.norm_type](h_feats),
                                     ACT_DICT[self.act_type],
@@ -161,7 +161,7 @@ class IGNNConv(nn.Module):
                 self.inceptive_agg = nn.ModuleList(
                     [
                         nn.Sequential(
-                            nn.Dropout(p=nas_dropout),
+                            nn.Dropout(p=pre_dropout),
                             nn.Linear(in_feats, h_feats),
                             NORM_DICT[self.norm_type](h_feats),
                             ACT_DICT[self.act_type],
@@ -175,7 +175,7 @@ class IGNNConv(nn.Module):
         elif IN == "IN-SN":
             if self.pre_lin and not fast:
                 self.lin = nn.Sequential(
-                    nn.Dropout(p=nas_dropout),
+                    nn.Dropout(p=pre_dropout),
                     nn.Linear(in_feats, h_feats),
                     NORM_DICT[self.norm_type](h_feats),
                     ACT_DICT[self.act_type],
@@ -184,7 +184,7 @@ class IGNNConv(nn.Module):
             self.inceptive_agg = nn.ModuleList(
                 [
                     nn.Sequential(
-                        nn.Dropout(p=nas_dropout if not self.lin else nss_dropout),
+                        nn.Dropout(p=pre_dropout if not self.lin else hid_dropout),
                         nn.Linear(n_feats, h_feats),
                         NORM_DICT[self.norm_type](h_feats),
                         ACT_DICT[self.act_type],
@@ -194,7 +194,7 @@ class IGNNConv(nn.Module):
             for _ in range(self.n_hops):
                 self.inceptive_agg.append(
                     nn.Sequential(
-                        nn.Dropout(p=nas_dropout if not self.lin else nss_dropout),
+                        nn.Dropout(p=pre_dropout if not self.lin else hid_dropout),
                         nn.Linear(n_feats, h_feats),
                         NORM_DICT[self.norm_type](h_feats),
                         ACT_DICT[self.act_type],
@@ -204,7 +204,7 @@ class IGNNConv(nn.Module):
                         [
                             GNNConv(n_feats, n_feats, 0, "none", "none", self.agg_type),
                             nn.Sequential(
-                                nn.Dropout(p=nas_dropout if not self.lin else nss_dropout),
+                                nn.Dropout(p=pre_dropout if not self.lin else hid_dropout),
                                 nn.Linear(n_feats, h_feats),
                                 NORM_DICT[self.norm_type](h_feats),
                                 ACT_DICT[self.act_type],
@@ -213,10 +213,10 @@ class IGNNConv(nn.Module):
                     )
                 )
 
-    def init_RNs(self, RN, h_feats, nss_dropout, ndim_fc, att_act_type):
+    def init_RNs(self, RN, h_feats, hid_dropout, ndim_fc, att_act_type):
         if RN == "concat":
             self.nei_rel_learn = nn.Sequential(
-                nn.Dropout(p=nss_dropout),
+                nn.Dropout(p=hid_dropout),
                 nn.Linear(ndim_fc, h_feats),
                 NORM_DICT[self.norm_type](h_feats),
                 ACT_DICT[self.act_type],
@@ -228,7 +228,7 @@ class IGNNConv(nn.Module):
             self.nei_rel_learn = nn.ModuleList(
                 [
                     nn.Sequential(
-                        nn.Dropout(p=nss_dropout),
+                        nn.Dropout(p=hid_dropout),
                         nn.Linear(h_feats * 2, 1),
                         NORM_DICT[self.norm_type](1),
                         ACT_DICT[att_act_type],

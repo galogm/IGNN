@@ -78,8 +78,8 @@ search_space = {
 
     "lr": [0.001, 0.005, 0.01],
     "l2_coef": [0.0, 5e-5, 1e-4, 5e-4, 1e-5],
-    "nas_dropout": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-    "nss_dropout": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+    "pre_dropout": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+    "hid_dropout": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
     "clf_dropout": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
 
     "early_stop": [50, 100, 150, 200],
@@ -164,8 +164,8 @@ def objective(trial: optuna.trial.Trial, dataset, source, gpu, log_path, prune_f
         "att_act_type": trial.suggest_categorical("att_act_type", search_space["att_act_type"]),
         "lr": trial.suggest_categorical("lr", search_space["lr"]),
         "l2_coef": trial.suggest_categorical("l2_coef", search_space["l2_coef"]),
-        "nas_dropout": trial.suggest_categorical("nas_dropout", search_space["nas_dropout"]),
-        "nss_dropout": trial.suggest_categorical("nss_dropout", search_space["nss_dropout"]),
+        "pre_dropout": trial.suggest_categorical("pre_dropout", search_space["pre_dropout"]),
+        "hid_dropout": trial.suggest_categorical("hid_dropout", search_space["hid_dropout"]),
         "clf_dropout": trial.suggest_categorical("clf_dropout", search_space["clf_dropout"]),
         "early_stop": trial.suggest_categorical("early_stop", search_space["early_stop"]),
     }
@@ -209,8 +209,8 @@ def objective(trial: optuna.trial.Trial, dataset, source, gpu, log_path, prune_f
         "--preln", str(params["preln"]),
         # "--fast", str(params["fast"]),
 
-        "--nas_dropout", str(params["nas_dropout"]),
-        "--nss_dropout", str(params["nss_dropout"]),
+        "--pre_dropout", str(params["pre_dropout"]),
+        "--hid_dropout", str(params["hid_dropout"]),
         "--clf_dropout", str(params["clf_dropout"]),
     ]
     # fmt: on

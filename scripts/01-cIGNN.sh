@@ -85,12 +85,12 @@ hops=10
 layers=1
 lr=0.001
 l2_coef=0.00005
-nas_dropout=0
-nss_dropout=0.8
+pre_dropout=0
+hid_dropout=0.8
 clf_dropout=0.5
 m=IGNN-$IN-$RN
-lp=$log_path/large/$g-$d-$hops-$layers-$f-$lr-$l2_coef-$nas_dropout-$nss_dropout-$clf_dropout.log
-nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN -RN $RN -hops $hops -layers $layers -lr $lr -l2_coef $l2_coef -nas_dropout $nas_dropout -nss_dropout $nss_dropout -clf_dropout $clf_dropout -n ln -fs False -a $agg > $lp & echo "Check logs in $lp . PID: $! "
+lp=$log_path/large/$g-$d-$hops-$layers-$f-$lr-$l2_coef-$pre_dropout-$hid_dropout-$clf_dropout.log
+nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN -RN $RN -hops $hops -layers $layers -lr $lr -l2_coef $l2_coef -pre_dropout $pre_dropout -hid_dropout $hid_dropout -clf_dropout $clf_dropout -n ln -fs False -a $agg > $lp & echo "Check logs in $lp . PID: $! "
 
 d=products s=ogb
 g=1
@@ -99,12 +99,12 @@ hops=5
 layers=1
 lr=0.003
 l2_coef=0.00000
-nas_dropout=0
-nss_dropout=0.5
+pre_dropout=0
+hid_dropout=0.5
 clf_dropout=0.5
 m=IGNN-$IN-$RN
-lp=$log_path/large/$g-$d-$hops-$layers-$f-$lr-$l2_coef-$nas_dropout-$nss_dropout-$clf_dropout.log
-PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:21 nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN -RN $RN -hops $hops -layers $layers -lr $lr -l2_coef $l2_coef -nas_dropout $nas_dropout -nss_dropout $nss_dropout -clf_dropout $clf_dropout -p 10 --eval_start 150 -i 3 -n ln -fs False -pre True -a $agg > $lp & echo "Check logs in $lp . PID: $! "
+lp=$log_path/large/$g-$d-$hops-$layers-$f-$lr-$l2_coef-$pre_dropout-$hid_dropout-$clf_dropout.log
+PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:21 nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN -RN $RN -hops $hops -layers $layers -lr $lr -l2_coef $l2_coef -pre_dropout $pre_dropout -hid_dropout $hid_dropout -clf_dropout $clf_dropout -p 10 --eval_start 150 -i 3 -n ln -fs False -pre True -a $agg > $lp & echo "Check logs in $lp . PID: $! "
 
 d=pokec s=linkx
 g=4
@@ -113,9 +113,9 @@ hops=6
 layers=1
 lr=0.001
 l2_coef=0.0000005
-nas_dropout=0
-nss_dropout=0.2
+pre_dropout=0
+hid_dropout=0.2
 clf_dropout=0.2
 m=IGNN-$IN-$RN
-lp=$log_path/large/$g-$d-$hops-$layers-$f-$lr-$l2_coef-$nas_dropout-$nss_dropout-$clf_dropout.log
-PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:21  nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN -RN $RN -hops $hops -layers $layers -lr $lr -l2_coef $l2_coef -nas_dropout $nas_dropout -nss_dropout $nss_dropout -clf_dropout $clf_dropout -p 10 -eval 1200 -i 3 -n bn -fs False -pre True -a $agg > $lp & echo "Check logs in $lp . PID: $! "
+lp=$log_path/large/$g-$d-$hops-$layers-$f-$lr-$l2_coef-$pre_dropout-$hid_dropout-$clf_dropout.log
+PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:21  nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN -RN $RN -hops $hops -layers $layers -lr $lr -l2_coef $l2_coef -pre_dropout $pre_dropout -hid_dropout $hid_dropout -clf_dropout $clf_dropout -p 10 -eval 1200 -i 3 -n bn -fs False -pre True -a $agg > $lp & echo "Check logs in $lp . PID: $! "

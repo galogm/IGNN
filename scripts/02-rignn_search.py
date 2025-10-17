@@ -1,7 +1,7 @@
 """
 Parameter Search:
 ```bash
-id=0;model="c-IGNN";d=chameleon;gpu=$id;log_path=logs/$model/$d;mkdir -p $log_path;nohup python -u -m scripts.cignn_search --gpu=$gpu --dataset=$d --n_trials=128 --n_jobs=3 > $log_path/$id.log 2>&1 & echo $!
+id=1;model="r-IGNN";d=chameleon;gpu=$id;log_path=logs/$model/$d;mkdir -p $log_path;nohup python -u -m scripts.rignn_search --gpu=$gpu --dataset=$d --n_trials=128 --n_jobs=3 > $log_path/$id.log 2>&1 & echo $!
 ```
 """
 
@@ -49,7 +49,7 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-MODEL = "c-IGNN"
+MODEL = "r-IGNN"
 
 DATASETS = {
     "critical": ["chameleon", "squirrel", "roman-empire", "amazon-ratings"],
@@ -64,13 +64,13 @@ search_space = {
     "n_layers": [1, 3, 5],
     "n_hops": [1, 3, 6, 8, 10, 16, 32, 64],
     # "agg_type": ["gcn", "gcn_incep", "sage", "gat"],
-    "agg_type": ["gcn_incep"],
+    "agg_type": ["gcn"],
     # "IN": ["IN-SN", "IN-nSN"],
-    "IN": ["IN-SN"],
+    "IN": ["IN-nSN"],
     # "RN": ["none", "concat", "attentive", "residual"],
-    "RN": ["none", "concat"],
+    "RN": ["residual"],
     "preln": [True, False],
-    "fast":  [True, False],
+    # "fast":  [True, False],
 
     "norm_type": ["bn", "ln", "none"],
     "act_type": ["relu", "prelu", "none"],
@@ -78,8 +78,8 @@ search_space = {
 
     "lr": [0.001, 0.005, 0.01],
     "l2_coef": [0.0, 5e-5, 1e-4, 5e-4, 1e-5],
-    "nas_dropout": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-    "nss_dropout": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+    "pre_dropout": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+    "hid_dropout": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
     "clf_dropout": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
 
     "early_stop": [50, 100, 150, 200],
@@ -164,8 +164,8 @@ def objective(trial: optuna.trial.Trial, dataset, source, gpu, log_path, prune_f
         # "att_act_type": trial.suggest_categorical("att_act_type", search_space["att_act_type"]),
         "lr": trial.suggest_categorical("lr", search_space["lr"]),
         "l2_coef": trial.suggest_categorical("l2_coef", search_space["l2_coef"]),
-        "nas_dropout": trial.suggest_categorical("nas_dropout", search_space["nas_dropout"]),
-        "nss_dropout": trial.suggest_categorical("nss_dropout", search_space["nss_dropout"]),
+        "pre_dropout": trial.suggest_categorical("pre_dropout", search_space["pre_dropout"]),
+        "hid_dropout": trial.suggest_categorical("hid_dropout", search_space["hid_dropout"]),
         "clf_dropout": trial.suggest_categorical("clf_dropout", search_space["clf_dropout"]),
         "early_stop": trial.suggest_categorical("early_stop", search_space["early_stop"]),
     }
@@ -175,11 +175,11 @@ def objective(trial: optuna.trial.Trial, dataset, source, gpu, log_path, prune_f
         else 1
     )
 
-    params["fast"] = (
-        trial.suggest_categorical("fast", search_space["fast"])
-        if params["n_layers"] == 1
-        else False
-    )
+    # params["fast"] = (
+    #     trial.suggest_categorical("fast", search_space["fast"])
+    #     if params["n_layers"] == 1
+    #     else False
+    # )
 
     cmd = [
         "python",
@@ -207,10 +207,10 @@ def objective(trial: optuna.trial.Trial, dataset, source, gpu, log_path, prune_f
         # "--att_act_type", params["att_act_type"],
 
         "--preln", str(params["preln"]),
-        "--fast", str(params["fast"]),
+        # "--fast", str(params["fast"]),
 
-        "--nas_dropout", str(params["nas_dropout"]),
-        "--nss_dropout", str(params["nss_dropout"]),
+        "--pre_dropout", str(params["pre_dropout"]),
+        "--hid_dropout", str(params["hid_dropout"]),
         "--clf_dropout", str(params["clf_dropout"]),
     ]
     # fmt: on

@@ -35,8 +35,8 @@ class IGNN(nn.Module):
         l2_coef: float = 0.00005,
         early_stop: int = 100,
         device=None,
-        nas_dropout: float = 0.0,
-        nss_dropout: float = 0.8,
+        pre_dropout: float = 0.0,
+        hid_dropout: float = 0.8,
         clf_dropout: float = 0.9,
         n_hops=6,
         IN="gcn",
@@ -55,7 +55,7 @@ class IGNN(nn.Module):
         # pylint: disable=consider-iterating-dictionary
         assert loss in losses.keys(), f"loss should be in {losses.keys()}"
         self.criterion = losses[loss]()
-        self.nss_dropout = nss_dropout
+        self.hid_dropout = hid_dropout
         self.n_epochs = n_epochs
         self.h_feats = h_feats
         self.l2_coef = l2_coef
@@ -75,8 +75,8 @@ class IGNN(nn.Module):
                         else (h_feats if RN != "none" else h_feats * (1 + n_hops))
                     ),
                     h_feats=h_feats,
-                    nas_dropout=nas_dropout,
-                    nss_dropout=nss_dropout,
+                    pre_dropout=pre_dropout,
+                    hid_dropout=hid_dropout,
                     RN=RN,
                     n_hops=n_hops,
                     norm_type=norm_type,

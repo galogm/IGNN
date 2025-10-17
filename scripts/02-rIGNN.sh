@@ -83,12 +83,12 @@ hops=10
 layers=1
 lr=0.001
 l2_coef=0.00005
-nas_dropout=0
-nss_dropout=0.8
+pre_dropout=0
+hid_dropout=0.8
 clf_dropout=0.5
 m=IGNN-$IN-$RN
-nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN -RN $RN -hops $hops -layers $layers -lr $lr -l2_coef $l2_coef -nas_dropout $nas_dropout -nss_dropout $nss_dropout -clf_dropout $clf_dropout -a=$agg >$log_path/large/$d-$m.log 2>&1 & echo "Check logs in $log_path/$d-$m.log. PID: $! "
-# $d-$hops-$layers-$f-$lr-$l2_coef-$nas_dropout-$nss_dropout-$clf_dropout.log 2>&1 & echo "Check logs in $log_path/$d-$m.log. PID: $! "
+nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN -RN $RN -hops $hops -layers $layers -lr $lr -l2_coef $l2_coef -pre_dropout $pre_dropout -hid_dropout $hid_dropout -clf_dropout $clf_dropout -a=$agg >$log_path/large/$d-$m.log 2>&1 & echo "Check logs in $log_path/$d-$m.log. PID: $! "
+# $d-$hops-$layers-$f-$lr-$l2_coef-$pre_dropout-$hid_dropout-$clf_dropout.log 2>&1 & echo "Check logs in $log_path/$d-$m.log. PID: $! "
 
 d=products s=ogb
 g=2
@@ -97,11 +97,11 @@ hops=5
 layers=1
 lr=0.003
 l2_coef=0.00000
-nas_dropout=0
-nss_dropout=0.5
+pre_dropout=0
+hid_dropout=0.5
 clf_dropout=0.5
 m=IGNN-$IN-$RN
-nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN -RN $RN -hops $hops -layers $layers -lr $lr -l2_coef $l2_coef -nas_dropout $nas_dropout -nss_dropout $nss_dropout -clf_dropout $clf_dropout --eval_start 100 -i 3 -n ln -p 5 -a=$agg >$log_path/large/$d-$hops-$layers-$f-$lr-$l2_coef-$nas_dropout-$nss_dropout-$clf_dropout-$b.log 2>&1 & echo "Check logs in $log_path/$d-$m.log. PID: $! "
+nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN -RN $RN -hops $hops -layers $layers -lr $lr -l2_coef $l2_coef -pre_dropout $pre_dropout -hid_dropout $hid_dropout -clf_dropout $clf_dropout --eval_start 100 -i 3 -n ln -p 5 -a=$agg >$log_path/large/$d-$hops-$layers-$f-$lr-$l2_coef-$pre_dropout-$hid_dropout-$clf_dropout-$b.log 2>&1 & echo "Check logs in $log_path/$d-$m.log. PID: $! "
 
 d=pokec s=linkx
 g=3
@@ -110,8 +110,8 @@ hops=5
 layers=1
 lr=0.001
 l2_coef=0.000005
-nas_dropout=0
-nss_dropout=0.2
+pre_dropout=0
+hid_dropout=0.2
 clf_dropout=0.2
 m=IGNN-$IN-$RN
-nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN -RN $RN -hops $hops -layers $layers -lr $lr -l2_coef $l2_coef -nas_dropout $nas_dropout -nss_dropout $nss_dropout -clf_dropout $clf_dropout -eval 1200 -i 3  -n bn -a=$agg >$log_path/large/$d-$hops-$layers-$f-$lr-$l2_coef-$nas_dropout-$nss_dropout-$clf_dropout-$b.log 2>&1 & echo "Check logs in $log_path/$d-$m.log. PID: $! "
+nohup python -u main.py -g $g -f $f -d $d -s $s -m $m -v $v -IN $IN -RN $RN -hops $hops -layers $layers -lr $lr -l2_coef $l2_coef -pre_dropout $pre_dropout -hid_dropout $hid_dropout -clf_dropout $clf_dropout -eval 1200 -i 3  -n bn -a=$agg >$log_path/large/$d-$hops-$layers-$f-$lr-$l2_coef-$pre_dropout-$hid_dropout-$clf_dropout-$b.log 2>&1 & echo "Check logs in $log_path/$d-$m.log. PID: $! "

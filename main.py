@@ -18,13 +18,13 @@ from configs.params import (
     clf_dropouts,
     ess,
     feats,
+    hid_dropouts,
     l2_coefs,
     lrs,
     n_hopss,
     n_layerss,
-    nas_dropouts,
     norms,
-    nss_dropouts,
+    pre_dropouts,
     pre_norms,
     repeats,
     self_loop_attentive,
@@ -55,8 +55,8 @@ def main(
     n_epochs=2000,
     lr=0.001,
     l2_coef=5e-5,
-    nas_dropout=0.0,
-    nss_dropout=0.0,
+    pre_dropout=0.0,
+    hid_dropout=0.0,
     clf_dropout=0.0,
     early_stop=None,
     num_parts=3,
@@ -101,8 +101,8 @@ def main(
 
     LR = lr if lr is not None else lrs[dataset]
     COEF = l2_coef if l2_coef is not None else l2_coefs[dataset]
-    DNAS = nas_dropout or nas_dropouts[dataset]
-    DNSS = nss_dropout or nss_dropouts[dataset]
+    DNAS = pre_dropout or pre_dropouts[dataset]
+    DNSS = hid_dropout or hid_dropouts[dataset]
     DCLF = clf_dropout or clf_dropouts[dataset]
     PRE_LN = pre_lin if pre_lin is not None else (name in BATCH_LOAD)
     params = {
@@ -111,8 +111,8 @@ def main(
         "lr": LR,
         "l2_coef": COEF,
         "early_stop": early_stop or ess[dataset],  # early_stop or
-        "nas_dropout": DNAS,
-        "nss_dropout": DNSS,
+        "pre_dropout": DNAS,
+        "hid_dropout": DNSS,
         "clf_dropout": DCLF,
         "n_hops": N_HOPS,
         "IN": IN,
@@ -232,8 +232,8 @@ if __name__ == "__main__":
         n_epochs=args.n_epochs,
         lr=args.lr,
         l2_coef=args.l2_coef,
-        nas_dropout=args.nas_dropout,
-        nss_dropout=args.nss_dropout,
+        pre_dropout=args.pre_dropout,
+        hid_dropout=args.hid_dropout,
         clf_dropout=args.clf_dropout,
         early_stop=args.early_stop,
         num_parts=args.num_parts,

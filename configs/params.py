@@ -99,7 +99,7 @@ ess = defaultdict(
     },
 )
 
-nas_dropouts = defaultdict(
+pre_dropouts = defaultdict(
     lambda: 0.5,
     {
         "flickr": 0.8,
@@ -118,7 +118,7 @@ nas_dropouts = defaultdict(
     },
 )
 
-nss_dropouts = defaultdict(
+hid_dropouts = defaultdict(
     lambda: 0.8,
     {
         "flickr": 0.8,

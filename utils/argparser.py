@@ -246,18 +246,18 @@ def parse_ignn_args() -> argparse.Namespace:
         help="h feats",
     )
     parser.add_argument(
-        "-nas_dropout",
-        "--nas_dropout",
+        "-pre_dropout",
+        "--pre_dropout",
         type=lambda x: None if x == "None" else float(x),
         default="None",
-        help="nas_dropout",
+        help="pre_dropout",
     )
     parser.add_argument(
-        "-nss_dropout",
-        "--nss_dropout",
+        "-hid_dropout",
+        "--hid_dropout",
         type=lambda x: None if x == "None" else float(x),
         default="None",
-        help="nss_dropout",
+        help="hid_dropout",
     )
     parser.add_argument(
         "-clf_dropout",
