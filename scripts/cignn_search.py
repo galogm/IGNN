@@ -74,7 +74,7 @@ search_space = {
 
     "norm_type": ["bn", "ln", "none"],
     "act_type": ["relu", "prelu", "none"],
-    "att_act_type": ["tanh", "sigmoid", "softmax", "none"],
+    # "att_act_type": ["tanh", "sigmoid", "softmax", "none"],
 
     "lr": [0.001, 0.005, 0.01],
     "l2_coef": [0.0, 5e-5, 1e-4, 5e-4, 1e-5],
@@ -161,7 +161,7 @@ def objective(trial: optuna.trial.Trial, dataset, source, gpu, log_path, prune_f
         "preln": trial.suggest_categorical("preln", search_space["preln"]),
         "norm_type": trial.suggest_categorical("norm_type", search_space["norm_type"]),
         "act_type": trial.suggest_categorical("act_type", search_space["act_type"]),
-        "att_act_type": trial.suggest_categorical("att_act_type", search_space["att_act_type"]),
+        # "att_act_type": trial.suggest_categorical("att_act_type", search_space["att_act_type"]),
         "lr": trial.suggest_categorical("lr", search_space["lr"]),
         "l2_coef": trial.suggest_categorical("l2_coef", search_space["l2_coef"]),
         "nas_dropout": trial.suggest_categorical("nas_dropout", search_space["nas_dropout"]),
@@ -204,7 +204,7 @@ def objective(trial: optuna.trial.Trial, dataset, source, gpu, log_path, prune_f
         "--RN", params["RN"],
         "--norm_type", params["norm_type"],
         "--act_type", params["act_type"],
-        "--att_act_type", params["att_act_type"],
+        # "--att_act_type", params["att_act_type"],
 
         "--preln", str(params["preln"]),
         "--fast", str(params["fast"]),
