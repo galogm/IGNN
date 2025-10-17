@@ -95,10 +95,10 @@ def main(
 
     BATCH_LOAD = ["products_ogb", "pokec_linkx"]
     N_HOPS = n_hops or n_hopss[dataset]
-    FAST = fast if fast is not None else (name not in BATCH_LOAD)
+    N_LAYERS = n_layers or n_layerss[dataset]
+    FAST = N_LAYERS == 1 and (fast if fast is not None else (name not in BATCH_LOAD))
     IN_config = INConf(name, N_HOPS, add_self_loop, rm_self_loop, True, row_norm, FAST)
 
-    N_LAYERS = n_layers or n_layerss[dataset]
     LR = lr if lr is not None else lrs[dataset]
     COEF = l2_coef if l2_coef is not None else l2_coefs[dataset]
     DNAS = nas_dropout or nas_dropouts[dataset]

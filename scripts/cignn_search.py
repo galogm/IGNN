@@ -63,7 +63,7 @@ DATASETS = {
 # fmt: off
 search_space = {
     "h_feats": [64, 128, 256, 512],
-    "n_layers": [1],
+    "n_layers": [1, 3, 5],
     "n_hops": [1, 3, 6, 8, 10, 16, 32, 64],
     # "agg_type": ["gcn", "gcn_incep", "sage", "gat"],
     "agg_type": ["gcn_incep"],
@@ -72,6 +72,7 @@ search_space = {
     # "RN": ["none", "concat", "attentive", "residual"],
     "RN": ["none", "concat"],
     "preln": [True, False],
+    "fast":  [True, False],
 
     "norm_type": ["bn", "ln", "none"],
     "act_type": ["relu", "prelu", "none"],
@@ -156,7 +157,6 @@ def objective(trial: optuna.trial.Trial, dataset, source, gpu, log_path, prune_f
     params = {
         "h_feats": trial.suggest_categorical("h_feats", search_space["h_feats"]),
         "n_layers": trial.suggest_categorical("n_layers", search_space["n_layers"]),
-        "n_hops": trial.suggest_categorical("n_hops", search_space["n_hops"]),
         "agg_type": trial.suggest_categorical("agg_type", search_space["agg_type"]),
         "IN": trial.suggest_categorical("IN", search_space["IN"]),
         "RN": trial.suggest_categorical("RN", search_space["RN"]),
@@ -171,6 +171,17 @@ def objective(trial: optuna.trial.Trial, dataset, source, gpu, log_path, prune_f
         "clf_dropout": trial.suggest_categorical("clf_dropout", search_space["clf_dropout"]),
         "early_stop": trial.suggest_categorical("early_stop", search_space["early_stop"]),
     }
+    params["n_hops"] = (
+        trial.suggest_categorical("n_hops", search_space["n_hops"])
+        if params["n_layers"] == 1
+        else 1
+    )
+
+    params["fast"] = (
+        trial.suggest_categorical("fast", search_space["fast"])
+        if params["n_layers"] == 1
+        else False
+    )
 
     cmd = [
         "python",
@@ -198,6 +209,7 @@ def objective(trial: optuna.trial.Trial, dataset, source, gpu, log_path, prune_f
         "--att_act_type", params["att_act_type"],
 
         "--preln", str(params["preln"]),
+        "--fast", str(params["fast"]),
 
         "--nas_dropout", str(params["nas_dropout"]),
         "--nss_dropout", str(params["nss_dropout"]),
@@ -317,7 +329,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_trials",
         type=int,
-        default=256,
+        default=128,
         help="Number of trials for the experiment (default: 256)",
     )
     parser.add_argument(

@@ -69,7 +69,11 @@ class IGNN(nn.Module):
             [
                 IGNNConv(
                     IN=IN,
-                    in_feats=in_feats if i == 0 else h_feats,
+                    in_feats=(
+                        in_feats
+                        if i == 0
+                        else (h_feats if RN != "none" else h_feats * (1 + n_hops))
+                    ),
                     h_feats=h_feats,
                     nas_dropout=nas_dropout,
                     nss_dropout=nss_dropout,
