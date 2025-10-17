@@ -3,7 +3,7 @@ Forked from https://github.com/cornell-zhang/Polynormer
 
 Parameter Search:
 ```bash
-id=0;model="c-IGNN";d=chameleon;gpu=$id;log_path=logs/$model/$d;mkdir -p $log_path;nohup python -u -m scripts.cignn_search --gpu=$gpu --metric=$metric --dataset=$d --n_trials=128 --n_jobs=3 > $log_path/$id.log 2>&1 & echo $!
+id=0;model="c-IGNN";d=chameleon;gpu=$id;log_path=logs/$model/$d;mkdir -p $log_path;nohup python -u -m scripts.cignn_search --gpu=$gpu --dataset=$d --n_trials=128 --n_jobs=3 > $log_path/$id.log 2>&1 & echo $!
 ```
 """
 
@@ -288,6 +288,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--metric",
         type=str,
+        default="acc",
         choices=["acc"],
         help='The metric type to use ("acc")',
     )
