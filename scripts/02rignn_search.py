@@ -1,7 +1,7 @@
 """
 Parameter Search:
 ```bash
-id=1;model="r-IGNN";d=chameleon;gpu=$id;log_path=logs/$model/$d;mkdir -p $log_path;nohup python -u -m scripts.rignn_search --gpu=$gpu --dataset=$d --n_trials=128 --n_jobs=3 > $log_path/$id.log 2>&1 & echo $!
+id=1;model="r-IGNN";d=chameleon;gpu=$id;log_path=logs/$model/$d;mkdir -p $log_path;nohup python -u -m scripts.02rignn_search --gpu=$gpu --dataset=$d --n_trials=128 --n_jobs=3 > $log_path/$id.log 2>&1 & echo $!
 ```
 """
 

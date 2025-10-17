@@ -38,9 +38,9 @@ Hyperparameter searching scripts for each IGNN variant across all datasets:
 
 | Variant | Script                                                   |
 | ------- | -------------------------------------------------------- |
-| c-IGNN  | [`./scripts/cignn_search.py`](./scripts/cignn_search.py) |
-| r-IGNN  | [`./scripts/rignn_search.py`](./scripts/rignn_search.py) |
-| a-IGNN  | [`./scripts/aignn_search.py`](./scripts/aignn_search.py) |
+| c-IGNN  | [`./scripts/01cignn_search.py`](./scripts/01cignn_search.py) |
+| r-IGNN  | [`./scripts02rignn_search.py`](./scripts/02rignn_search.py) |
+| a-IGNN  | [`./scripts/03aignn_search.py`](./scripts/03aignn_search.py) |
 
 ## Datasets and Splits
 
