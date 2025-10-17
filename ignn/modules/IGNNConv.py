@@ -122,7 +122,6 @@ class IGNNConv(nn.Module):
                 module.reset_parameters()
 
     def init_INs(self, IN, in_feats, h_feats, nas_dropout, nss_dropout, fast):
-        n_feats = in_feats if not self.lin else h_feats
         if IN == "IN-nSN":
             if self.RN == "none":
                 self.lin = nn.Sequential(
@@ -135,7 +134,7 @@ class IGNNConv(nn.Module):
                     [
                         nn.Sequential(
                             nn.Dropout(p=nas_dropout if not self.lin else nss_dropout),
-                            nn.Linear(n_feats, h_feats),
+                            nn.Linear(h_feats, h_feats),
                             NORM_DICT[self.norm_type](h_feats),
                             ACT_DICT[self.act_type],
                         )
@@ -145,7 +144,7 @@ class IGNNConv(nn.Module):
                     self.inceptive_agg.append(
                         nn.ModuleList(
                             [
-                                GNNConv(n_feats, n_feats, 0, "none", "none", self.agg_type),
+                                GNNConv(h_feats, h_feats, 0, "none", "none", self.agg_type),
                                 nn.Sequential(
                                     nn.Dropout(p=nas_dropout if not self.lin else nss_dropout),
                                     nn.Linear(in_feats, h_feats),
@@ -178,6 +177,7 @@ class IGNNConv(nn.Module):
                     NORM_DICT[self.norm_type](h_feats),
                     ACT_DICT[self.act_type],
                 )
+            n_feats = in_feats if not self.lin else h_feats
             self.inceptive_agg = nn.ModuleList(
                 [
                     nn.Sequential(
