@@ -284,7 +284,7 @@ def parse_ignn_args() -> argparse.Namespace:
     parser.add_argument(
         "-at",
         "--att_act_type",
-        choices=["tanh", "sigmoid", "softmax", None, "none"],
+        choices=["tanh", "sigmoid", "softmax", "relu", "prelu", "leakyrelu", "gelu", "none", None],
         type=str,
         default=None,
         help="act attentive",
