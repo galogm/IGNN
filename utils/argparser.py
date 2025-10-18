@@ -190,7 +190,7 @@ def parse_ignn_args() -> argparse.Namespace:
         "-p",
         "--num_parts",
         type=int,
-        default=3,
+        default=10,
         help="Graph partition parts for batch learning",
     )
     parser.add_argument(
@@ -338,6 +338,13 @@ def parse_ignn_args() -> argparse.Namespace:
         type=int,
         default=3000,
         help="maximum epochs",
+    )
+    parser.add_argument(
+        "-rp",
+        "--repeat",
+        type=int,
+        default=None,
+        help="repeats",
     )
     parser.add_argument(
         "-es",

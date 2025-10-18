@@ -70,6 +70,7 @@ def main(
     pre_lin=None,
     TRAIN_RATIO=48,
     VALID_RATIO=32,
+    repeat=None,
     VERSION="1.0",
     device=torch.device("cpu"),
 ):
@@ -138,7 +139,7 @@ def main(
     res_list_acc_joint = []
     tms = {"model": f"IGNN-{IN}-{RN}", "dataset": dataset, "hops": N_HOPS}
     ts = []
-    repeat = repeats[dataset.lower()]
+    repeat = repeat or repeats[dataset.lower()]
     for i in range(repeat):
         model = IGNN(in_feats=features.shape[1], n_clusters=n_clusters, device=device, **params)
 
@@ -247,6 +248,7 @@ if __name__ == "__main__":
         pre_lin=args.preln,
         TRAIN_RATIO=48,
         VALID_RATIO=32,
+        repeat=args.repeat,
         VERSION=args.version,
         device=DEVICE,
     )

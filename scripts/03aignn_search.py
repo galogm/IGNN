@@ -2,6 +2,8 @@
 Parameter Search:
 ```bash
 id=0;model="a-IGNN";d=chameleon;gpu=$id;log_path=logs/$model/$d;mkdir -p $log_path;nohup python -u -m scripts.03aignn_search --gpu=$gpu --dataset=$d --n_trials=128 --n_jobs=3 > $log_path/$id.log 2>&1 & echo $!
+
+id=0;model="a-IGNN";d=products;gpu=$id;log_path=logs/$model/$d;mkdir -p $log_path;nohup python -u -m scripts.03aignn_search --gpu=$gpu --dataset=$d --n_trials=64 --n_jobs=2 --repeat=1 > $log_path/$id.log 2>&1 & echo $!
 ```
 """
 
@@ -12,6 +14,7 @@ import os
 import re
 import subprocess
 import time
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -55,7 +58,8 @@ DATASETS = {
     "critical": ["chameleon", "squirrel", "roman-empire", "amazon-ratings"],
     "cola": ["flickr", "blogcatalog"],
     "pyg": ["pubmed", "photo", "actor", "wikics"],
-    "linkx": ["arxiv-year", "minesweeper", "ogbn-arxiv"],
+    "linkx": ["arxiv-year", "minesweeper", "pokec"],
+    "ogb": ["products", "arxiv"],
 }
 
 # fmt: off
@@ -85,6 +89,14 @@ search_space = {
     "early_stop": [50, 100, 150, 200],
 }
 # fmt: on
+
+n_epochs = defaultdict(
+    lambda: 3000,
+    {
+        "products": 300,
+        "pokec": 1200,
+    },
+)
 
 
 class GPUOutOfMemoryError(torch.cuda.OutOfMemoryError):
@@ -148,7 +160,9 @@ def should_retry(flag_file_path: str) -> bool:
                 pass
 
 
-def objective(trial: optuna.trial.Trial, dataset, source, gpu, log_path, prune_fail_pruned=True):
+def objective(
+    trial: optuna.trial.Trial, dataset, source, gpu, log_path, prune_fail_pruned=True, repeat=None
+):
     trial_id = trial.number
 
     # fmt: off
@@ -191,7 +205,7 @@ def objective(trial: optuna.trial.Trial, dataset, source, gpu, log_path, prune_f
         "--dataset", dataset,
         "--source", source,
         "--model", "ignn",
-        "--n_epochs", str(3000),
+        "--n_epochs", str(n_epochs[dataset]),
         "--agg_type", params["agg_type"],
         "--IN", params["IN"],
         "--h_feats", str(params["h_feats"]),
@@ -213,6 +227,10 @@ def objective(trial: optuna.trial.Trial, dataset, source, gpu, log_path, prune_f
         "--hid_dropout", str(params["hid_dropout"]),
         "--clf_dropout", str(params["clf_dropout"]),
     ]
+
+    if repeat is not None:
+        cmd.append("--repeat")
+        cmd.append(str(repeat))
     # fmt: on
 
     logger.info("Trial %d: %s", trial_id, " ".join(cmd))
@@ -303,6 +321,12 @@ if __name__ == "__main__":
         help='The metric type to use ("acc")',
     )
     parser.add_argument(
+        "--repeat",
+        type=int,
+        default=None,
+        help="repeat",
+    )
+    parser.add_argument(
         "--dataset",
         type=str,
         choices=[
@@ -320,7 +344,9 @@ if __name__ == "__main__":
             "citeseer",
             "cora",
             "minesweeper",
-            "ogbn-arxiv",
+            "arxiv",
+            "products",
+            "pokec",
         ],
         help="The name of the dataset to process",
     )
@@ -342,6 +368,7 @@ if __name__ == "__main__":
     d = args.dataset
     n_trials: int = args.n_trials
     n_jobs: int = args.n_jobs
+    repeat = args.repeat
 
     source_category = find_source_by_dataset(d)
 
@@ -367,6 +394,7 @@ if __name__ == "__main__":
                 source=source_category,
                 gpu=gpu_number,
                 log_path=log_path,
+                repeat=repeat,
             ),
             n_trials=n_trials,
             n_jobs=n_jobs,
@@ -415,6 +443,7 @@ if __name__ == "__main__":
                             gpu=gpu_number,
                             log_path=log_path,
                             prune_fail_pruned=False,
+                            repeat=repeat,
                         ),
                         n_trials=trials_enqueued,
                         n_jobs=1,
