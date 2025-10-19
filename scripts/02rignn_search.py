@@ -98,6 +98,22 @@ n_epochs = defaultdict(
     },
 )
 
+eval_interval = defaultdict(
+    lambda: 1,
+    {
+        "pokec": 5,
+        "products": 3,
+    },
+)
+
+eval_start = defaultdict(
+    lambda: 0,
+    {
+        "pokec": 1200,
+        "products": 250,
+    },
+)
+
 
 class GPUOutOfMemoryError(torch.cuda.OutOfMemoryError):
     """Custom exception for GPU Out-of-Memory errors."""
@@ -226,6 +242,9 @@ def objective(
         "--pre_dropout", str(params["pre_dropout"]),
         "--hid_dropout", str(params["hid_dropout"]),
         "--clf_dropout", str(params["clf_dropout"]),
+
+        "--eval_interval", str(eval_interval[dataset]),
+        "--eval_start", str(eval_start[dataset]),
     ]
 
     if repeat is not None:
