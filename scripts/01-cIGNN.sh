@@ -1,6 +1,6 @@
 # Tesla V100, with Python 3.9.15, PyTorch 2.0.1, and Cuda 11.7
 
-python -u -m main --gpu_id 0 --seed 42 --dataset actor --source pyg --model ignn --n_epochs 3000 --agg_type gcn_incep --IN IN-SN --h_feats 512 --lr 0.001 --l2_coef 0.0 --n_hops 1 --n_layers 1 --early_stop 100 --RN concat --norm_type none --act_type relu --preln False --fast False --pre_dropout 0.0 --hid_dropout 0.8 --clf_dropout 0.9
+python -u -m main --gpu_id 0 --seed 42 --dataset actor --source pyg --model ignn --n_epochs 3000 --agg_type gcn_incep --IN IN-SN --h_feats 512 --lr 0.001 --l2_coef 0.0 --n_hops 1 --n_layers 1 --early_stop 100 --RN concat --norm_type ln --act_type relu --preln False --fast False --pre_dropout 0.0 --hid_dropout 0.8 --clf_dropout 0.9
 
 python -u -m main --gpu_id 3 --seed 42 --dataset chameleon --source critical --model ignn --n_epochs 3000 --agg_type gcn_incep --IN IN-SN --h_feats 64 --lr 0.001 --l2_coef 0.0 --n_hops 1 --n_layers 5 --early_stop 150 --RN concat --norm_type none --act_type none --preln True --fast False --pre_dropout 0.8 --hid_dropout 0.3 --clf_dropout 0.3
 
