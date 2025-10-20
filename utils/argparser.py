@@ -333,6 +333,20 @@ def parse_ignn_args() -> argparse.Namespace:
         help="pre linear transformation",
     )
     parser.add_argument(
+        "-pub",
+        "--public",
+        type=lambda x: defaultdict(
+            lambda: False,
+            {
+                "True": True,
+                "False": False,
+            },
+        )[x],
+        choices=[True, False],
+        default=False,
+        help="use public splits",
+    )
+    parser.add_argument(
         "-ne",
         "--n_epochs",
         type=int,

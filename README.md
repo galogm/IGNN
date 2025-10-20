@@ -10,7 +10,7 @@ NeurIPS 25 Poster: [Making Classic GNNs Strong Baselines Across Varying Homophil
 
 **Requirements:**
 
-* Python ≥ 3.8
+* Python ≥ 3.8.16
 * See venv installation scripts: [`./.ci/install-dev.sh`](./.ci/install-dev.sh), [`./.ci/install.sh`](./.ci/install.sh)
 * Dependencies: [`./requirements-dev.txt`](./requirements-dev.txt), [`./requirements.txt`](./requirements.txt).
 
@@ -41,6 +41,22 @@ Hyperparameter searching scripts for each IGNN variant across all datasets:
 | c-IGNN  | [`./scripts/01cignn_search.py`](./scripts/01cignn_search.py) |
 | r-IGNN  | [`./scripts02rignn_search.py`](./scripts/02rignn_search.py) |
 | a-IGNN  | [`./scripts/03aignn_search.py`](./scripts/03aignn_search.py) |
+
+
+> [!important]
+> Our hyperparameter search was conducted under the following experimental setups:
+> 1. c-IGNNs and r-IGNNs were run on Tesla V100, with Python 3.9.15, PyTorch 2.0.1, and Cuda 11.7.
+> 2. a-IGNNs were run on RTX 3090, with Python 3.8.16, PyTorch 2.1.2, and Cuda 12.1.
+>
+> We observed **performance discrepancies when using the same hyperparameters across different versions of PyTorch, CUDA, and related dependencies**, as well as between CUDA devices (e.g., RTX 3090 vs. V100).
+>
+> For example, applying the same hyperparameters for Chameleon in [`./scripts/01-cIGNN.sh`](./scripts/01-cIGNN.sh) yielded `50.79 ± 4.92` under Setting 1 and `47.53 ± 3.36` under Setting 2, while those for amazon-ratings in [`./scripts/03-aIGNN.sh`](./scripts/03-aIGNN.sh) yielded `53.03 ±0.61 ` under Setting 2 and `52.93 ± 0.78` under Setting 1.
+>
+> Although all runs can achieve SOTA performance in our baseline comparisons with proper tuning despite these variations, **the optimal hyperparameters may vary across environments**.
+>
+
+> [!tip]
+> We **strongly recommend performing your own hyperparameter search** to achieve the best performance in your specific setup using the provided search scripts.
 
 ## Datasets and Splits
 

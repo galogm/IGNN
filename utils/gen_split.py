@@ -55,23 +55,24 @@ def get_splits(
     VALID_RATIO=None,
     DATA=None,
     labeled_idx=None,
+    public=False,
 ) -> Tuple[torch.BoolTensor, torch.BoolTensor, torch.BoolTensor]:
     train_mask = data.get("train_mask", None)
     val_mask = data.get("val_mask", None)
     test_mask = data.get("test_mask", None)
-    if train_mask is not None and name not in [
-        # "cora_pyg",
-        # "citeseer_pyg",
-        "actor_pyg",
-        "pubmed_pyg",
-        "wikics_pyg",
-        "arxiv-year_linkx",
-    ]:
+    if train_mask is not None and public:
+        if "ogb" in name or "pubmed" in name:
+            num = 1
+        else:
+            num = train_mask.shape[1]
+            train_mask = train_mask[:, i] if len(train_mask.shape) > 1 else train_mask
+            val_mask = val_mask[:, i] if len(val_mask.shape) > 1 else val_mask
+            test_mask = test_mask[:, i] if len(test_mask.shape) > 1 else test_mask
         onetime_reminder(
-            f"split num: {1} repeat time: {5}\n"
-            f"public split train:val:test = {train_mask.sum()/ num_nodes*100:.0f}:"
-            f"{val_mask.sum()/ num_nodes*100:.0f}:"
-            f"{test_mask.sum()/ num_nodes*100:.0f}\n"
+            f"split num: {num}; "
+            f"public split train:val:test = {train_mask.sum()/ num_nodes*100:.2f}:"
+            f"{val_mask.sum()/ num_nodes*100:.2f}:"
+            f"{test_mask.sum()/ num_nodes*100:.2f}"
         )
     elif name == "pokec_linkx":
         split = np.load("data/random_splits/fixed_splits/pokec-splits.npy", allow_pickle=True)

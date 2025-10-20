@@ -55,9 +55,9 @@ def main(
     n_epochs=2000,
     lr=0.001,
     l2_coef=5e-5,
-    pre_dropout=0.0,
-    hid_dropout=0.0,
-    clf_dropout=0.0,
+    pre_dropout=None,
+    hid_dropout=None,
+    clf_dropout=None,
     early_stop=None,
     num_parts=3,
     eval_interval=1,
@@ -71,6 +71,7 @@ def main(
     TRAIN_RATIO=48,
     VALID_RATIO=32,
     repeat=None,
+    public=False,
     VERSION="1.0",
     device=torch.device("cpu"),
 ):
@@ -102,9 +103,9 @@ def main(
 
     LR = lr if lr is not None else lrs[dataset]
     COEF = l2_coef if l2_coef is not None else l2_coefs[dataset]
-    DNAS = pre_dropout or pre_dropouts[dataset]
-    DNSS = hid_dropout or hid_dropouts[dataset]
-    DCLF = clf_dropout or clf_dropouts[dataset]
+    DNAS = pre_dropout if pre_dropout is not None else pre_dropouts[dataset]
+    DNSS = hid_dropout if hid_dropout is not None else hid_dropouts[dataset]
+    DCLF = clf_dropout if clf_dropout is not None else clf_dropouts[dataset]
     PRE_LN = pre_lin if pre_lin is not None else (name in BATCH_LOAD)
     params = {
         "h_feats": h_feats or feats[dataset],
@@ -139,7 +140,7 @@ def main(
     res_list_acc_joint = []
     tms = {"model": f"IGNN-{IN}-{RN}", "dataset": dataset, "hops": N_HOPS}
     ts = []
-    repeat = repeat or repeats[dataset.lower()]
+    repeat = repeat if repeat is not None else repeats[dataset.lower()]
     for i in range(repeat):
         model = IGNN(in_feats=features.shape[1], n_clusters=n_clusters, device=device, **params)
 
@@ -147,13 +148,22 @@ def main(
         if name in BATCH_LOAD:
             if name == "pokec_linkx":
                 data["train_mask"], data["val_mask"], data["test_mask"] = get_splits(
-                    data, name, n_nodes, i, TRAIN_RATIO, VALID_RATIO, DATA_INFO, labeled_idx
+                    data, name, n_nodes, i, TRAIN_RATIO, VALID_RATIO, DATA_INFO, labeled_idx, public
                 )
             train_loader = RandomNodeLoader(data, num_parts=num_parts, shuffle=True, num_workers=5)
             test_loader = RandomNodeLoader(data, num_parts=1, num_workers=5)
         else:
             train_mask, val_mask, test_mask = get_splits(
-                data, name, n_nodes, i, repeat, TRAIN_RATIO, VALID_RATIO, DATA_INFO, labeled_idx
+                data,
+                name,
+                n_nodes,
+                i,
+                repeat,
+                TRAIN_RATIO,
+                VALID_RATIO,
+                DATA_INFO,
+                labeled_idx,
+                public,
             )
 
         tm = model.fit(
@@ -249,6 +259,7 @@ if __name__ == "__main__":
         TRAIN_RATIO=48,
         VALID_RATIO=32,
         repeat=args.repeat,
+        public=args.public,
         VERSION=args.version,
         device=DEVICE,
     )
