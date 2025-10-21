@@ -112,7 +112,7 @@ train_mask, val_mask, test_mask = get_splits(
 
 ## 🧩 Baselines
 
-The code for all 30 baselines is in [`./semi_heter/baselines/`](./semi_heter/baselines/):
+The code for all 30 baselines is in [`./benchmark/baselines`](./benchmark/baselines):
 
 * If a baseline has its **own folder**, a `search.py` script is included for hyperparameter tuning with `optuna`. See the `README.md` in the folder for details.
 * If a baseline does **not** have its own folder, it can be run with a script like [`./baselines.py`](./baselines.py), which can conveniently derive the corresponding `search.py` script.
