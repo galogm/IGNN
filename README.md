@@ -4,29 +4,23 @@
 
 </div>
 
-NeurIPS 25 Poster: [Making Classic GNNs Strong Baselines Across Varying Homophily: A Smoothness–Generalization Perspective](https://neurips.cc/virtual/2025/poster/118841).
+NeurIPS 25 Poster:
 
-## Installation
+[Making Classic GNNs Strong Baselines Across Varying Homophily: A Smoothness–Generalization Perspective](https://neurips.cc/virtual/2025/poster/118841).
 
-**Requirements:**
+## 🛠️ Installation
 
 * Python ≥ 3.8.16
-* See venv installation scripts: [`./.ci/install-dev.sh`](./.ci/install-dev.sh), [`./.ci/install.sh`](./.ci/install.sh)
-* Dependencies: [`./requirements-dev.txt`](./requirements-dev.txt), [`./requirements.txt`](./requirements.txt).
+* See virtual environment setup scripts:
+  * Development: [`./.ci/install-dev.sh`](./.ci/install-dev.sh)
+  * Production: [`./.ci/install.sh`](./.ci/install.sh)
+* Dependency lists:
+  * [`./requirements-dev.txt`](./requirements-dev.txt)
+  * [`./requirements.txt`](./requirements.txt)
 
-**Install scripts:**
+## 🚀 Usage
 
-```bash
-# Development environment
-$ bash .ci/install-dev.sh
-
-# Production environment
-$ bash .ci/install.sh
-```
-
-## Usage
-
-Running scripts for each IGNN variant across all datasets:
+Run each IGNN variant across all datasets using the following scripts:
 
 | Variant | Script                                           |
 | ------- | ------------------------------------------------ |
@@ -34,7 +28,8 @@ Running scripts for each IGNN variant across all datasets:
 | r-IGNN  | [`./scripts/02-rIGNN.sh`](./scripts/02-rIGNN.sh) |
 | a-IGNN  | [`./scripts/03-aIGNN.sh`](./scripts/03-aIGNN.sh) |
 
-Hyperparameter searching scripts for each IGNN variant across all datasets:
+
+Perform hyperparameter searches for each variant using:
 
 | Variant | Script                                                   |
 | ------- | -------------------------------------------------------- |
@@ -44,21 +39,26 @@ Hyperparameter searching scripts for each IGNN variant across all datasets:
 
 
 > [!important]
-> Our hyperparameter search was conducted under the following experimental setups:
+> Experimental setups for our reported results:
 > 1. c-IGNNs and r-IGNNs were run on Tesla V100, with Python 3.9.15, PyTorch 2.0.1, and Cuda 11.7.
 > 2. a-IGNNs were run on RTX 3090, with Python 3.8.16, PyTorch 2.1.2, and Cuda 12.1.
 >
-> We observed **performance discrepancies when using the same hyperparameters across different versions of PyTorch, CUDA, and related dependencies**, as well as between CUDA devices (e.g., RTX 3090 vs. V100).
+> We observed **performance discrepancies when using identical hyperparameters across different PyTorch/CUDA versions and GPU architectures (e.g., RTX 3090 vs. V100)**.
 >
-> For example, applying the same hyperparameters for Chameleon in [`./scripts/01-cIGNN.sh`](./scripts/01-cIGNN.sh) yielded `50.79 ± 4.92` under Setting 1 and `47.53 ± 3.36` under Setting 2, while those for amazon-ratings in [`./scripts/03-aIGNN.sh`](./scripts/03-aIGNN.sh) yielded `53.03 ±0.61 ` under Setting 2 and `52.93 ± 0.78` under Setting 1.
+> For instance:
+> - On Chameleon, the same config in [`./scripts/01-cIGNN.sh`](./scripts/01-cIGNN.sh) yielded `50.79 ± 4.92` (Setting 1) vs. `47.53 ± 3.36` (Setting 2)
+> - On Amazon-ratings , the same config in [`./scripts/03-aIGNN.sh`](./scripts/03-aIGNN.sh) yielded `53.03 ±0.61 ` (Setting 2) vs. `52.93 ± 0.78` (Setting 1)
 >
-> Although all runs can achieve SOTA performance in our baseline comparisons with proper tuning despite these variations, **the optimal hyperparameters may vary across environments**.
+> Although SOTA performance can be achieved under all environments with proper tuning, **optimal hyperparameters may differ across setups**.
 >
+
+- [`./scripts/search_our_split.sh`](./scripts/search_our_split.sh)
+- [`./scripts/search_public_split.sh`](./scripts/search_public_split.sh)
 
 > [!tip]
-> We **strongly recommend performing your own hyperparameter search** to achieve the best performance in your specific setup using the provided search scripts.
+> We **strongly recommend performing your own hyperparameter search** to achieve the best performance in your environment using the above provided search scripts.
 
-## Datasets and Splits
+## 📊 Datasets and Splits
 
 We use the open-source pip package [`graph_datasets`](https://github.com/galogm/graph_datasets) for unified data loading:
 
@@ -87,9 +87,9 @@ data = load_data(
 )
 ```
 
-To reduce variance across datasets caused by heterogeneous splitting policies, we use a **unified 10× random split scheme** with a **48%/32%/20%** train/validation/test ratio.
+To minimize variance from inconsistent split policies across datasets, we use a **unified 10× random split scheme** with a **48%/32%/20%** train/validation/test ratio.
 
-- For medium-size datasets, the splits are stored in [`./data/random_splits/fixed_splits/`](./data/random_splits/fixed_splits/) and can be loaded as follows:
+- For medium-size datasets, the splits are stored in [`./data/random_splits/fixed_splits/`](./data/random_splits/fixed_splits/) and can be loaded via:
 
 ```python
 from utils import get_splits
@@ -105,10 +105,10 @@ train_mask, val_mask, test_mask = get_splits(
 )
 ```
 
-- For large datasets, `OGB-arxiv` and `OGB_products` are using the public splits with `pokec` using the splits from [this previous work](https://github.com/cornell-zhang/Polynormer).
+- For large datasets, `OGB-arxiv` and `OGB_products` are using the public splits with `pokec` using the splits from [this work](https://github.com/cornell-zhang/Polynormer).
 
 
-## Baselines
+## 🧩 Baselines
 
 The code for all 30 baselines is in [`./semi_heter/baselines/`](./semi_heter/baselines/):
 
@@ -116,7 +116,7 @@ The code for all 30 baselines is in [`./semi_heter/baselines/`](./semi_heter/bas
 * If a baseline does **not** have its own folder, it can be run with a script like [`./baselines.py`](./baselines.py), which can conveniently derive the corresponding `search.py` script.
 * All search spaces used in the experiments are documented in [`./configs/search_grid.py`](./configs/search_grid.py).
 
-## Citation
+## 📚 Citation
 
 If you find this work useful, please cite our paper:
 ```kotlin
