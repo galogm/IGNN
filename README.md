@@ -89,24 +89,26 @@ data = load_data(
 
 To minimize variance from inconsistent split policies across datasets, we use a **unified 10× random split scheme** with a **48%/32%/20%** train/validation/test ratio.
 
-- For medium-size datasets, the splits are stored in [`./data/random_splits/fixed_splits/`](./data/random_splits/fixed_splits/) and can be loaded via:
-
+- For medium-size datasets, the splits are stored in [`./data/random_splits/fixed_splits/`](./data/random_splits/fixed_splits/).
+- For large datasets, `OGB-arxiv` and `OGB_products` are using the public splits with `pokec` using the splits from [this work](https://github.com/cornell-zhang/Polynormer).
+- All splits can be loaded via:
 ```python
 from utils import get_splits
 
+# `repeat` is the number of our/public splits
+# `i` is the index of the selected split
 train_mask, val_mask, test_mask = get_splits(
     data=data,
     name=data.name,
     n_nodes=data.num_nodes,
-    i=10,
+    i=1,
+    repeat=10,
     TRAIN_RATIO=48,
     VALID_RATIO=32,
-    DATA=DATA_INFO
+    DATA=DATA_INFO,
+    public=False,
 )
 ```
-
-- For large datasets, `OGB-arxiv` and `OGB_products` are using the public splits with `pokec` using the splits from [this work](https://github.com/cornell-zhang/Polynormer).
-
 
 ## 🧩 Baselines
 
