@@ -1,9 +1,13 @@
 """
 Parameter Search:
 ```bash
-id=0;model="c-IGNN";d=chameleon;gpu=$id;log_path=logs/$model/$d;mkdir -p $log_path;nohup python -u -m scripts.01cignn_search --gpu=$gpu --dataset=$d --n_trials=128 --n_jobs=3 > $log_path/$id.log 2>&1 & echo $!
+# search on unified 10x random splits
+id=0;model="c-IGNN";d=chameleon;gpu=$id;log_path=logs/$model;mkdir -p $log_path;nohup python -u -m scripts.01cignn_search --gpu=$gpu --dataset=$d --n_trials=128 --n_jobs=3 > $log_path/$id.log 2>&1 & echo $!
 
-id=0;model="c-IGNN";d=products;gpu=$id;log_path=logs/$model/$d;mkdir -p $log_path;nohup python -u -m scripts.01cignn_search --gpu=$gpu --dataset=$d --n_trials=64 --n_jobs=2 --repeat=1 > $log_path/$id.log 2>&1 & echo $!
+id=0;model="c-IGNN";d=products;gpu=$id;log_path=logs/$model;mkdir -p $log_path;nohup python -u -m scripts.01cignn_search --gpu=$gpu --dataset=$d --n_trials=64 --n_jobs=2 --repeat=1 > $log_path/$id.log 2>&1 & echo $!
+
+# search on public splits
+id=0;model="c-IGNN";d=chameleon;gpu=$id;log_path=logs/$model/public;mkdir -p $log_path;nohup python -u -m scripts.01cignn_search --gpu=$gpu --dataset=$d --n_trials=256 --n_jobs=3 --public True > $log_path/$id.log 2>&1 & echo $!
 ```
 """
 
@@ -78,10 +82,10 @@ search_space = {
 
     "norm_type": ["bn", "ln", "none"],
     "act_type": ["relu", "prelu", "none"],
-    # "att_act_type": ["tanh", "sigmoid", "softmax", "none"],
+    # "att_act_type": ["tanh", "sigmoid", "relu", "prelu", "leakyrelu", "gelu", "none"],
 
-    "lr": [0.001, 0.005, 0.01],
-    "l2_coef": [0.0, 5e-5, 1e-4, 5e-4, 1e-5],
+    "lr": [0.0001, 0.0005, 0.001, 0.005, 0.01],
+    "l2_coef": [0.0, 1e-5, 5e-5, 1e-4, 5e-4],
     "pre_dropout": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
     "hid_dropout": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
     "clf_dropout": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
@@ -177,7 +181,14 @@ def should_retry(flag_file_path: str) -> bool:
 
 
 def objective(
-    trial: optuna.trial.Trial, dataset, source, gpu, log_path, prune_fail_pruned=True, repeat=None
+    trial: optuna.trial.Trial,
+    dataset,
+    source,
+    gpu,
+    log_path,
+    prune_fail_pruned=True,
+    repeat=None,
+    public=False,
 ):
     trial_id = trial.number
 
@@ -245,6 +256,8 @@ def objective(
 
         "--eval_interval", str(eval_interval[dataset]),
         "--eval_start", str(eval_start[dataset]),
+
+        "--public", str(public),
     ]
 
     if repeat is not None:
@@ -340,6 +353,12 @@ if __name__ == "__main__":
         help='The metric type to use ("acc")',
     )
     parser.add_argument(
+        "--public",
+        type=lambda x: True if x == "True" else False,
+        default=False,
+        help="If True, use public splits. Otherwise use unified random 10x splits.",
+    )
+    parser.add_argument(
         "--repeat",
         type=int,
         default=None,
@@ -388,11 +407,18 @@ if __name__ == "__main__":
     n_trials: int = args.n_trials
     n_jobs: int = args.n_jobs
     repeat = args.repeat
+    public = args.public
 
     source_category = find_source_by_dataset(d)
 
-    LOCK_FILE_FLOCK = f"logs/{MODEL}/{d}/trails/{metric}.lock"
-    log_path = Path(f"logs/{MODEL}/{d}/trails")
+    LOCK_FILE_FLOCK = (
+        f"logs/{MODEL}/{d}/trails/{metric}.lock"
+        if not public
+        else f"logs/{MODEL}/public/{d}/trails/{metric}.lock"
+    )
+    log_path = (
+        Path(f"logs/{MODEL}/{d}/trails") if not public else Path(f"logs/{MODEL}/public/{d}/trails")
+    )
     os.makedirs(log_path, exist_ok=True)
     if source_category:
         storage = optuna.storages.RDBStorage(
@@ -414,6 +440,7 @@ if __name__ == "__main__":
                 gpu=gpu_number,
                 log_path=log_path,
                 repeat=repeat,
+                public=public,
             ),
             n_trials=n_trials,
             n_jobs=n_jobs,
@@ -463,6 +490,7 @@ if __name__ == "__main__":
                             log_path=log_path,
                             prune_fail_pruned=False,
                             repeat=repeat,
+                            public=public,
                         ),
                         n_trials=trials_enqueued,
                         n_jobs=1,
