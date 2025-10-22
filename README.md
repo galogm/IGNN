@@ -52,8 +52,8 @@ Perform hyperparameter searches for each variant using:
 > Although SOTA performance can be achieved under all environments with proper tuning, **optimal hyperparameters may differ across setups**.
 >
 
-- [`./scripts/search_our_split.sh`](./scripts/search_our_split.sh)
-- [`./scripts/search_public_split.sh`](./scripts/search_public_split.sh)
+- [`./scripts/00-search-ours-split.sh`](./scripts/00-search-ours-split.sh)
+- [`./scripts/00-search-public-split.sh`](./scripts/00-search-public-split.sh)
 
 > [!tip]
 > We **strongly recommend performing your own hyperparameter search** to achieve the best performance in your environment using the above provided search scripts.
@@ -117,6 +117,15 @@ The code for all 30 baselines is in [`./benchmark/baselines`](./benchmark/baseli
 * If a baseline has its **own folder**, a `search.py` script is included for hyperparameter tuning with `optuna`. See the `README.md` in the folder for details.
 * If a baseline does **not** have its own folder, it can be run with a script like [`./baselines.py`](./baselines.py), which can conveniently derive the corresponding `search.py` script.
 * All search spaces used in the experiments are documented in [`./configs/search_grid.py`](./configs/search_grid.py).
+
+## 📝 Empirical Analysis
+
+* The code for the empirical analysis is documented in  [`./scripts/dml.sh`](./scripts/dml.sh).
+* Run the analysis and draw the analysis plots via:
+```bash
+$ bash scripts/dml.sh squirrel critical False 10
+$ python -u -m scripts.merge
+```
 
 ## 📚 Citation
 

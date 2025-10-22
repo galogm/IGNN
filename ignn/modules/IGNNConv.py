@@ -8,11 +8,12 @@ from typing import Dict, Type
 import torch
 import torch.nn.functional as F
 from torch import nn
-from torch_geometric.nn import GATConv, GCNConv, SAGEConv
+from torch_geometric.nn import GATConv, SAGEConv
 from torch_sparse import remove_diag, set_diag
 from torch_sparse.tensor import SparseTensor
 
 from ..utils import get_logger
+from .GCNConv import GCNConv
 from .GCNIncep import GCNIncep
 
 logger = get_logger(__name__)
@@ -59,19 +60,15 @@ class GNNConv(torch.nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.normalization = NORM_DICT[norm_type](in_channels)
         self.activation = ACT_DICT[act_type]
-        self.conv = CONV_DICT[agg_type](in_channels, out_channels)
+        self.conv = CONV_DICT[agg_type](
+            in_channels, out_channels, normalization=self.normalization, act=self.activation
+        )
 
     def reset_parameters(self):
         self.conv.reset_parameters()
-        if hasattr(self.normalization, "reset_parameters"):
-            self.normalization.reset_parameters()
-        if hasattr(self.activation, "reset_parameters"):
-            self.activation.reset_parameters()
 
     def forward(self, x, edge_index):
         x = self.conv(x, edge_index)
-        x = self.normalization(x)
-        self.activation(x)
         return self.dropout(x)
 
 
@@ -125,7 +122,23 @@ class IGNNConv(nn.Module):
                 module.reset_parameters()
 
     def init_INs(self, IN, in_feats, h_feats, pre_dropout, hid_dropout, fast):
-        if IN == "IN-nSN":
+        if IN == "nIN-nSN":
+            assert (
+                self.RN == "none" and self.agg_type == "gcn"
+            ), f"{IN} only supports RN==none and agg_type==gcn."
+            self.inceptive_agg = nn.ModuleList()
+            for i in range(self.n_hops + 1):
+                self.inceptive_agg.append(
+                    GNNConv(h_feats, h_feats, 0, "none", self.act_type, "gcn")
+                    if i != 0
+                    else nn.Sequential(
+                        nn.Dropout(p=pre_dropout),
+                        nn.Linear(in_feats, h_feats),
+                        NORM_DICT[self.norm_type](h_feats),
+                        ACT_DICT[self.act_type],
+                    )
+                )
+        elif IN == "IN-nSN":
             if self.RN == "none":
                 self.lin = nn.Sequential(
                     nn.Dropout(p=pre_dropout),
@@ -248,6 +261,19 @@ class IGNNConv(nn.Module):
                 row=edge_index[0].long(), col=edge_index[1].long(), sparse_sizes=(n_nodes, n_nodes)
             )
 
+        if self.IN == "nIN-nSN":
+            if self.RN == "none":
+                h = self.inceptive_agg[0](features)
+                if hiddens:
+                    hs = [h.detach().clone()]
+                for i in range(1, self.n_hops + 1):
+                    h = self.inceptive_agg[i](x=h, edge_index=edge_index)
+                    if hiddens:
+                        hs.append(h.detach().clone())
+
+                # NOTE: GCN - ❌ IN ❌ SN ❌ RN
+                return (h, hs) if hiddens else h
+
         if self.IN == "IN-nSN":
             if self.RN == "residual":
                 h = self.inceptive_agg[0](features)
@@ -322,15 +348,10 @@ class IGNNConv(nn.Module):
         raise ValueError(f"Either IN: {self.IN} or RN: {self.RN} is not valid.")
 
     def get_Ws(self):
-        if self.RN in ["none", "residual"]:
+        if self.RN in ["residual", "none"]:
             Ws = [self.inceptive_agg[0][1].weight.detach().clone()]
             for i in range(1, len(self.inceptive_agg)):
-                Ws.append(self.inceptive_agg[i].lin.weight.detach().clone())
-            return Ws
-        if self.RN == "attentive":
-            Ws = [self.inceptive_agg[0][1].weight.detach().clone()]
-            for i in range(1, len(self.nei_rel_learn)):
-                Ws.append(self.nei_rel_learn[i][1].weight.detach().clone())
+                Ws.append(self.inceptive_agg[i].conv.lin.weight.detach().clone())
             return Ws
 
         if self.RN == "concat":

@@ -92,7 +92,9 @@ class IGNN(nn.Module):
 
         self.classifier = nn.Sequential(
             nn.Dropout(p=clf_dropout),
-            nn.Linear(h_feats if RN != "none" else h_feats * (n_hops + 1), n_clusters),
+            nn.Linear(
+                h_feats if (RN != "none" or IN == "nIN-nSN") else h_feats * (n_hops + 1), n_clusters
+            ),
         )
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.l2_coef)
 

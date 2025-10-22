@@ -226,7 +226,7 @@ def parse_ignn_args() -> argparse.Namespace:
         "-IN",
         "--IN",
         type=str,
-        choices=["IN-SN", "IN-nSN"],
+        choices=["IN-SN", "IN-nSN", "nIN-nSN"],
         default="IN-SN",
         help="IN",
     )

@@ -1,6 +1,7 @@
 """IGNN"""
 
 # pylint: disable=unused-import,line-too-long,unused-argument,too-many-locals,invalid-name,too-many-statements, duplicate-code
+import logging
 import time
 
 import numpy as np
@@ -36,8 +37,13 @@ from ignn.models import IGNN
 from ignn.utils import metric
 from utils import get_splits, parse_ignn_args, read_configs
 
-torch.set_printoptions(threshold=10_000)
-np.set_printoptions(threshold=10_000)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="[%(levelname)1.1s %(asctime)s %(name)s:%(lineno)d] %(message)s",
+    handlers=[logging.StreamHandler()],
+)
+
+logger = logging.getLogger(__name__)
 
 
 # pylint: disable=too-many-branches
@@ -53,32 +59,34 @@ def main(
     n_epochs=2000,
     lr=0.001,
     l2_coef=5e-5,
-    pre_dropout=0.0,
-    hid_dropout=0.0,
-    clf_dropout=0.0,
+    pre_dropout=None,
+    hid_dropout=None,
+    clf_dropout=None,
     early_stop=None,
     num_parts=3,
     eval_interval=1,
     eval_start=0,
-    norm=None,
-    act_att="tanh",
+    norm_type=None,
+    att_act_type="tanh",
+    act_type="relu",
+    agg_type="gcn_incep",
+    fast=None,
+    pre_lin=None,
     TRAIN_RATIO=48,
     VALID_RATIO=32,
+    repeat=None,
+    public=False,
     VERSION="1.0",
     device=torch.device("cpu"),
 ):
     DATA_INFO = DataConf(**read_configs("data"))
+    add_self_loop = RN != "attentive" or self_loop_attentive[dataset]
+    rm_self_loop = False if RN != "attentive" else (not self_loop_attentive[dataset])
+    simple = dataset not in ["products", "arxiv-year"]
+    row_norm = pre_norms[dataset]
+
     data = load_data(
-        dataset_name=dataset,
-        source=source,
-        directory=DATA_INFO.DATA_DIR,
-        row_normalize=pre_norms[dataset],
-        rm_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
-        add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
-        # products and arxiv-year are already simple graphs
-        to_simple=dataset not in ["products", "arxiv-year"],
-        verbosity=1,
-        return_type="pyg",
+        dataset, DATA_INFO.DATA_DIR, 3, source, "pyg", row_norm, rm_self_loop, add_self_loop, simple
     )
     label = data.y
     n_clusters = data.num_classes
@@ -86,56 +94,43 @@ def main(
     edge_index = data.edge_index
     features = data.x
     name = data.name
-    if name == "core_pyg":
-        features[(features - 0.0) > 0.0] = 1.0
-
     labeled_idx = torch.where(label != -1)[0] if dataset in ["wiki", "Penn94", "pokec"] else None
-    n_clusters = 2 if dataset == "pokec" else n_clusters
-    n_clusters = n_clusters if dataset not in ["proteins"] else label.shape[1]
-
-    repeat = repeats[dataset.lower()]
-
-    N_HOPS = n_hops if n_hops is not None else n_hopss[dataset]
-    N_LAYERS = (
-        n_layers
-        if n_layers is not None
-        else n_layerss[dataset] if RN not in ["residual", "attentive"] else 1
+    n_clusters = (
+        label.shape[1] if dataset == "proteins" else (2 if dataset == "pokec" else n_clusters)
     )
+
+    BATCH_LOAD = ["products_ogb", "pokec_linkx"]
+    N_HOPS = n_hops or n_hopss[dataset]
+    N_LAYERS = n_layers or n_layerss[dataset]
+    FAST = N_LAYERS == 1 and (fast if fast is not None else (name not in BATCH_LOAD))
+    IN_config = INConf(name, N_HOPS, add_self_loop, rm_self_loop, True, row_norm, FAST)
+
     LR = lr if lr is not None else lrs[dataset]
     COEF = l2_coef if l2_coef is not None else l2_coefs[dataset]
     DNAS = pre_dropout if pre_dropout is not None else pre_dropouts[dataset]
     DNSS = hid_dropout if hid_dropout is not None else hid_dropouts[dataset]
     DCLF = clf_dropout if clf_dropout is not None else clf_dropouts[dataset]
-    IN_config = INConf(
-        n_hops=N_HOPS,
-        add_self_loop=True if RN != "attentive" else self_loop_attentive[dataset],
-        remove_self_loop=False if RN != "attentive" else (not self_loop_attentive[dataset]),
-        symm_norm=True,
-        row_normalized=pre_norms[dataset],
-        fast=False,
-        name=name,
-    )
+    PRE_LN = pre_lin if pre_lin is not None else (name in BATCH_LOAD)
     params = {
-        "IN": IN,
-        "RN": RN if RN is not None else RNs[dataset],
+        "h_feats": h_feats or feats[dataset],
+        "n_epochs": n_epochs,
         "lr": LR,
-        "h_feats": h_feats if h_feats is not None else feats[dataset],
         "l2_coef": COEF,
+        "early_stop": early_stop or ess[dataset],  # early_stop or
         "pre_dropout": DNAS,
         "hid_dropout": DNSS,
         "clf_dropout": DCLF,
-        "n_epochs": n_epochs,
         "n_hops": N_HOPS,
+        "IN": IN,
+        "RN": RN or RNs[dataset],
         "n_layers": N_LAYERS,
-        "early_stop": early_stop or ess[dataset],
-        "act_type": acts[dataset],
-        "norm_type": (
-            None
-            if norm is False
-            else norm or (att_norms[dataset] if RN == "attentive" else norms[dataset])
-        ),
         "loss": "ce" if dataset not in ["proteins"] else "bce",
-        "att_act_type": act_att,
+        "fast": IN_config.fast,
+        "pre_lin": PRE_LN,
+        "norm_type": norm_type or (att_norms[dataset] if RN == "attentive" else norms[dataset]),
+        "agg_type": agg_type,
+        "act_type": act_type or acts[dataset],  # act_type or
+        "att_act_type": att_act_type,
     }
     params_all = {
         "eval_start": eval_start,
@@ -143,38 +138,25 @@ def main(
         "IN_config": IN_config,
         **params,
     }
-    tab_printer({**params_all})
+    logger.info("\n%s", tab_printer({**params_all}, verbose=0))
 
     t_start = time.time()
-
-    # seed_list = [random.randint(0, 99999) for i in range(repeat)]
-
     res_list_acc_joint = []
-
     tms = {"model": f"IGNN-{IN}-{RN}", "dataset": dataset, "hops": N_HOPS}
     ts = []
+    repeat = repeat if repeat is not None else repeats[dataset.lower()]
 
     W_normss = []
     H_dms = []
     Ls = []
-
     for i in range(repeat):
-        # set_seed(seed_list[i])
         model = IGNN(in_feats=features.shape[1], n_clusters=n_clusters, device=device, **params)
 
         train_mask = val_mask = test_mask = train_loader = test_loader = None
-        batch_list = ["products_ogb", "pokec_linkx"]
-        if name in batch_list:
+        if name in BATCH_LOAD:
             if name == "pokec_linkx":
                 data["train_mask"], data["val_mask"], data["test_mask"] = get_splits(
-                    data,
-                    name,
-                    n_nodes,
-                    i,
-                    TRAIN_RATIO=TRAIN_RATIO,
-                    VALID_RATIO=VALID_RATIO,
-                    DATA=DATA_INFO,
-                    labeled_idx=labeled_idx,
+                    data, name, n_nodes, i, TRAIN_RATIO, VALID_RATIO, DATA_INFO, labeled_idx, public
                 )
             train_loader = RandomNodeLoader(data, num_parts=num_parts, shuffle=True, num_workers=5)
             test_loader = RandomNodeLoader(data, num_parts=1, num_workers=5)
@@ -184,25 +166,28 @@ def main(
                 name,
                 n_nodes,
                 i,
-                TRAIN_RATIO=TRAIN_RATIO,
-                VALID_RATIO=VALID_RATIO,
-                DATA=DATA_INFO,
-                labeled_idx=labeled_idx,
+                repeat,
+                TRAIN_RATIO,
+                VALID_RATIO,
+                DATA_INFO,
+                labeled_idx,
+                public,
             )
 
         tm = model.fit(
-            edge_index=edge_index,
-            features=features,
-            labels=label,
-            IN_config=IN_config,
-            train_loader=train_loader,
-            test_loader=test_loader,
-            train_mask=train_mask,
-            val_mask=val_mask,
-            test_mask=test_mask,
+            edge_index,
+            features,
+            label,
+            IN_config,
+            train_loader,
+            test_loader,
+            train_mask,
+            val_mask,
+            test_mask,
+            eval_interval,
+            eval_start,
+            save_state=False,
             device=device,
-            eval_interval=eval_interval,
-            eval_start=eval_start,
         )
 
         with torch.no_grad():
@@ -294,7 +279,7 @@ def main(
     Ls = f"{Ls.mean():.2f}±{Ls.std():.2f}"
 
     save_to_csv_files(
-        results={"model": f"IGNN-{IN}-{RN}", "dataset": dataset, "hops": N_HOPS},
+        results={"model": MODEL, "dataset": dataset, "hops": N_HOPS},
         append_info={
             "Ls": Ls,
             "H_dms_m": H_dms.mean(axis=0),
@@ -354,10 +339,16 @@ if __name__ == "__main__":
         num_parts=args.num_parts,
         eval_interval=args.eval_interval,
         eval_start=args.eval_start,
-        act_att=args.act_att,
-        norm=args.norm,
+        att_act_type=args.att_act_type,
+        act_type=args.act_type,
+        norm_type=args.norm_type,
+        agg_type=args.agg_type,
+        fast=args.fast,
+        pre_lin=args.preln,
         TRAIN_RATIO=48,
         VALID_RATIO=32,
+        repeat=args.repeat,
+        public=args.public,
         VERSION=args.version,
         device=DEVICE,
     )

@@ -61,7 +61,7 @@ def get_splits(
     val_mask = data.get("val_mask", None)
     test_mask = data.get("test_mask", None)
     if train_mask is not None and public:
-        if "ogb" in name or "pubmed" in name:
+        if "ogb" in name or "pubmed" in name or "cora" in name:
             num = 1
         else:
             num = train_mask.shape[1]
