@@ -149,7 +149,7 @@ class IGNNConv(nn.Module):
                 self.inceptive_agg = nn.ModuleList(
                     [
                         nn.Sequential(
-                            nn.Dropout(p=pre_dropout if not self.lin else hid_dropout),
+                            nn.Dropout(p=hid_dropout),
                             nn.Linear(h_feats, h_feats),
                             NORM_DICT[self.norm_type](h_feats),
                             ACT_DICT[self.act_type],
@@ -162,8 +162,8 @@ class IGNNConv(nn.Module):
                             [
                                 GNNConv(h_feats, h_feats, 0, "none", "none", self.agg_type),
                                 nn.Sequential(
-                                    nn.Dropout(p=pre_dropout if not self.lin else hid_dropout),
-                                    nn.Linear(in_feats, h_feats),
+                                    nn.Dropout(hid_dropout),
+                                    nn.Linear(h_feats, h_feats),
                                     NORM_DICT[self.norm_type](h_feats),
                                     ACT_DICT[self.act_type],
                                 ),
@@ -182,6 +182,12 @@ class IGNNConv(nn.Module):
                     ]
                 )
                 for _ in range(self.n_hops):
+                    # NOTE: Since our theoretical analysis omits LN/BN normalization and activation\
+                    # in the AGG hidden layers while allowing them in the final output layer, we follow\
+                    # this practice in the implementation of the three variants. Reintroducing normalization\
+                    # into the AGG hidden layers may further improve performance, as some studies have shown\
+                    # its role in mitigating oversmoothing. However, this restriction may also limit the model's\
+                    # ability to adaptively control smoothness, which we leave for future work.
                     self.inceptive_agg.append(
                         GNNConv(h_feats, h_feats, 0, "none", "none", self.agg_type)
                     )
@@ -214,6 +220,12 @@ class IGNNConv(nn.Module):
                     )
                     if fast
                     else nn.ModuleList(
+                        # NOTE: Since our theoretical analysis omits LN/BN normalization and activation\
+                        # in the AGG hidden layers while allowing them in the final output layer, we follow\
+                        # this practice in the implementation of the three variants. Reintroducing normalization\
+                        # into the AGG hidden layers may further improve performance, as some studies have shown\
+                        # its role in mitigating oversmoothing. However, this restriction may also limit the model's\
+                        # ability to adaptively control smoothness, which we leave for future work.
                         [
                             GNNConv(n_feats, n_feats, 0, "none", "none", self.agg_type),
                             nn.Sequential(
@@ -262,6 +274,7 @@ class IGNNConv(nn.Module):
             )
 
         if self.IN == "nIN-nSN":
+            # NOTE: GCN - ❌ IN ❌ SN ❌ RN
             if self.RN == "none":
                 h = self.inceptive_agg[0](features)
                 if hiddens:
@@ -270,11 +283,10 @@ class IGNNConv(nn.Module):
                     h = self.inceptive_agg[i](x=h, edge_index=edge_index)
                     if hiddens:
                         hs.append(h.detach().clone())
-
-                # NOTE: GCN - ❌ IN ❌ SN ❌ RN
                 return (h, hs) if hiddens else h
 
         if self.IN == "IN-nSN":
+            # NOTE: r-IGNN - ✅ IN ❌ SN ✅ RN
             if self.RN == "residual":
                 h = self.inceptive_agg[0](features)
                 if hiddens:
@@ -283,10 +295,9 @@ class IGNNConv(nn.Module):
                     h = self.inceptive_agg[i](x=h, edge_index=edge_index) + h
                     if hiddens:
                         hs.append(h.detach().clone())
-
-                # NOTE: r-IGNN - ✅ IN ❌ SN ✅ RN
                 return (h, hs) if hiddens else h
 
+            # NOTE: a-IGNN - ✅ IN ❌ SN ✅ RN
             if self.RN == "attentive":
                 h = self.inceptive_agg[0](features)
                 if hiddens:
@@ -297,20 +308,16 @@ class IGNNConv(nn.Module):
                     h = a * h_k + (1 - a) * h
                     if hiddens:
                         hs.append(h.detach().clone())
-
-                # NOTE: a-IGNN - ✅ IN ❌ SN ✅ RN
                 return (h, hs) if hiddens else h
 
+            # NOTE: SIGN w/o SN - ✅ IN ❌ SN ❌ RN
             if self.RN == "none":
-                if self.nei_feats is None:
-                    h = self.lin(features)
-                    ns = [self.inceptive_agg[0](h)]
-                    _h = h
-                    for i in range(1, self.n_hops + 1):
-                        _h = self.inceptive_agg[i][0](x=_h, edge_index=edge_index)
-                        ns.append(self.inceptive_agg[i][1](_h))
-
-                # NOTE: SIGN w/o SN - ✅ IN ❌ SN ❌ RN
+                h = self.lin(features)
+                ns = [self.inceptive_agg[0](h)]
+                _h = h
+                for i in range(1, self.n_hops + 1):
+                    _h = self.inceptive_agg[i][0](x=_h, edge_index=edge_index)
+                    ns.append(self.inceptive_agg[i][1](_h))
                 return torch.cat(ns, dim=1)
 
         if self.IN == "IN-SN":
@@ -341,7 +348,7 @@ class IGNNConv(nn.Module):
                     if hiddens
                     else self.nei_rel_learn(torch.cat(ns, dim=1))
                 ),
-                # NOTE: SIGN - ✅ IN ✅ SN ❌ RN
+                # NOTE: SIGN - ✅ IN ✅ SN 〰 RN (merged with SN)
                 "none": torch.cat(ns, dim=1),
             }[self.RN]
 

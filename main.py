@@ -106,7 +106,7 @@ def main(
     DNAS = pre_dropout if pre_dropout is not None else pre_dropouts[dataset]
     DNSS = hid_dropout if hid_dropout is not None else hid_dropouts[dataset]
     DCLF = clf_dropout if clf_dropout is not None else clf_dropouts[dataset]
-    PRE_LN = pre_lin if pre_lin is not None else (name in BATCH_LOAD)
+    PRE_LN = pre_lin if pre_lin is not None else (name in BATCH_LOAD and RN == "concat")
     params = {
         "h_feats": h_feats or feats[dataset],
         "n_epochs": n_epochs,
