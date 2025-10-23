@@ -31,30 +31,28 @@ Run each IGNN variant across all datasets using the following scripts:
 
 Perform hyperparameter searches for each variant using:
 
-| Variant | Script                                                   |
-| ------- | -------------------------------------------------------- |
+| Variant | Script                                                       |
+| ------- | ------------------------------------------------------------ |
 | c-IGNN  | [`./scripts/01cignn_search.py`](./scripts/01cignn_search.py) |
-| r-IGNN  | [`./scripts02rignn_search.py`](./scripts/02rignn_search.py) |
+| r-IGNN  | [`./scripts02rignn_search.py`](./scripts/02rignn_search.py)  |
 | a-IGNN  | [`./scripts/03aignn_search.py`](./scripts/03aignn_search.py) |
 
 
 > [!important]
 > Experimental setups for our reported results:
-> 1. c-IGNNs and r-IGNNs were run on Tesla V100, with Python 3.9.15, PyTorch 2.0.1, and Cuda 11.7.
-> 2. a-IGNNs were run on RTX 3090, with Python 3.8.16, PyTorch 2.1.2, and Cuda 12.1.
+> - [Setting 1] Tesla V100, with Python 3.9.15, PyTorch 2.0.1, and Cuda 11.7.
 >
-> We observed **performance discrepancies when using identical hyperparameters across different PyTorch/CUDA versions and GPU architectures (e.g., RTX 3090 vs. V100)**.
+> We observed **performance discrepancies when using identical hyperparameters across different PyTorch/CUDA versions and GPU architectures, e.g., V100 (Setting 1) vs. RTX 3090 (Setting 2)**.
+> - [Setting 2] RTX 3090, with Python 3.8.16, PyTorch 2.1.2, and Cuda 12.1.
 >
-> For instance:
-> - On Chameleon, the same config in [`./scripts/01-cIGNN.sh`](./scripts/01-cIGNN.sh) yielded `50.79 ± 4.92` (Setting 1) vs. `47.53 ± 3.36` (Setting 2)
-> - On Amazon-ratings , the same config in [`./scripts/03-aIGNN.sh`](./scripts/03-aIGNN.sh) yielded `53.03 ±0.61 ` (Setting 2) vs. `52.93 ± 0.78` (Setting 1)
->
+> For instance, on Chameleon, the same config in [`./scripts/01-cIGNN.sh`](./scripts/01-cIGNN.sh) yielded `50.79 ± 4.92` (Setting 1) vs. `47.53 ± 3.36` (Setting 2).
 > Although SOTA performance can be achieved under all environments with proper tuning, **optimal hyperparameters may differ across setups**.
 >
 
-- [`./scripts/00-search-ours-split.sh`](./scripts/00-search-ours-split.sh)
-- [`./scripts/00-search-public-split.sh`](./scripts/00-search-public-split.sh)
-
+| Split  | Search Script                                                                |
+| ------ | ---------------------------------------------------------------------------- |
+| Ours   | [`./scripts/00-search-ours-split.sh`](./scripts/00-search-ours-split.sh)     |
+| Public | [`./scripts/00-search-public-split.sh`](./scripts/00-search-public-split.sh) |
 > [!tip]
 > We **strongly recommend performing your own hyperparameter search** to achieve the best performance in your environment using the above provided search scripts.
 
